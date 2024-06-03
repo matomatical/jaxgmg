@@ -1,5 +1,8 @@
 Goal misgeneralisation benchmark environments
 =============================================
 
-Some environments for studying goal misgeneralisation. Explore with the
-command `python -m gmg_environments`.
+JAX-based environments and RL baselines for studying goal misgeneralisation.
+
+Install with `pip install TODO`.
+
+Explore with `python -m jaxgmg`.

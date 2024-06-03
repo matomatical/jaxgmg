@@ -4,7 +4,7 @@ version = "0.0.0"
 authors = [
     { name="Matthew Farrugia-Roberts", email="matthew@far.in.net" },
 ]
-description = "JAX-based environments and RL baselines demonstrating goal generalisation failures"
+description = "JAX-based environments and RL baselines for studying goal misgeneralisation."
 readme = "README.md"
 classifiers = [
     "Private :: Do Not Upload",
