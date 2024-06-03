@@ -7,10 +7,11 @@ import time
 
 import typer
 
+from jaxgmg.environments import maze_generation
+from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
-from jaxgmg.environments import cheese_in_the_corner
-from jaxgmg.environments import maze_generation
+from jaxgmg.environments import lava_land
 
 
 # # # 
@@ -441,6 +442,33 @@ def play_monsters(
     )
     
 
+def play_lava(
+    height: int                 = 13,
+    width: int                  = 9,
+    layout: str                 = 'edges',
+    prob_lava: float            = 0.01,
+    seed: int                   = 42,
+    debug: bool                 = False,
+):
+    print("monsters: interact with a random monster world level")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = lava_land.Env(rgb=True)
+    level_generator = lava_land.LevelGenerator(
+        height=height,
+        width=width,
+        layout=layout,
+        prob_lava=prob_lava,
+    )
+    play_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        debug=debug,
+    )
+    
+
 # # # 
 # SOLVING ENVIRONMENTS
 
@@ -793,6 +821,7 @@ app.command()(maze_direction)
 app.command()(play_corner)
 app.command()(play_keys)
 app.command()(play_monsters)
+app.command()(play_lava)
 
 # solve environments
 app.command()(solve_corner)
