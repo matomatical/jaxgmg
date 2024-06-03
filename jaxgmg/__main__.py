@@ -7,9 +7,10 @@ import time
 
 import typer
 
-from jaxgmg.environments import keys_and_chests
-from jaxgmg.environments import monster_world
 from jaxgmg.environments import cheese_in_the_corner
+from jaxgmg.environments import keys_and_chests
+from jaxgmg.environments import cheese_on_a_dish
+from jaxgmg.environments import monster_world
 from jaxgmg.environments import maze_generation
 
 
@@ -408,6 +409,33 @@ def play_keys(
     )
 
 
+def play_dish(
+    height: int                 = 13,
+    width: int                  = 9,
+    layout: str                 = 'tree',
+    max_cheese_radius: int      = 3,
+    seed: int                   = 42,
+    debug: bool                 = False,
+):
+    print("dish: interact with a random cheese on a dish level")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = cheese_on_a_dish.Env(rgb=True)
+    level_generator = cheese_on_a_dish.LevelGenerator(
+        height=height,
+        width=width,
+        layout=layout,
+        max_cheese_radius=max_cheese_radius,
+    )
+    play_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        debug=debug,
+    )
+
+
 def play_monsters(
     height: int                 = 13,
     width: int                  = 9,
@@ -585,22 +613,6 @@ def solve_keys(
     print_histogram(v)
     print('average optimal value:', v.mean())
     print('std dev optimal value:', v.std())
-
-
-def solve_monsters(
-    height: int                 = 13,
-    width: int                  = 9,
-    layout: str                 = 'open',
-    num_apples: int             = 5,
-    num_shields: int            = 5,
-    num_monsters: int           = 5,
-    monster_optimality: float   = 3,
-    penalize_time: bool         = True,
-    max_steps_in_episode: int   = 128,
-    discount_rate: float        = 0.995,
-    seed: int                   = 42,
-):
-    print("solve-monsters: not yet implemented, sorry")
 
     
 # # # 
@@ -792,12 +804,12 @@ app.command()(maze_direction)
 # play environments
 app.command()(play_corner)
 app.command()(play_keys)
+app.command()(play_dish)
 app.command()(play_monsters)
 
 # solve environments
 app.command()(solve_corner)
 app.command()(solve_keys)
-app.command()(solve_monsters) # TODO
 
 # mutate environments
 app.command()(mutate_corner)

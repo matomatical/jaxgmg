@@ -259,7 +259,7 @@ class Env(base.Env):
             # one object
             spritesheet.WALL,
             spritesheet.MOUSE,
-            spritesheet.CHEESE,
+            spritesheet.SMALL_CHEESE,
             spritesheet.DISH,
             # no objects
             spritesheet.PATH,
@@ -360,10 +360,10 @@ class LevelGenerator(base.LevelGenerator):
             dish_pos[0],
             dish_pos[1],
         ]
-        near_dish = (distance_to_dish <= self.max_cheese_radius)
+        near_dish = (distance_to_dish <= self.max_cheese_radius).flatten()
 
         rng_spawn_cheese, rng = jax.random.split(rng)
-        cheese_pos = coords[jax.random.choice(
+        cheese_pos = jax.random.choice(
             key=rng_spawn_cheese,
             a=coords,
             axis=0,
