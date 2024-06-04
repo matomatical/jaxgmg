@@ -7,10 +7,11 @@ import time
 
 import typer
 
+from jaxgmg.procgen import maze_generation
+
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import cheese_in_the_corner
-from jaxgmg.environments import maze_generation
 
 
 # # # 

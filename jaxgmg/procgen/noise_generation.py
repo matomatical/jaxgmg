@@ -3,7 +3,8 @@ JAX implementation of 2D perlin noise and associated fractal noise.
 
 Credits:
 
-* Closely based on Craftax's JAX implementation ()
+* Closely based on Craftax's JAX implementation
+  (https://github.com/MichaelTMatthews/Craftax/blob/main/craftax/craftax_classic/util/noise.py)
 * Which was, in turn, based on Pierre Vigier's numpy implementation
   (https://github.com/pvigier/perlin-numpy)
 """
