@@ -672,7 +672,7 @@ class LevelParser:
             default map is as follows:
             * The character '#' maps to `Env.Channel.WALL`.
             * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character 'c' maps to `Env.Channel.CHEESE`.
+            * The character '*' maps to `Env.Channel.CHEESE`.
             * The character '.' maps to `len(Env.Channel)`, i.e. none of the
               above, representing the absence of an item.
     """
@@ -696,7 +696,7 @@ class LevelParser:
         ... # # # # #
         ... # . . . #
         ... # @ # . #
-        ... # . . c #
+        ... # . . * #
         ... # # # # #
         ... ''')
         Level(
