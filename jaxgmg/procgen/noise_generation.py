@@ -90,7 +90,6 @@ def generate_perlin_noise(
 
     * noise : float[height, width]
         The noise grid, values between -1.0 and +1.0.
-
     """
     cell_height = height // num_rows
     cell_width = width // num_cols
@@ -183,32 +182,76 @@ def generate_perlin_noise(
     return noise
 
 
+@functools.partial(
+    jax.jit,
+    static_argnames=(
+        'height',
+        'width',
+        'base_num_rows',
+        'base_num_cols',
+        'num_octaves',
+        'interpolant',
+    ),
+)
 def generate_fractal_noise(
-    rng,
-    shape,
-    res,
-    octaves=1,
-    persistence=0.5,
-    lacunarity=2,
+    key,
+    height: int,
+    width: int,
+    base_num_rows: int,
+    base_num_cols: int,
+    num_octaves: int,
     interpolant=smootherstep,
-    override_angles=None,
 ):
-    noise = jnp.zeros(shape)
+    """
+    Two-dimensional fractal noise generated based on superimposing Perlin
+    noise.
+
+    Parameters:
+
+    * key : PRNGKey
+        RNG state used to generate angles. Consumed.
+    * height : int
+        Number of rows in the generated noise grid.
+    * width : int
+        Number of columns in the generated noise grid.
+    * base_num_rows : int
+        Number of rows in the largest macroscopic grid of cells used to
+        generate the first layer of noise.
+        Must divide height and must be divisble by 2^{num_octaves-1}.
+    * base_num_cols : int
+        Number of columns in the largest macroscopic grid of cells used to
+        generate the first layer of noise.
+        Must divide width and must be divisible by 2^{num_octaves-1}.
+    * num_octaves : int (>= 1)
+        Number of iterations of noise to superimpose.
+    * interpolant : function from [0.,1.] to [0.,1.] (e.g. smootherstep)
+        Function used to interpolate between the corners of each cell.
+
+    Returns:
+
+    * noise : float[height, width]
+        The noise grid, values between -1.0 and +1.0.
+    """
+    # accumulate noise of increasing frequency/resolution
+    noise = jnp.zeros((height, width))
     frequency = 1
     amplitude = 1
-    for _ in range(octaves):
-        rng, _rng = jax.random.split(rng)
-        noise += amplitude * generate_perlin_noise_2d(
-            _rng,
-            shape,
-            (frequency * res[0], frequency * res[1]),
-            interpolant,
-            override_angles=override_angles,
+    for _ in range(num_octaves):
+        k_octave, key = jax.random.split(key)
+        noise = noise + amplitude * generate_perlin_noise(
+            key=k_octave,
+            height=height,
+            width=width,
+            num_rows=frequency * base_num_rows,
+            num_cols=frequency * base_num_cols,
+            interpolant=interpolant,
         )
-        frequency *= lacunarity
-        amplitude *= persistence
+        frequency *= 2
+        amplitude *= 0.5
 
-    # Normalise
-    noise = (noise - noise.min()) / (noise.max() - noise.min())
+    # scale to the range [-1, 1]
+    # total_amplitude = 1.0 + 0.5 + 0.25 + ... + 0.5^{num_octaves-1}
+    total_amplitude = 2 - (0.5 ** (num_octaves-1))
+    noise = noise / total_amplitude
 
     return noise
