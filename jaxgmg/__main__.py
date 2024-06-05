@@ -7,10 +7,12 @@ import time
 
 import typer
 
+from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import noise_generation
+
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import cheese_in_the_corner
-from jaxgmg.environments import maze_generation
 
 
 # # # 
@@ -342,6 +344,56 @@ def maze_direction(
     }, colormap=sweetie16)
     print("the source is represented by the square in the macromaze")
     print("the target is represented by the square in the micromaze")
+
+
+# # # 
+# NOISE GENERATION FUNCTIONALITY
+
+
+def perlin_noise(
+    height: int = 64,
+    width:  int = 64,
+    num_rows: int = 8,
+    num_cols: int = 8,
+    seed: int = 42,
+):
+    print("perlin-noise: generate and visualise 2d perlin noise")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    noise = noise_generation.generate_perlin_noise(
+        key=rng,
+        height=height,
+        width=width,
+        num_rows=num_rows,
+        num_cols=num_cols,
+    )
+    noise_0to1 = (noise + 1) / 2
+    print(img2str(noise_0to1, colormap=viridis))
+
+
+def fractal_noise(
+    height: int = 64,
+    width:  int = 64,
+    base_num_rows: int = 8,
+    base_num_cols: int = 8,
+    num_octaves: int = 4,
+    seed: int = 42,
+):
+    print("fractal-noise: generate and visualise 2d fractal perlin noise")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    noise = noise_generation.generate_fractal_noise(
+        key=rng,
+        height=height,
+        width=width,
+        base_num_rows=base_num_rows,
+        base_num_cols=base_num_cols,
+        num_octaves=num_octaves,
+    )
+    noise_0to1 = (noise + 1) / 2
+    print(img2str(noise_0to1, colormap=viridis))
 
 
 # # # 
@@ -788,6 +840,10 @@ app = typer.Typer(
 app.command()(maze_gen)
 app.command()(maze_distance)
 app.command()(maze_direction)
+
+# noise generation
+app.command()(perlin_noise)
+app.command()(fractal_noise)
 
 # play environments
 app.command()(play_corner)

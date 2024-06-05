@@ -7,6 +7,8 @@ import jax
 import jax.numpy as jnp
 import einops
 
+from jaxgmg.procgen import noise_generation
+
 
 def get_generator_function(name):
     """
@@ -31,6 +33,8 @@ def get_generator_function(name):
         return generate_edge_maze
     elif name.lower() in {"block", "blocks"}:
         return generate_block_maze
+    elif name.lower() in {"noise"}:
+        return generate_noise_maze
     elif name.lower() in {"open", "empty"}:
         return generate_open_maze
     else:
@@ -233,13 +237,11 @@ def generate_edge_maze(key, h, w, edge_prob=0.75):
 
 
 @functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_block_maze(key, h, w, block_prob=0.2):
+def generate_noise_maze(key, h, w, threshold=0.25):
     """
     Generate an `h` by `w` binary gridworld including a 1-wall-thick border
-    around the perimiter and a random arrangement of blocks in the center.
-    
-    A block is placed in each center square independently with probability
-    `block_prob`.
+    around the perimiter and an arrangement of blocks in the center
+    determined by Perlin noise.
 
     Parameters:
 
@@ -249,8 +251,8 @@ def generate_block_maze(key, h, w, block_prob=0.2):
             height of the grid (num rows, >=3)
     * w : static int
             width of the grid (num columns, >=3)
-    * block_prob: float
-            independent probability of each square having a wall
+    * threshold : float (in range [-1, 1])
+            noise threshold above which a wall spawns
 
     Returns:
 
@@ -258,11 +260,47 @@ def generate_block_maze(key, h, w, block_prob=0.2):
             the binary grid (True indicates a wall, False indicates a path)
     """
     assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    grid = jnp.ones((h, w), dtype=bool)
-    grid = grid.at[1:-1,1:-1].set(
-        jax.random.bernoulli(key=key, p=block_prob, shape=(h-2, w-2))
+    # generate noise (next power of 2 size)
+    h_ = max(4, 2**(h - 1).bit_length())
+    w_ = max(4, 2**(w - 1).bit_length())
+    noise = noise_generation.generate_perlin_noise(
+        key=key,
+        height=h_,
+        width=w_,
+        num_rows=h_//4,
+        num_cols=w_//4,
     )
+    # use this to fill in a grid
+    grid = jnp.ones((h, w), dtype=bool)
+    grid = grid.at[1:-1,1:-1].set(noise[:h-2,:w-2] > threshold)
 
+    return grid
+
+
+@functools.partial(jax.jit, static_argnames=('h', 'w'))
+def generate_open_maze(key, h, w):
+    """
+    Generate an `h` by `w` binary gridworld including a 1-wall-thick border
+    around the perimeter.
+
+    Parameters:
+
+    * key : PRNGKey
+            unused (here for compatibility with other methods)
+    * h : static int
+            height of the grid (num rows, >=3)
+    * w : static int
+            width of the grid (num columns, >=3)
+
+    Returns:
+
+    * grid : bool[h, w]
+            the binary grid (True indicates a wall, False indicates a path)
+    """
+    assert h >= 3 and w >= 3, "dimensions must be at least 3"
+    grid = jnp.zeros((h, w), dtype=bool)
+    grid = grid.at[::h-1,:].set(True)
+    grid = grid.at[:,::w-1].set(True)
     return grid
 
 
