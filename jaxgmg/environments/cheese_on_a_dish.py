@@ -285,7 +285,7 @@ class LevelGenerator(base.LevelGenerator):
     * width : int (>= 3, odd)
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('tree', 'bernoulli', 'blocks', or 'open')
+    * layout : str ('tree', 'bernoulli', 'blocks', 'noise', or 'open')
             specifies the maze generation method to use (see module
             `maze_generation` for details)
     * max_cheese_radius : int (>=0)
@@ -299,7 +299,7 @@ class LevelGenerator(base.LevelGenerator):
     
     def __post_init__(self):
         # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open'}
+        assert self.layout in {'tree', 'edges', 'blocks', 'noise', 'open'}
         # validate dimensions
         assert self.height >= 3
         assert self.width >= 3
