@@ -396,7 +396,6 @@ def fractal_noise(
     print(img2str(noise_0to1, colormap=viridis))
 
 
-
 # # # 
 # ENVIRONMENTS
 
