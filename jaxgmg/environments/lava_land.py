@@ -29,8 +29,9 @@ import chex
 import einops
 from flax import struct
 
+from jaxgmg.procgen import maze_generation
+
 from jaxgmg.environments import base
-from jaxgmg.environments import maze_generation
 from jaxgmg.environments import spritesheet
 
 
