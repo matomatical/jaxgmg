@@ -30,6 +30,7 @@ import einops
 from flax import struct
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import noise_generation
 
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
@@ -281,13 +282,14 @@ class LevelGenerator(base.LevelGenerator):
     * layout : str ('tree', 'bernoulli', 'blocks', 'noise', or 'open')
             specifies the maze generation method to use (see module
             `maze_generation` for details)
-    * prob_lava : float (0.0 to 1.0, default 0.0):
-            free tiles will spawn lava independently with this probability.
+    * lava_threshold : float (-1.0 to +1.0, default -1.0):
+            unoccupied tiles will spawn lava where perlin noise falls below
+            this threshold (-1.0 means never, +1.0 means always)
     """
     height: int = 13
     width: int = 13
     layout : str = 'tree'
-    prob_lava: int = 0.0
+    lava_threshold: int = -0.25
     
     def __post_init__(self):
         # validate layout
@@ -299,7 +301,7 @@ class LevelGenerator(base.LevelGenerator):
             assert self.height % 2 == 1, "height must be odd for this layout"
             assert self.width % 2 == 1,  "width must be odd for this layout"
         # validate corner size
-        assert 0.0 <= self.prob_lava <= 1.0
+        assert -1.0 <= self.lava_threshold <= 1.0
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
@@ -354,11 +356,15 @@ class LevelGenerator(base.LevelGenerator):
         ].set(False)
 
         rng_lava, rng = jax.random.split(rng)
-        raw_lava_map = jax.random.bernoulli(
+        noise_height = max(4, 2**(self.height - 1).bit_length())
+        noise_width = max(4, 2**(self.width - 1).bit_length())
+        raw_lava_map = noise_generation.generate_perlin_noise(
             key=rng_lava,
-            p=self.prob_lava,
-            shape=(self.height,self.width),
-        )
+            height=noise_height,
+            width=noise_width,
+            num_cols=noise_height//4,
+            num_rows=noise_width//4,
+        )[:self.height,:self.width] < self.lava_threshold
         lava_map = (
             raw_lava_map
             & no_wall_map

@@ -526,7 +526,7 @@ def play_lava(
     height: int                 = 13,
     width: int                  = 9,
     layout: str                 = 'edges',
-    prob_lava: float            = 0.01,
+    lava_threshold: float       = -0.25,
     seed: int                   = 42,
     debug: bool                 = False,
 ):
@@ -539,7 +539,7 @@ def play_lava(
         height=height,
         width=width,
         layout=layout,
-        prob_lava=prob_lava,
+        lava_threshold=lava_threshold,
     )
     play_forever(
         rng=rng,
