@@ -34,15 +34,19 @@ Roadmap
 
 Core maze generation methods:
 
-* [ ]
+* [x] Kruskal's algorithm
+* [x] Random block mazes
+* [x] Perlin noise
+* [ ] Room-based on BSP-based? Tunnelling? Cellular automata? See notes
+      [here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/)
 
 Core environments:
 
 * [x] Cheese in the corner
 * [x] Keys and chests
 * [x] Monster world
-* [ ] Cheese on a dish
-* [ ] Lava land
+* [x] Cheese on a dish
+* [x] Lava land
 * [ ] Follow the leader (simplified 'cultural transmission')
 * [ ] Forest recovery
 
