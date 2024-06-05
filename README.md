@@ -26,7 +26,7 @@ Explore
 After installing run the following:
 
 ```
-python -m jaxgmg
+jaxgmg --help
 ```
 
 

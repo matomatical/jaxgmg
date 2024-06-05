@@ -639,20 +639,6 @@ def solve_keys(
     print('std dev optimal value:', v.std())
 
 
-def solve_monsters(
-    height: int                 = 13,
-    width: int                  = 9,
-    layout: str                 = 'open',
-    num_apples: int             = 5,
-    num_shields: int            = 5,
-    num_monsters: int           = 5,
-    monster_optimality: float   = 3,
-    penalize_time: bool         = True,
-    max_steps_in_episode: int   = 128,
-    discount_rate: float        = 0.995,
-    seed: int                   = 42,
-):
-    print("solve-monsters: not yet implemented, sorry")
 
     
 # # # 
@@ -853,7 +839,6 @@ app.command()(play_monsters)
 # solve environments
 app.command()(solve_corner)
 app.command()(solve_keys)
-app.command()(solve_monsters) # TODO
 
 # mutate environments
 app.command()(mutate_corner)
