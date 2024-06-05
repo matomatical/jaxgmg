@@ -25,6 +25,10 @@ CHEST               = _SPRITESHEET[1,1]
 MOUSE_ON_CHEST      = _SPRITESHEET[1,2]
 KEY_ON_WALL         = _SPRITESHEET[1,3]
 
+DISH                = _SPRITESHEET[1,4]
+SMALL_CHEESE        = _SPRITESHEET[1,5]
+CHEESE_ON_DISH      = _SPRITESHEET[1,6]
+
 APPLE               = _SPRITESHEET[2,0]
 SHIELD              = _SPRITESHEET[2,1]
 MONSTER             = _SPRITESHEET[2,2]
