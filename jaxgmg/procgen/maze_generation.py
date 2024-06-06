@@ -18,36 +18,53 @@ class MazeGenerator:
 
     Parameters:
 
-    * h: int (>= 3)
+    * height : int (>= 3)
         Maze height (number of rows in grid).
-    * w: int (>= 3)
+    * width : int (>= 3)
         Maze width (number of columns in grid).
     """
-    h: int
-    w: int
+    height: int
+    width: int
 
 
 @struct.dataclass
 class TreeMazeGenerator(MazeGenerator):
+    """
+    Generate tree mazes ('perfect mazes' or 'acyclic mazes') using Kruskal's
+    algorithm for finding a random spanning tree of a grid graph.
+
+    Parameters:
+
+    * height : int (>= 3)
+        Maze height (number of rows in grid).
+    * width : int (>= 3)
+        Maze width (number of columns in grid).
+    * alt_kruskal_algorithm : bool (default False)
+        Whether to use an alternative implementation of Kruskal's algorithm
+        (probably slower after JAX acceleration).
+    """
     alt_kruskal_algorithm: bool = False
 
     def __post_init__(self):
-        assert self.h >= 3 and self.w >= 3, "dimensions must be at least 3"
-        assert self.h % 2 == 1 and self.w % 2 == 1, "dimensions must be odd"
+        assert self.height >= 3, "height must be at least 3"
+        assert self.width >= 3, "width must be at least 3"
+        assert self.height % 2 == 1, "height must be odd"
+        assert self.width % 2 == 1,  "width must be odd"
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def generate(self, key):
         """
-        Generate an `h` by `w` binary gridworld including an acyclic maze.
+        Generate a `height` by `width` binary gridworld with a 1-wall thick
+        border and a random acyclic maze in the centre.
 
-        Assume `h` and `w` are odd integers and consider the 'junction'
-        squares (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1). These
-        squares form the nodes of a grid graph.
-
-        This function constructs a random spanning tree of this grid graph
-        using Kruskal's algorithm, and returns the corresponding binary
-        matrix.
+        Consider the 'junction' squares
+            
+            (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1).
+        
+        These squares form the nodes of a grid graph. This function
+        constructs a random spanning tree of this grid graph using Kruskal's
+        algorithm, and returns the corresponding binary matrix.
 
         Parameters:
 
@@ -56,12 +73,14 @@ class TreeMazeGenerator(MazeGenerator):
 
         Returns:
 
-        * grid : bool[h, w]
+        * grid : bool[height, width]
                 the binary grid (True indicates a wall, False indicates a
                 path)
+
+
         """
         # assign each 'junction' in the grid an integer node id
-        H, W = self.h // 2, self.w // 2
+        H, W = self.height // 2, self.width // 2
         nodes = jnp.arange(H * W)
         ngrid = nodes.reshape((H, W))
 
@@ -78,9 +97,9 @@ class TreeMazeGenerator(MazeGenerator):
             include_edges = self._kruskal(key, nodes, edges)
 
         # finally, generate the grid array
-        grid = jnp.ones((self.h, self.w), dtype=bool)   # start full
-        grid = grid.at[1::2,1::2].set(False)            # carve out junctions
-        include_edges_ijs = jnp.rint(jnp.stack((        # carve out edges
+        grid = jnp.ones((self.height, self.width), dtype=bool)
+        grid = grid.at[1::2,1::2].set(False)        # carve out junctions
+        include_edges_ijs = jnp.rint(jnp.stack((    # carve out edges
             include_edges // W,
             include_edges % W,
         )).mean(axis=-1) * 2 + 1).astype(int)
@@ -147,7 +166,7 @@ class TreeMazeGenerator(MazeGenerator):
     def _kruskal_alt(self, key, nodes, edges):
         """
         Alternative implementation of Kruskal's algorithm that is faster in
-        theory but apprently much slower in practice when acelerated and
+        theory but seems to be much slower in practice when acelerated and
         running in parallel on a GPU.
         """
         # initially each node is in its own subtree
@@ -210,6 +229,83 @@ class TreeMazeGenerator(MazeGenerator):
         return include_edges
 
 
+@struct.dataclass
+class EdgeMazeGenerator(MazeGenerator):
+    """
+    Generate edge mazes (random subgraph of a grid graph).
+
+    Parameters:
+
+    * height : int (>= 3)
+        Maze height (number of rows in grid).
+    * width : int (>= 3)
+        Maze width (number of columns in grid).
+    * edge_prob : float (probability, default 0.75).
+        Independent probability for each edge between grid nodes to be
+        available in the maze.
+        Default of 0.75 leads to mazes that are usually mostly connected
+        (except around some edges or corners).
+    """
+    edge_prob: float = 0.75
+
+    def __post_init__(self):
+        assert self.height >= 3, "height must be at least 3"
+        assert self.width >= 3, "width must be at least 3"
+        assert self.height % 2 == 1, "height must be odd"
+        assert self.width % 2 == 1,  "width must be odd"
+        assert 0.0 <= self.edge_prob <= 1.0, "edge_prob must be a probability"
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def generate(self, key):
+        """
+        Generate an `height` by `width` binary gridworld including a
+        1-wall-thick border around the perimiter and a grid graph with random
+        edges in the center.
+        
+        Consider the 'junction' squares
+
+            (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1).
+
+        These squares form the nodes of a grid graph. This function
+        constructs a random subgraph of this grid graph with each edge
+        included independently with probability `edge_prob`, and returns the
+        corresponding binary matrix.
+
+        Parameters:
+
+        * key : PRNGKey
+                RNG state (will be consumed).
+
+        Returns:
+
+        * grid : bool[height, width]
+                The binary grid (True indicates a wall, False indicates a
+                path).
+        """
+        H = self.height // 2
+        W = self.width // 2
+        grid = jnp.ones((self.height, self.width), dtype=bool)
+
+        # junctions
+        grid = grid.at[1:-1:2,1:-1:2].set(False)
+        
+        # edges
+        kh, kv = jax.random.split(key)
+        grid = grid.at[2:-2:2,1:-1:2].set(~jax.random.bernoulli(
+            key=kh,
+            p=self.edge_prob,
+            shape=(H-1, W),
+        ))
+        grid = grid.at[1:-1:2,2:-2:2].set(~jax.random.bernoulli(
+            key=kv,
+            p=self.edge_prob,
+            shape=(H, W-1),
+        ))
+
+        return grid
+
+
 def get_generator_function(name):
     """
     Maps a string descriptor of a maze generation method. Useful for handling
@@ -239,57 +335,6 @@ def get_generator_function(name):
         return generate_open_maze
     else:
         raise ValueError(f"Unknown maze generation method {name!r}")
-
-
-@functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_edge_maze(key, h, w, edge_prob=0.75):
-    """
-    Generate an `h` by `w` binary gridworld including a 1-wall-thick border
-    around the perimiter and a grid graph with random edges in the center.
-    
-    Assume `h` and `w` are odd integers and consider the 'junction' squares
-    (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1). These squares form the
-    nodes of a grid graph. This function constructs a random subgraph of this
-    grid graph with each edge included independently with probability
-    `edge_prob`, and returns the corresponding binary matrix.
-
-    Parameters:
-
-    * key : PRNGKey
-            RNG state (will be consumed)
-    * h : static int
-            height of the grid (num rows, odd, >=3)
-    * w : static int
-            width of the grid (num columns, odd, >=3)
-    * edge_prob: float
-            independent probability of each edge square having an edge (no wall)
-
-    Returns:
-
-    * grid : bool[h, w]
-            the binary grid (True indicates a wall, False indicates a path)
-    """
-    assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    assert h % 2 == 1 and w % 2 == 1, "dimensions must be odd"
-    H = h//2
-    W = w//2
-    grid = jnp.ones((h, w), dtype=bool)
-    # junctions
-    grid = grid.at[1:-1:2,1:-1:2].set(False)
-    # edges
-    kh, kv = jax.random.split(key)
-    grid = grid.at[2:-2:2,1:-1:2].set(~jax.random.bernoulli(
-        key=kh,
-        p=edge_prob,
-        shape=(H-1, W),
-    ))
-    grid = grid.at[1:-1:2,2:-2:2].set(~jax.random.bernoulli(
-        key=kv,
-        p=edge_prob,
-        shape=(H, W-1),
-    ))
-
-    return grid
 
 
 @functools.partial(jax.jit, static_argnames=('h', 'w'))
