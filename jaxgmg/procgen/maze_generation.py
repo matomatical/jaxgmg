@@ -11,39 +11,34 @@ from flax import struct
 from jaxgmg.procgen import noise_generation
 
 
-def get_generator_function(name):
+def get_generator_class(name):
     """
-    Maps a string descriptor of a maze generation method. Useful for handling
-    command line arguments.
+    Maps a string descriptor to a maze generator struct class.
 
     Parameters:
 
-    * name : str
-        * 'kruskal' or 'tree' for `generate_tree_maze`
-        * 'edge' for `generate_edge_maze`
-        * 'block' or 'blocks' for `generate_block_maze`
-        * 'open' or 'empty' for `generate_open_maze`
+    * name : str ("tree", "edges", "blocks", "noise", or "open")
+            The name of the generator.
 
     Returns:
 
-    * the above-listed maze generation function
+    * MazeGenerator : subclass of MazeGenerator
+            The class of the maze generator.
     """
-    if name.lower() in {"kruskal", "tree"}:
-        return generate_tree_maze
-    elif name.lower() in {"edges", "bernoulli"}:
-        return generate_edge_maze
-    elif name.lower() in {"block", "blocks"}:
-        return generate_block_maze
-    elif name.lower() in {"noise"}:
-        return generate_noise_maze
-    elif name.lower() in {"open", "empty"}:
-        return generate_open_maze
+
+    if name.lower() == "tree":
+        return TreeMazeGenerator
+    elif name.lower() == "edges":
+        return EdgeMazeGenerator
+    elif name.lower() == "blocks":
+        return BlockMazeGenerator
+    elif name.lower() == "noise":
+        return NoiseMazeGenerator
+    elif name.lower() == "open":
+        return OpenMazeGenerator
     else:
-        raise ValueError(f"Unknown maze generation method {name!r}")
+        raise ValueError(f"Unknown maze generator {name!r}")
 
-
-# # # 
-# GENERATING MAZES
 
 @struct.dataclass
 class MazeGenerator:
@@ -59,6 +54,14 @@ class MazeGenerator:
     """
     height: int
     width: int
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def generate(self, key):
+        """
+        Generate a `height` by `width` binary gridworld with a 1-wall thick
+        border and a maze of some kind in the interior.
+        """
+        raise NotImplementedError
 
 
 @struct.dataclass
@@ -343,7 +346,8 @@ class EdgeMazeGenerator(MazeGenerator):
 @struct.dataclass
 class NoiseMazeGenerator(MazeGenerator):
     """
-    Generate noise mazes (with walls locations determined by Perlin noise).
+    Generate noise mazes (with walls locations determined by Perlin noise
+    or associated fractal noise).
 
     Parameters:
 

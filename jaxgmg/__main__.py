@@ -351,8 +351,8 @@ def mazegen_open(
 
 def mazesoln_distance(
     layout: str = 'tree',
-    height: int = 5,
-    width:  int = 5,
+    height: int = 7,
+    width:  int = 7,
     seed: int = 42,
 ):
     print(
@@ -363,12 +363,12 @@ def mazesoln_distance(
 
     print("generating maze...")
     rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.get_generator_function(layout)
-    maze = gen(key=rng, h=height, w=width)
+    MazeGenerator = maze_generation.get_generator_class(layout)
+    maze = MazeGenerator(height=height, width=width).generate(key=rng)
     print(img2str(maze * .25))
 
     print("solving maze...")
-    dist = maze_generation.maze_distances(maze)
+    dist = maze_solving.maze_distances(maze)
 
     print("visualising solution...")
     # transform inf -> -inf, [0,max] -> [0.5,1.0] for visualisation
@@ -391,8 +391,8 @@ def mazesoln_distance(
 
 def mazesoln_direction(
     layout: str = 'tree',
-    height: int = 5,
-    width:  int = 5,
+    height: int = 7,
+    width:  int = 7,
     stay_action: bool = True,
     seed: int = 42,
 ):
@@ -404,12 +404,12 @@ def mazesoln_direction(
 
     print("generating maze...")
     rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.get_generator_function(layout)
-    maze = gen(key=rng, h=height, w=width)
+    MazeGenerator = maze_generation.get_generator_class(layout)
+    maze = MazeGenerator(height=height, width=width).generate(key=rng)
     print(img2str(maze * .25))
 
     print("solving maze...")
-    soln = maze_generation.maze_optimal_directions(maze, stay_action=stay_action)
+    soln = maze_solving.maze_optimal_directions(maze, stay_action=stay_action)
 
     print("visualising directions...")
     # transform {0,1,2,3} -> {1,2,3,4} and walls -> 0
@@ -763,7 +763,6 @@ def solve_keys(
     }, colormap=sweetie16)
 
     print("solving levels...")
-    
     v = jax.vmap(
         env.optimal_value,
         in_axes=(0,None),
