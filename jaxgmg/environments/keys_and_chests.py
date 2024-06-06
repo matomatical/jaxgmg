@@ -15,6 +15,8 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level from a configurable level distribution.
+* `LevelMutator` class, provides `mutate` method for mutating an existing
+  level with configurable mutations.
 * `LevelParser` class, provides a `parse` and `parse_batch` method for
   designing Level structs based on ASCII depictions.
 """
@@ -625,6 +627,359 @@ class LevelGenerator(base.LevelGenerator):
             inventory_map=inventory_map,
             hidden_keys=hidden_keys,
             hidden_chests=hidden_chests,
+        )
+
+
+@struct.dataclass
+class LevelMutator(base.LevelMutator):
+    """
+    Configurable level mutator. Provides a 'mutate' method that transforms a
+    level into a slightly different level, with the configured mutation
+    operations.
+
+    Parameters:
+
+    * prob_wall_spawn : float
+            Probability that a given interior (non-border) wall will despawn
+            during a mutation.
+    * prob_wall_despawn : float
+            Probability that a given blank space (with no wall, key, chest,
+            or mouse) will spawn a wall during a mutation.
+    * prob_scatter : float
+            Probability that a given item (key/chest/mouse spawn) will have
+            its position randomised during a mutation.
+    * max_steps : int (>= 0)
+            For each key, each chest, and the mouse spawn position, sample
+            this many directions and apply them to the position (unless that
+            would result in a collision with another item or with a wall).
+    * prob_num_keys_step : float
+    * num_keys_min : int (>= 0)
+    * num_keys_max : int (>= num_keys_min)
+            With `prob_num_keys_step`, each mutation may randomly increment
+            or decrement the number of active keys by one (each direction
+            occurs with probability `0.5 * prob_num_keys_step`).
+            The increment or decrement is then clamped to the range
+            `num_keys_min` to `num_keys_max` (inclusive), and also to not
+            exceed the number of keys supported by the shape of the level.
+    * prob_num_chests_step : float
+    * num_chests_min : int
+    * num_chests_max : int
+            With `prob_num_chests_step`, each mutation may randomly increment
+            or decrement the number of active chests by one (each direction
+            occurs with probability `0.5 * prob_num_chests_step`). The
+            increment or decrement is then clamped to the range
+            `num_chests_min` to `num_chests_max` (inclusive), and also to not
+            exceed the number of chests supported by the shape of the level.
+    
+    Notes:
+
+    * The wall mutations are applied first, then the scatter mutation, then
+      the step mutations are applied (stepwise, within each step the order is
+      mouse spawn, keys, then chests).
+    * The step mutations are implemented using a fully unrolled loop, which
+      should be slightly faster at the cost of slightly larger functions to
+      compile. This might become an issue if very large number of steps are
+      requested.
+    * As long as the input level initially has distinct locations for all
+      walls and entities (including hidden entities), and the initial number
+      of active (non-hidden) keys and chests are within the min/max ranges
+      specified to the mutator, then the mutation function should always
+      return a valid level. However, if these invariants are violated, then
+      it's possible that this method will return an invalid level.
+    """
+    prob_wall_spawn: float
+    prob_wall_despawn: float
+    prob_scatter: float
+    max_steps: int
+    prob_num_keys_step: float
+    num_keys_min: int
+    num_keys_max: int
+    prob_num_chests_step: float
+    num_chests_min: int
+    num_chests_max: int
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def mutate(self, rng: chex.PRNGKey, level: Level):
+        """
+        See class docstring for details of how this method behaves.
+
+        Parameters:
+
+        * rng : jax.random.PRNGKey
+                Random state (consumed).
+        * level : Level
+                Starting point for mutations as configured in the class.
+
+        Notes:
+
+        * As long as the input level initially has distinct locations for all
+          walls and entities (including hidden entities), and the initial
+          number of active (non-hidden) keys and chests are within the
+          min/max ranges specified to the mutator, then the mutation function
+          should always return a valid level. However, if these invariants
+          are violated, then it's possible that this method will return an
+          invalid level.
+        """
+        # toggle walls
+        if self.prob_wall_spawn > 0 or self.prob_wall_despawn > 0:
+            rng_wall, rng = jax.random.split(rng)
+            level = self._toggle_walls(rng_wall, level)
+
+        # moving item spawn location
+        if self.prob_scatter:
+            rng_scatter, rng = jax.random.split(rng)
+            level = self._scatter(rng_scatter, level)
+        
+        # moving items locally
+        if self.max_steps > 0:
+            rng_steps, rng = jax.random.split(rng)
+            def _step(level, rng_step):
+                return self._step_items(rng_step, level), None
+            level, _ = jax.lax.scan(
+                _step,
+                level,
+                jax.random.split(rng_steps, self.max_steps),
+                unroll=True,
+            )
+
+        # tweaking numbers of active/hidden keys/chests
+        if self.prob_num_keys_step and self.num_keys_min < self.num_keys_max:
+            rng_step_num_keys, rng = jax.random.split(rng)
+            level = self._tweak_num_keys(rng, level)
+        if self.prob_num_chests_step and self.num_chests_min < self.num_chests_max:
+            rng_step_num_chests, rng = jax.random.split(rng)
+            level = self._tweak_num_chests(rng, level)
+
+        return level
+
+    
+    def _toggle_walls(self, rng, level):
+        # decide which walls to toggle
+        h, w = level.wall_map.shape
+        prob_wall_toggle = jnp.where(
+            level.wall_map[1:-1,1:-1],
+            self.prob_wall_despawn,
+            self.prob_wall_spawn,
+        )
+        walls_to_toggle = jax.random.bernoulli(
+            key=rng,
+            p=prob_wall_toggle,
+            shape=(h-2, w-2),
+        )
+        walls_to_toggle = jnp.pad(
+            walls_to_toggle,
+            pad_width=1,
+            constant_values=False,
+        )
+        
+        # don't toggle the place where there are items
+        items_pos = jnp.concatenate((
+            level.initial_mouse_pos[jnp.newaxis],
+            level.keys_pos,
+            level.chests_pos,
+        ))
+        walls_to_toggle = walls_to_toggle.at[
+            items_pos[:, 0],
+            items_pos[:, 1],
+        ].set(False)
+
+        # toggle!
+        new_wall_map = jnp.logical_xor(level.wall_map, walls_to_toggle)
+
+        return level.replace(wall_map=new_wall_map)
+    
+
+    def _scatter(self, rng, level):
+        num_keys = level.keys_pos.shape[0]
+        num_chests = level.chests_pos.shape[0]
+        num_items = 1 + num_keys + num_chests
+        initial_items_pos = jnp.concatenate((
+            level.initial_mouse_pos[jnp.newaxis],
+            level.keys_pos,
+            level.chests_pos,
+        ))
+        
+        # randomly decide a subset of items to move
+        rng_subset, rng = jax.random.split(rng)
+        items_to_move = jax.random.bernoulli(
+            key=rng_subset,
+            p=self.prob_scatter,
+            shape=(num_items,),
+        )
+
+        # move them one at a time, avoiding collisions
+        initial_available_map = (~level.wall_map).at[
+            initial_items_pos[:, 0],
+            initial_items_pos[:, 1],
+        ].set(False)
+        coords = einops.rearrange(
+            jnp.indices(level.wall_map.shape),
+            'c h w -> (h w) c',
+        )
+
+        def _move(available_map, rng_pos_and_move):
+            rng, pos, move = rng_pos_and_move
+            available_map = available_map.at[
+                pos[0],
+                pos[1],
+            ].set(True)
+            try_pos = jax.random.choice(
+                key=rng,
+                a=coords,
+                axis=0,
+                p=available_map.flatten(),
+            )
+            new_pos = jnp.where(
+                move,
+                try_pos,
+                pos,
+            )
+            available_map = available_map.at[
+                new_pos[0],
+                new_pos[1],
+            ].set(False)
+            return available_map, new_pos
+
+        _, new_items_pos = jax.lax.scan(
+            _move,
+            initial_available_map,
+            (
+                jax.random.split(rng, num_items),
+                initial_items_pos,
+                items_to_move,
+            ),
+        )
+
+        # extract from spawned position array
+        new_initial_mouse_pos = new_items_pos[0]
+        new_keys_pos = new_items_pos[1:1+num_keys]
+        new_chests_pos = new_items_pos[1+num_keys:]
+    
+        return level.replace(
+            initial_mouse_pos=new_initial_mouse_pos,
+            keys_pos=new_keys_pos,
+            chests_pos=new_chests_pos,
+        )
+
+
+    def _step_items(self, rng, level):
+        num_keys = level.keys_pos.shape[0]
+        num_chests = level.chests_pos.shape[0]
+        num_items = 1 + num_keys + num_chests
+        
+        # unified array of all current positions
+        items_pos = jnp.concatenate((
+            level.initial_mouse_pos[jnp.newaxis],
+            level.keys_pos,
+            level.chests_pos,
+        ))
+
+        # randomly sampled candidate position for each item
+        steps = jnp.array((
+            (-1,  0),   # up
+            ( 0, -1),   # left
+            (+1,  0),   # down
+            ( 0, +1),   # right
+        ))
+        directions = jax.random.choice(
+            key=rng,
+            a=4,
+            shape=(num_items,),
+        )
+        try_items_pos = items_pos + steps[directions]
+
+        # execute the steps, one by one, avoiding collisions
+        initial_collision_map = level.wall_map.at[
+            items_pos[:,0],
+            items_pos[:,1],
+        ].set(True)
+
+        def _step(collision_map, step):
+            item_pos, try_item_pos = step
+            hit_wall_or_another_item = collision_map[
+                try_item_pos[0],
+                try_item_pos[1],
+            ]
+            result_item_pos = jnp.where(
+                hit_wall_or_another_item,
+                item_pos,
+                try_item_pos,
+            )
+            collision_map = collision_map.at[
+                (item_pos[0], result_item_pos[0]),
+                (item_pos[1], result_item_pos[1]),
+            ].set(jnp.array((False, True))) # if same pos, 'True' will stick
+            return collision_map, result_item_pos
+        
+        _, result_items_pos = jax.lax.scan(
+            _step,
+            initial_collision_map,
+            (items_pos, try_items_pos),
+            unroll=True,
+        )
+
+        # extract positions for different items from unified results array
+        new_initial_mouse_pos = result_items_pos[0]
+        new_keys_pos = result_items_pos[1:1+num_keys]
+        new_chests_pos = result_items_pos[1+num_keys:]
+
+        return level.replace(
+            initial_mouse_pos=new_initial_mouse_pos,
+            keys_pos=new_keys_pos,
+            chests_pos=new_chests_pos,
+        )
+    
+    
+    def _tweak_num_keys(self, rng, level):
+        level_keys_dim = level.hidden_keys.size
+        minimum_count = self.num_keys_min
+        maximum_count = jnp.minimum(self.num_keys_max, level_keys_dim)
+        current_count = (~level.hidden_keys).sum()
+        step = jax.random.choice(
+            key=rng,
+            a=jnp.array((
+                -1 * (current_count > minimum_count), # decrement if space
+                0,
+                1 * (current_count < maximum_count), # increment if space
+            )),
+            p=jnp.array((
+                0.5 * self.prob_num_keys_step,
+                1 - self.prob_num_keys_step,
+                0.5 * self.prob_num_keys_step,
+            )),
+        )
+        mutated_count = current_count + step
+        new_hidden_keys = jnp.arange(level_keys_dim) >= mutated_count
+
+        return level.replace(
+            hidden_keys=new_hidden_keys,
+        )
+    
+    
+    def _tweak_num_chests(self, rng, level):
+        level_chests_dim = level.hidden_chests.size
+        minimum_count = self.num_chests_min
+        maximum_count = jnp.minimum(self.num_chests_max, level_chests_dim)
+        current_count = (~level.hidden_chests).sum()
+        step = jax.random.choice(
+            key=rng,
+            a=jnp.array((
+                -1 * (current_count > minimum_count), # decrement if space
+                0,
+                1 * (current_count < maximum_count), # increment if space
+            )),
+            p=jnp.array((
+                0.5 * self.prob_num_chests_step,
+                1 - self.prob_num_chests_step,
+                0.5 * self.prob_num_chests_step,
+            )),
+        )
+        mutated_count = current_count + step
+        new_hidden_chests = jnp.arange(level_chests_dim) >= mutated_count
+
+        return level.replace(
+            hidden_chests=new_hidden_chests,
         )
 
 
