@@ -8,6 +8,7 @@ import time
 import typer
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
 from jaxgmg.procgen import noise_generation
 
 from jaxgmg.environments import cheese_in_the_corner
@@ -247,32 +248,13 @@ def print_histogram(data, bins=10, range=None, width=40):
 # MAZE GENERATION/SOLUTION FUNCTIONALITY
 
 
-def maze_gen(
-    layout: str = 'tree',
-    height: int = 15,
-    width:  int = 79,
-    seed: int = 42,
-):
-    print("maze-gen: generate and visualise a random maze")
-    print_config(locals())
-
-    rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.get_generator_function(layout)
-    maze = gen(
-        key=rng,
-        h=height,
-        w=width,
-    )
-    print(img2str(maze * .25))
-
-
-def maze_tree(
+def mazegen_tree(
     height: int = 79,
     width: int = 79,
     alt_kruskal_algorithm: bool = False,
     seed: int = 42,
 ):
-    print("maze-tree: generate and visualise a random tree maze")
+    print("tree: generate and visualise a random tree maze")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -285,13 +267,13 @@ def maze_tree(
     print(img2str(maze * .25))
 
 
-def maze_edges(
+def mazegen_edges(
     height: int = 79,
     width: int = 79,
     edge_prob: float = 0.75,
     seed: int = 42,
 ):
-    print("maze-edges: generate and visualise a random edge maze")
+    print("edges: generate and visualise a random edge maze")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -304,7 +286,7 @@ def maze_edges(
     print(img2str(maze * .25))
 
 
-def maze_noise(
+def mazegen_noise(
     height: int = 79,
     width: int = 79,
     wall_threshold: float = 0.25,
@@ -312,7 +294,7 @@ def maze_noise(
     num_octaves: int = 1,
     seed: int = 42,
 ):
-    print("maze-noise: generate and visualise a random noise maze")
+    print("noise: generate and visualise a random noise maze")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -327,13 +309,13 @@ def maze_noise(
     print(img2str(maze * .25))
 
 
-def maze_blocks(
+def mazegen_blocks(
     height: int = 79,
     width: int = 79,
     wall_prob: float = 0.25,
     seed: int = 42,
 ):
-    print("maze-blocks: generate and visualise a random block maze")
+    print("blocks: generate and visualise a random block maze")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -346,12 +328,12 @@ def maze_blocks(
     print(img2str(maze * .25))
 
 
-def maze_open(
+def mazegen_open(
     height: int = 79,
     width: int = 79,
     seed: int = 42, # unused
 ):
-    print("maze-open: generate and visualise an open maze")
+    print("open: generate and visualise an open maze")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -367,14 +349,14 @@ def maze_open(
 # MAZE SOLVING FUNCTIONALITY
 
 
-def maze_distance(
+def mazesoln_distance(
     layout: str = 'tree',
     height: int = 5,
     width:  int = 5,
     seed: int = 42,
 ):
     print(
-        "maze-distance: solve a maze and plot the optimal distance "
+        "distance: solve a maze and plot the optimal distance "
         "from any source to any destination"
     )
     print_config(locals())
@@ -407,7 +389,7 @@ def maze_distance(
     print("the target is represented by the square in the micromaze")
 
 
-def maze_direction(
+def mazesoln_direction(
     layout: str = 'tree',
     height: int = 5,
     width:  int = 5,
@@ -453,7 +435,7 @@ def maze_direction(
 # NOISE GENERATION FUNCTIONALITY
 
 
-def perlin_noise(
+def noisegen_perlin(
     height: int = 64,
     width:  int = 64,
     num_rows: int = 8,
@@ -475,7 +457,7 @@ def perlin_noise(
     print(img2str(noise_0to1, colormap=viridis))
 
 
-def fractal_noise(
+def noisegen_fractal(
     height: int = 64,
     width:  int = 64,
     base_num_rows: int = 8,
@@ -977,20 +959,20 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False, # can turn on during debugging
 )
 
-# maze generation and solving
-app.command()(maze_gen)
-app.command()(maze_distance)
-app.command()(maze_direction)
-
-app.command()(maze_tree)
-app.command()(maze_edges)
-app.command()(maze_noise)
-app.command()(maze_blocks)
-app.command()(maze_open)
-
 # noise generation
-app.command()(perlin_noise)
-app.command()(fractal_noise)
+app.command()(noisegen_perlin)
+app.command()(noisegen_fractal)
+
+# maze generation
+app.command()(mazegen_tree)
+app.command()(mazegen_edges)
+app.command()(mazegen_noise)
+app.command()(mazegen_blocks)
+app.command()(mazegen_open)
+
+# maze solving
+app.command()(mazesoln_distance)
+app.command()(mazesoln_direction)
 
 # play environments
 app.command()(play_corner)
