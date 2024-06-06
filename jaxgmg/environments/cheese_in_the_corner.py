@@ -31,8 +31,8 @@ import chex
 import einops
 from flax import struct
 
+from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import base
-from jaxgmg.environments import maze_generation
 from jaxgmg.environments import spritesheet
 
 
@@ -328,7 +328,7 @@ class LevelGenerator(base.LevelGenerator):
     * width : int (>= 3, odd)
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('tree', 'bernoulli', 'blocks', or 'open')
+    * layout : str ('tree', 'bernoulli', 'blocks', 'noise', or 'open')
             specifies the maze generation method to use (see module
             `maze_generation` for details)
     * corner_size : int (>=1, <=width, <=height):
@@ -342,7 +342,7 @@ class LevelGenerator(base.LevelGenerator):
     
     def __post_init__(self):
         # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open'}
+        assert self.layout in {'tree', 'edges', 'blocks', 'open', 'noise'}
         # validate dimensions
         assert self.height >= 3
         assert self.width >= 3
@@ -672,7 +672,7 @@ class LevelParser:
             default map is as follows:
             * The character '#' maps to `Env.Channel.WALL`.
             * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character 'c' maps to `Env.Channel.CHEESE`.
+            * The character '*' maps to `Env.Channel.CHEESE`.
             * The character '.' maps to `len(Env.Channel)`, i.e. none of the
               above, representing the absence of an item.
     """
@@ -696,7 +696,7 @@ class LevelParser:
         ... # # # # #
         ... # . . . #
         ... # @ # . #
-        ... # . . c #
+        ... # . . * #
         ... # # # # #
         ... ''')
         Level(

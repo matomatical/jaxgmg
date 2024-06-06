@@ -27,6 +27,9 @@ dependencies = [
     "typer",
 ]
 
+[project.scripts]
+jaxgmg = "jaxgmg.__main__:int"
+
 [project.urls]
 Homepage = "https://github.com/matomatical/jaxgmg"
 Issues = "https://github.com/matomatical/jaxgmg/issues"
