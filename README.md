@@ -1,5 +1,5 @@
-Goal misgeneralisation benchmark environments
-=============================================
+Goal misgeneralisation in JAX
+=============================
 
 JAX-based environments and RL baselines for studying goal misgeneralisation.
 
@@ -37,8 +37,8 @@ Core maze generation methods:
 * [x] Kruskal's algorithm
 * [x] Random block mazes
 * [x] Perlin noise
-* [ ] Room-based on BSP-based? Tunnelling? Cellular automata? See notes
-      [here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/)
+* [ ] Rooms? BSP? Tunnelling? Cellular automata? See notes
+      [here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/).
 
 Core environments:
 
