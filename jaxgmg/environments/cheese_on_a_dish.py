@@ -15,8 +15,6 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level.
-* `LevelMutator` class, provides `mutate` method for mutating an existing
-  level with configurable mutations.
 * `LevelParser` class, provides a `parse` and `parse_batch` method for
   designing Level structs based on ASCII depictions.
 """
