@@ -400,8 +400,8 @@ class NoiseMazeGenerator(MazeGenerator):
             quotient = (number // divisor) + ((number % divisor) > 0)
             next_multiple = quotient * divisor
             return next_multiple, quotient
-        noise_height, num_cols = next_multiple(interior_height, self.cell_size)
-        noise_width, num_rows = next_multiple(interior_width, self.cell_size)
+        noise_height, num_rows = next_multiple(interior_height, self.cell_size)
+        noise_width, num_cols = next_multiple(interior_width, self.cell_size)
 
         # generate noise
         noise = noise_generation.generate_fractal_noise(
