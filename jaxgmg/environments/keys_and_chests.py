@@ -31,6 +31,7 @@ import einops
 from flax import struct
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -398,7 +399,7 @@ class Env(base.Env):
         Having said all that---seems like this will be enough for now.
         """
         # compute distances between the mouse, and each key, and each chest
-        dist = maze_generation.maze_distances(level.wall_map)
+        dist = maze_solving.maze_distances(level.wall_map)
         pos = jnp.concatenate((
             level.initial_mouse_pos[jnp.newaxis],
             level.keys_pos,
@@ -563,10 +564,11 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = maze_generation.get_generator_class(self.layout)(
+            height=self.height,
+            width=self.width,
+        ).generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
         )
 
         # spawn random mouse pos, keys pos, chests pos

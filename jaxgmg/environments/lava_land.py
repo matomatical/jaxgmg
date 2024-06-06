@@ -312,10 +312,11 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = maze_generation.get_generator_class(self.layout)(
+            height=self.height,
+            width=self.width,
+        ).generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
         )
 
         # sample spawn positions by sampling from a list of coordinate pairs

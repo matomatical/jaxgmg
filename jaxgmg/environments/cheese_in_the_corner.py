@@ -30,6 +30,7 @@ import einops
 from flax import struct
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -285,7 +286,7 @@ class Env(base.Env):
           position rather than initial position.
         """
         # compute distance between mouse and cheese
-        dist = maze_generation.maze_distances(level.wall_map)
+        dist = maze_solving.maze_distances(level.wall_map)
         optimal_dist = dist[
             level.initial_mouse_pos[0],
             level.initial_mouse_pos[1],
@@ -360,10 +361,11 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = maze_generation.get_generator_class(self.layout)(
+            height=self.height,
+            width=self.width,
+        ).generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
         )
 
         # sample spawn positions by sampling from a list of coordinate pairs

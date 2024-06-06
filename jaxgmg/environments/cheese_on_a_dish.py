@@ -30,6 +30,7 @@ import einops
 from flax import struct
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
 
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
@@ -317,10 +318,11 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = maze_generation.get_generator_class(self.layout)(
+            height=self.height,
+            width=self.width,
+        ).generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
         )
 
         # sample spawn positions by sampling from a list of coordinate pairs
@@ -355,7 +357,7 @@ class LevelGenerator(base.LevelGenerator):
         )
 
         # cheese spawns in some remaining valid position near the dish
-        distance_to_dish = maze_generation.maze_distances(wall_map)[
+        distance_to_dish = maze_solving.maze_distances(wall_map)[
             dish_pos[0],
             dish_pos[1],
         ]

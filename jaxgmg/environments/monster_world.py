@@ -28,6 +28,8 @@ import einops
 from flax import struct
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
+
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -520,10 +522,11 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct the wall map
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = maze_generation.get_generator_class(self.layout)(
+            height=self.height,
+            width=self.width,
+        ).generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
         )
         
         # spawn random mouse, apple, shield and monster positions
@@ -547,7 +550,7 @@ class LevelGenerator(base.LevelGenerator):
         initial_monsters_pos = all_pos[num_all-self.num_monsters:num_all]
 
         # solve the map and cache the solution for the monsters
-        dist_map = maze_generation.maze_directional_distances(wall_map)
+        dist_map = maze_solving.maze_directional_distances(wall_map)
 
         # decide random positions for shield display
         rng_inventory, rng = jax.random.split(rng)
