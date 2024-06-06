@@ -266,6 +266,25 @@ def maze_gen(
     print(img2str(maze * .25))
 
 
+def maze_tree(
+    height: int = 79,
+    width: int = 79,
+    seed: int = 42,
+    alt_kruskal_algorithm: bool = False,
+):
+    print("maze-tree: generate and visualise a random tree maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.TreeMazeGenerator(
+        h=height,
+        w=width,
+        alt_kruskal_algorithm=alt_kruskal_algorithm,
+    )
+    maze = gen.generate(key=rng)
+    print(img2str(maze * .25))
+
+
 def maze_distance(
     layout: str = 'tree',
     height: int = 5,
@@ -880,6 +899,8 @@ app = typer.Typer(
 app.command()(maze_gen)
 app.command()(maze_distance)
 app.command()(maze_direction)
+
+app.command()(maze_tree)
 
 # noise generation
 app.command()(perlin_noise)

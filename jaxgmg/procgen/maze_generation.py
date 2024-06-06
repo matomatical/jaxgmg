@@ -6,8 +6,208 @@ import functools
 import jax
 import jax.numpy as jnp
 import einops
+from flax import struct
 
 from jaxgmg.procgen import noise_generation
+
+
+@struct.dataclass
+class MazeGenerator:
+    """
+    Abstract base class for maze generation.
+
+    Parameters:
+
+    * h: int (>= 3)
+        Maze height (number of rows in grid).
+    * w: int (>= 3)
+        Maze width (number of columns in grid).
+    """
+    h: int
+    w: int
+
+
+@struct.dataclass
+class TreeMazeGenerator(MazeGenerator):
+    alt_kruskal_algorithm: bool = False
+
+    def __post_init__(self):
+        assert self.h >= 3 and self.w >= 3, "dimensions must be at least 3"
+        assert self.h % 2 == 1 and self.w % 2 == 1, "dimensions must be odd"
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def generate(self, key):
+        """
+        Generate an `h` by `w` binary gridworld including an acyclic maze.
+
+        Assume `h` and `w` are odd integers and consider the 'junction'
+        squares (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1). These
+        squares form the nodes of a grid graph.
+
+        This function constructs a random spanning tree of this grid graph
+        using Kruskal's algorithm, and returns the corresponding binary
+        matrix.
+
+        Parameters:
+
+        * key : PRNGKey
+                RNG state (will be consumed)
+
+        Returns:
+
+        * grid : bool[h, w]
+                the binary grid (True indicates a wall, False indicates a
+                path)
+        """
+        # assign each 'junction' in the grid an integer node id
+        H, W = self.h // 2, self.w // 2
+        nodes = jnp.arange(H * W)
+        ngrid = nodes.reshape((H, W))
+
+        # an edge between each pair of nodes (represented as a node id pair)
+        # note: there are (H-1)W + H(W-1) = 2HW - H - W edges
+        h_edges = jnp.stack((ngrid[:,:-1].flatten(), ngrid[:,1:].flatten()))
+        v_edges = jnp.stack((ngrid[:-1,:].flatten(), ngrid[1:,:].flatten()))
+        edges = jnp.concatenate((h_edges, v_edges), axis=-1).transpose()
+
+        # kruskal's random spanning tree algorithm
+        if self.alt_kruskal_algorithm:
+            include_edges = self._kruskal_alt(key, nodes, edges)
+        else:
+            include_edges = self._kruskal(key, nodes, edges)
+
+        # finally, generate the grid array
+        grid = jnp.ones((self.h, self.w), dtype=bool)   # start full
+        grid = grid.at[1::2,1::2].set(False)            # carve out junctions
+        include_edges_ijs = jnp.rint(jnp.stack((        # carve out edges
+            include_edges // W,
+            include_edges % W,
+        )).mean(axis=-1) * 2 + 1).astype(int)
+        grid = grid.at[tuple(include_edges_ijs)].set(False)
+
+        return grid
+
+
+    def _kruskal(self, key, nodes, edges):
+        """
+        Kruskal's random spanning tree algorithm for an unweighted connected
+        graph.
+
+        Parameters:
+
+        * key : PRNGKey
+            Random state (consumed).
+        * nodes : int[n]
+            Labels of the nodes of the graph. Should be unique.
+        * edges : int[m,2]
+            Label pairs for the edges available. Pairs should be unique.
+
+        Returns:
+            
+        * include_edges : int[n-1,2]
+            Subset of edges included in the random spanning tree.
+
+        Note: if the node labels are not unique or the graph is not
+        connected, some of the entries in `include_edges` may become invalid.
+        """
+        # initially each node is in its own subtree
+        initial_parents = nodes
+
+        # randomly shuffling the edges creates a random spanning tree
+        edges = jax.random.permutation(key, edges, axis=0)
+
+        # for each edge we decide whether to include or skip it;
+        # track connected subtrees with a simple union-find data structure
+        def try_edge(parents, edge):
+            u, v = edge
+            pu = parents[u]
+            pv = parents[v]
+            include_edge = (pu != pv)
+            new_parents = jax.lax.select(
+                include_edge & (parents == pv),
+                jnp.full_like(parents, pu),
+                parents,
+            )
+            return new_parents, include_edge
+        
+        _final_parents, include_edge_mask = jax.lax.scan(
+            try_edge,
+            initial_parents,
+            edges,
+        )
+
+        # extract the pairs corresponding to the `n-1` included edges
+        include_edges = edges[
+            jnp.where(include_edge_mask, size=(nodes.size-1))
+        ]
+        return include_edges
+
+
+    def _kruskal_alt(self, key, nodes, edges):
+        """
+        Alternative implementation of Kruskal's algorithm that is faster in
+        theory but apprently much slower in practice when acelerated and
+        running in parallel on a GPU.
+        """
+        # initially each node is in its own subtree
+        initial_parents = nodes
+
+        # randomly shuffling the edges creates a random spanning tree
+        edges = jax.random.permutation(key, edges, axis=0)
+
+        # for each edge we decide whether to include it or skip it; tracking
+        # connected subtrees with a sophisticated union-find data structure.
+
+        def _find(x, parent):
+            """
+            Finds the root of x, while updating parents so that parent[i]
+            points one step closer to the root of i for next time.
+            """
+            px = parent[x]
+            def _find_body_fun(args):
+                x, px, parents = args
+                ppx = parents[px]
+                return px, ppx, parents.at[x].set(ppx)
+            root, _, parent = jax.lax.while_loop(
+                lambda args: args[0] != args[1],
+                _find_body_fun,
+                (x, px, parent),
+            )
+            return root, parent
+
+        def _union(root_x, root_y, parents):
+            """
+            Updates the root of x to be the root of y.
+            """
+            return parents.at[root_x].set(root_y)
+
+        def try_edge(parents, edge):
+            u, v = edge
+            ru, parents = _find(u, parents)
+            rv, parents = _find(v, parents)
+            include_edge = (ru != rv)
+            parents = jax.lax.cond(
+                include_edge,
+                _union,
+                lambda rx, ry, ps: ps,
+                ru,
+                rv,
+                parents,
+            )
+            return parents, include_edge
+
+        _final_parents, include_edge_mask = jax.lax.scan(
+            try_edge,
+            initial_parents,
+            edges,
+        )
+
+        # extract the pairs corresponding to the `n-1` included edges
+        include_edges = edges[
+            jnp.where(include_edge_mask, size=(nodes.size-1))
+        ]
+        return include_edges
 
 
 def get_generator_function(name):
@@ -39,150 +239,6 @@ def get_generator_function(name):
         return generate_open_maze
     else:
         raise ValueError(f"Unknown maze generation method {name!r}")
-
-
-@functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_tree_maze(key, h, w):
-    """
-    Generate an `h` by `w` binary gridworld including an acyclic maze.
-
-    Assume `h` and `w` are odd integers and consider the 'junction' squares
-    (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1). These squares form the
-    nodes of a grid graph. This function constructs a random spanning tree
-    of this grid graph using Kruskal's algorithm, and returns the
-    corresponding binary matrix.
-
-    Parameters:
-
-    * key : PRNGKey
-            RNG state (will be consumed)
-    * h : static int
-            height of the grid (num rows, odd, >=3)
-    * w : static int
-            width of the grid (num columns, odd, >=3)
-
-    Returns:
-
-    * grid : bool[h, w]
-            the binary grid (True indicates a wall, False indicates a path)
-    """
-    assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    assert h % 2 == 1 and w % 2 == 1, "dimensions must be odd"
-
-    # assign each 'junction' in the grid an integer node id
-    H, W = h//2, w//2
-    nodes = jnp.arange(H * W)
-    ngrid = nodes.reshape((H, W))
-
-    # an edge between each pair of nodes (represented as a node id pair)
-    # note: there are (H-1)W + H(W-1) = 2HW - H - W edges
-    h_edges = jnp.stack((ngrid[:,:-1].flatten(), ngrid[:,1:].flatten()))
-    v_edges = jnp.stack((ngrid[:-1,:].flatten(), ngrid[1:,:].flatten()))
-    edges = jnp.concatenate((h_edges, v_edges), axis=-1).transpose()
-
-    # kruskall's algorithm, ordering edges randomly -> random spanning tree
-    # note: since there are HW nodes the tree will have exactly HW-1 edges
-    parents = nodes
-    edges = jax.random.permutation(key, edges, axis=0)
-    def try_edge(parents, edge):
-        u, v = edge
-        pu = parents[u]
-        pv = parents[v]
-        include_edge = (pu != pv)
-        new_parents = jax.lax.select(
-            include_edge & (parents == pv),
-            jnp.full_like(parents, pu),
-            parents,
-        )
-        return new_parents, include_edge
-    _final_parents, include_edge_mask = jax.lax.scan(try_edge, parents, edges)
-    include_edges = edges[jnp.where(include_edge_mask, size=(H*W-1))]
-
-    # finally, generate the grid array (idea: start full, carve out the tree)
-    grid = jnp.ones((h, w), dtype=bool)
-    grid = grid.at[1::2,1::2].set(False)
-    include_edges_ijs = jnp.rint(jnp.stack((
-        include_edges // W,
-        include_edges % W,
-    )).mean(axis=-1) * 2 + 1).astype(int)
-    grid = grid.at[tuple(include_edges_ijs)].set(False)
-    return grid
-
-
-@functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_tree_maze_alt(key, h, w):
-    """
-    Same, but with an algorithm that is in theory faster but apparently in
-    practice slower when acelerated and running on parallel on a GPU.
-    """
-    assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    assert h % 2 == 1 and w % 2 == 1, "dimensions must be odd"
-
-    # union-find data structure operations
-    def _find(x: int, parent: jnp.array):
-        """
-        Finds the root of x, while updating parents so that parent[i] points
-        one step closer to the root of i.
-        """
-        px = parent[x]
-        def _find_body_fun(args):
-            x, px, parents = args
-            ppx = parents[px]
-            return px, ppx, parents.at[x].set(ppx)
-        root, _, parent = jax.lax.while_loop(
-            lambda args: args[0] != args[1],
-            _find_body_fun,
-            (x, px, parent),
-        )
-        return root, parent
-        
-    def _union(root_x, root_y, parents):
-        """
-        Updates the root of x to be the root of y.
-        """
-        return parents.at[root_x].set(root_y)
-
-    # assign each 'junction' in the grid an integer node id
-    H, W = h//2, w//2
-    nodes = jnp.arange(H * W)
-    ngrid = nodes.reshape((H, W))
-
-    # an edge between each pair of nodes (represented as a node id pair)
-    # note: there are (H-1)W + H(W-1) = 2HW - H - W edges
-    h_edges = jnp.stack((ngrid[:,:-1].flatten(), ngrid[:,1:].flatten()))
-    v_edges = jnp.stack((ngrid[:-1,:].flatten(), ngrid[1:,:].flatten()))
-    edges = jnp.concatenate((h_edges, v_edges), axis=-1).transpose()
-
-    # kruskall's algorithm, ordering edges randomly -> random spanning tree
-    # note: since there are HW nodes the tree will have exactly HW-1 edges
-    parents = nodes
-    edges = jax.random.permutation(key, edges, axis=0)
-    def try_edge(parents, edge):
-        u, v = edge
-        ru, parents = _find(u, parents)
-        rv, parents = _find(v, parents)
-        include_edge = (ru != rv)
-        parents = jax.lax.cond(
-            include_edge,
-            _union,
-            lambda rx, ry, ps: ps,
-            ru,
-            rv,
-            parents,
-        )
-        return parents, include_edge
-    _final_parents, include_edge_mask = jax.lax.scan(try_edge, parents, edges)
-    include_edges = edges[jnp.where(include_edge_mask, size=(H*W-1))]
-
-    # finally, generate the grid array (idea: start full, carve out the tree)
-    grid = jnp.ones((h, w), dtype=bool)
-    grid = grid.at[1::2,1::2].set(False)
-    include_edges_ijs = jnp.rint(jnp.stack((
-        include_edges // W,
-        include_edges % W,
-    )).mean(axis=-1) * 2 + 1).astype(int)
-    grid = grid.at[tuple(include_edges_ijs)].set(False)
-    return grid
 
 
 @functools.partial(jax.jit, static_argnames=('h', 'w'))
