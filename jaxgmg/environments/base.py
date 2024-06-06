@@ -96,7 +96,7 @@ class Env:
         chex.Array,
         EnvState,
     ]:
-        start_state = self._reset(rng, level).replace(level=level)
+        start_state = self._reset(rng, level)
         obs = self.get_obs(start_state)
         return (obs, start_state)
     
