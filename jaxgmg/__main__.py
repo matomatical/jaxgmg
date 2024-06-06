@@ -269,8 +269,8 @@ def maze_gen(
 def maze_tree(
     height: int = 79,
     width: int = 79,
-    seed: int = 42,
     alt_kruskal_algorithm: bool = False,
+    seed: int = 42,
 ):
     print("maze-tree: generate and visualise a random tree maze")
     print_config(locals())
@@ -288,8 +288,8 @@ def maze_tree(
 def maze_edges(
     height: int = 79,
     width: int = 79,
-    seed: int = 42,
     edge_prob: float = 0.75,
+    seed: int = 42,
 ):
     print("maze-edges: generate and visualise a random edge maze")
     print_config(locals())
@@ -299,6 +299,29 @@ def maze_edges(
         height=height,
         width=width,
         edge_prob=edge_prob,
+    )
+    maze = gen.generate(key=rng)
+    print(img2str(maze * .25))
+
+
+def maze_noise(
+    height: int = 79,
+    width: int = 79,
+    wall_threshold: float = 0.25,
+    cell_size: int = 3,
+    num_octaves: int = 1,
+    seed: int = 42,
+):
+    print("maze-noise: generate and visualise a random noise maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.NoiseMazeGenerator(
+        height=height,
+        width=width,
+        wall_threshold=wall_threshold,
+        cell_size=cell_size,
+        num_octaves=num_octaves,
     )
     maze = gen.generate(key=rng)
     print(img2str(maze * .25))
@@ -921,6 +944,7 @@ app.command()(maze_direction)
 
 app.command()(maze_tree)
 app.command()(maze_edges)
+app.command()(maze_noise)
 
 # noise generation
 app.command()(perlin_noise)

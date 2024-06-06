@@ -60,7 +60,7 @@ class TreeMazeGenerator(MazeGenerator):
 
         Consider the 'junction' squares
             
-            (1,1), (1,3), ..., (1,w-1), (3,1), ..., (h-1,w-1).
+            (1,1), (1,3), ..., (1,w-1), (3,1), ..., (height-1,width-1).
         
         These squares form the nodes of a grid graph. This function
         constructs a random spanning tree of this grid graph using Kruskal's
@@ -259,7 +259,7 @@ class EdgeMazeGenerator(MazeGenerator):
     @functools.partial(jax.jit, static_argnames=('self',))
     def generate(self, key):
         """
-        Generate an `height` by `width` binary gridworld including a
+        Generate a `height` by `width` binary gridworld including a
         1-wall-thick border around the perimiter and a grid graph with random
         edges in the center.
         
@@ -306,6 +306,87 @@ class EdgeMazeGenerator(MazeGenerator):
         return grid
 
 
+@struct.dataclass
+class NoiseMazeGenerator(MazeGenerator):
+    """
+    Generate noise mazes (with walls locations determined by Perlin noise).
+
+    Parameters:
+
+    * height : int (>= 3)
+        Maze height (number of rows in grid).
+    * width : int (>= 3)
+        Maze width (number of columns in grid).
+    * wall_threshold : float (between -1.0 and 1.0, default 0.25)
+        The noise threshold above which a wall spawns.
+    * cell_size : int (>= 2, default 2)
+        Width and height of the gradient grid for the noise (in the case of
+        multiple octaves, this is the size of the largest grid, and should be
+        repeatedly divisible by two).
+    """
+    wall_threshold: float = 0.25
+    cell_size : int = 2
+    num_octaves : int = 1
+
+
+    def __post_init__(self):
+        assert self.height >= 3, "height must be at least 3"
+        assert self.width >= 3, "width must be at least 3"
+        assert -1.0 <= self.wall_threshold <= 1.0, "invalid threshold"
+        assert self.cell_size >= 1, "cell size must be at least 2"
+        assert self.num_octaves >= 1, "num octaves must be positive"
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def generate(self, key):
+        """
+        Generate a `height` by `width` binary gridworld including a
+        1-wall-thick border around the perimiter and an arrangement of walls
+        in the center determined by Perlin noise.
+
+        Parameters:
+
+        * key : PRNGKey
+                RNG state (will be consumed)
+
+        Returns:
+
+        * grid : bool[height, width]
+                the binary grid (True indicates a wall, False indicates a path)
+        """
+        # make noise size a multiple of cell_size larger than the interior
+        interior_height = self.height - 2
+        interior_width = self.width - 2
+        
+        def next_multiple(number, divisor):
+            quotient = (number // divisor) + ((number % divisor) > 0)
+            next_multiple = quotient * divisor
+            return next_multiple, quotient
+        noise_height, num_cols = next_multiple(interior_height, self.cell_size)
+        noise_width, num_rows = next_multiple(interior_width, self.cell_size)
+
+        # generate noise
+        noise = noise_generation.generate_fractal_noise(
+            key=key,
+            height=noise_height,
+            width=noise_width,
+            base_num_rows=num_rows,
+            base_num_cols=num_cols,
+            num_octaves=self.num_octaves,
+        )
+
+        # determine walls location in interior
+        interior_walls = (
+            noise[:interior_height,:interior_width] > self.wall_threshold
+        )
+
+        # build the grid
+        grid = jnp.ones((self.height, self.width), dtype=bool)
+        grid = grid.at[1:-1,1:-1].set(interior_walls)
+
+        return grid
+
+
 def get_generator_function(name):
     """
     Maps a string descriptor of a maze generation method. Useful for handling
@@ -335,47 +416,6 @@ def get_generator_function(name):
         return generate_open_maze
     else:
         raise ValueError(f"Unknown maze generation method {name!r}")
-
-
-@functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_noise_maze(key, h, w, threshold=0.25):
-    """
-    Generate an `h` by `w` binary gridworld including a 1-wall-thick border
-    around the perimiter and an arrangement of blocks in the center
-    determined by Perlin noise.
-
-    Parameters:
-
-    * key : PRNGKey
-            RNG state (will be consumed)
-    * h : static int
-            height of the grid (num rows, >=3)
-    * w : static int
-            width of the grid (num columns, >=3)
-    * threshold : float (in range [-1, 1])
-            noise threshold above which a wall spawns
-
-    Returns:
-
-    * grid : bool[h, w]
-            the binary grid (True indicates a wall, False indicates a path)
-    """
-    assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    # generate noise (next power of 2 size)
-    h_ = max(4, 2**(h - 1).bit_length())
-    w_ = max(4, 2**(w - 1).bit_length())
-    noise = noise_generation.generate_perlin_noise(
-        key=key,
-        height=h_,
-        width=w_,
-        num_rows=h_//4,
-        num_cols=w_//4,
-    )
-    # use this to fill in a grid
-    grid = jnp.ones((h, w), dtype=bool)
-    grid = grid.at[1:-1,1:-1].set(noise[:h-2,:w-2] > threshold)
-
-    return grid
 
 
 @functools.partial(jax.jit, static_argnames=('h', 'w'))
