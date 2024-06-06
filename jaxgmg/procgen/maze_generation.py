@@ -11,6 +11,40 @@ from flax import struct
 from jaxgmg.procgen import noise_generation
 
 
+def get_generator_function(name):
+    """
+    Maps a string descriptor of a maze generation method. Useful for handling
+    command line arguments.
+
+    Parameters:
+
+    * name : str
+        * 'kruskal' or 'tree' for `generate_tree_maze`
+        * 'edge' for `generate_edge_maze`
+        * 'block' or 'blocks' for `generate_block_maze`
+        * 'open' or 'empty' for `generate_open_maze`
+
+    Returns:
+
+    * the above-listed maze generation function
+    """
+    if name.lower() in {"kruskal", "tree"}:
+        return generate_tree_maze
+    elif name.lower() in {"edges", "bernoulli"}:
+        return generate_edge_maze
+    elif name.lower() in {"block", "blocks"}:
+        return generate_block_maze
+    elif name.lower() in {"noise"}:
+        return generate_noise_maze
+    elif name.lower() in {"open", "empty"}:
+        return generate_open_maze
+    else:
+        raise ValueError(f"Unknown maze generation method {name!r}")
+
+
+# # # 
+# GENERATING MAZES
+
 @struct.dataclass
 class MazeGenerator:
     """
@@ -387,90 +421,102 @@ class NoiseMazeGenerator(MazeGenerator):
         return grid
 
 
-def get_generator_function(name):
+@struct.dataclass
+class BlockMazeGenerator(MazeGenerator):
     """
-    Maps a string descriptor of a maze generation method. Useful for handling
-    command line arguments.
+    Generate block mazes (mazes with walls placed independently at random).
 
     Parameters:
 
-    * name : str
-        * 'kruskal' or 'tree' for `generate_tree_maze`
-        * 'edge' for `generate_edge_maze`
-        * 'block' or 'blocks' for `generate_block_maze`
-        * 'open' or 'empty' for `generate_open_maze`
-
-    Returns:
-
-    * the above-listed maze generation function
+    * height : int (>= 3)
+            Maze height (number of rows in grid).
+    * width : int (>= 3)
+            Maze width (number of columns in grid).
+    * wall_prob : float (probability, default 0.25)
     """
-    if name.lower() in {"kruskal", "tree"}:
-        return generate_tree_maze
-    elif name.lower() in {"edges", "bernoulli"}:
-        return generate_edge_maze
-    elif name.lower() in {"block", "blocks"}:
-        return generate_block_maze
-    elif name.lower() in {"noise"}:
-        return generate_noise_maze
-    elif name.lower() in {"open", "empty"}:
-        return generate_open_maze
-    else:
-        raise ValueError(f"Unknown maze generation method {name!r}")
+    wall_prob : float = 0.25
 
 
-@functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_open_maze(key, h, w):
+    def __post_init__(self):
+        assert self.height >= 3, "height must be at least 3"
+        assert self.width >= 3, "width must be at least 3"
+        assert 0.0 <= self.wall_prob <= 1.0, "wall_prob must be a probability"
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def generate(self, key):
+        """
+        Generate a `height` by `width` binary gridworld including a
+        1-wall-thick border around the perimeter and randomly placed walls
+        within the interior.
+
+        Parameters:
+
+        * key : PRNGKey
+                Unused (here for compatibility with other methods)
+        Returns:
+
+        * grid : bool[height, width]
+                The binary grid (True indicates a wall, False indicates a
+                path)
+        """
+        grid = jnp.ones((self.height, self.width), dtype=bool)
+
+        grid = grid.at[1:-1,1:-1].set(jax.random.bernoulli(
+            key=key,
+            p=self.wall_prob,
+            shape=(self.height-2, self.width-2),
+        ))
+
+        return grid
+
+
+@struct.dataclass
+class OpenMazeGenerator(MazeGenerator):
     """
-    Generate an `h` by `w` binary gridworld including a 1-wall-thick border
-    around the perimeter.
+    Generate open 'mazes' (mazes with no walls actually...).
 
     Parameters:
 
-    * key : PRNGKey
-            unused (here for compatibility with other methods)
-    * h : static int
-            height of the grid (num rows, >=3)
-    * w : static int
-            width of the grid (num columns, >=3)
-
-    Returns:
-
-    * grid : bool[h, w]
-            the binary grid (True indicates a wall, False indicates a path)
+    * height : int (>= 3)
+            Maze height (number of rows in grid).
+    * width : int (>= 3)
+            Maze width (number of columns in grid).
     """
-    assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    grid = jnp.zeros((h, w), dtype=bool)
-    grid = grid.at[::h-1,:].set(True)
-    grid = grid.at[:,::w-1].set(True)
-    return grid
 
 
-@functools.partial(jax.jit, static_argnames=('h', 'w'))
-def generate_open_maze(key, h, w):
-    """
-    Generate an `h` by `w` binary gridworld including a 1-wall-thick border
-    around the perimeter.
+    def __post_init__(self):
+        assert self.height >= 3, "height must be at least 3"
+        assert self.width >= 3, "width must be at least 3"
 
-    Parameters:
 
-    * key : PRNGKey
-            unused (here for compatibility with other methods)
-    * h : static int
-            height of the grid (num rows, >=3)
-    * w : static int
-            width of the grid (num columns, >=3)
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def generate(self, key):
+        """
+        Generate a `height` by `width` binary gridworld including a
+        1-wall-thick border around the perimeter and an empry interior.
 
-    Returns:
+        Parameters:
 
-    * grid : bool[h, w]
-            the binary grid (True indicates a wall, False indicates a path)
-    """
-    assert h >= 3 and w >= 3, "dimensions must be at least 3"
-    grid = jnp.zeros((h, w), dtype=bool)
-    grid = grid.at[::h-1,:].set(True)
-    grid = grid.at[:,::w-1].set(True)
-    return grid
+        * key : PRNGKey
+                Unused (here for compatibility with other methods)
+        Returns:
 
+        * grid : bool[height, width]
+                The binary grid (True indicates a wall, False indicates a
+                path)
+        """
+        # empty gridworld
+        grid = jnp.zeros((self.height, self.width), dtype=bool)
+        # fill in border
+        grid = grid.at[::self.height-1,:].set(True)
+        grid = grid.at[:,::self.width-1].set(True)
+
+        return grid
+
+
+# # # 
+# SOLVING MAZES
 
 @jax.jit
 def maze_distances(grid):

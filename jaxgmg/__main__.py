@@ -327,6 +327,46 @@ def maze_noise(
     print(img2str(maze * .25))
 
 
+def maze_blocks(
+    height: int = 79,
+    width: int = 79,
+    wall_prob: float = 0.25,
+    seed: int = 42,
+):
+    print("maze-blocks: generate and visualise a random block maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.BlockMazeGenerator(
+        height=height,
+        width=width,
+        wall_prob=wall_prob,
+    )
+    maze = gen.generate(key=rng)
+    print(img2str(maze * .25))
+
+
+def maze_open(
+    height: int = 79,
+    width: int = 79,
+    seed: int = 42, # unused
+):
+    print("maze-open: generate and visualise an open maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.OpenMazeGenerator(
+        height=height,
+        width=width,
+    )
+    maze = gen.generate(key=rng)
+    print(img2str(maze * .25))
+
+
+# # # 
+# MAZE SOLVING FUNCTIONALITY
+
+
 def maze_distance(
     layout: str = 'tree',
     height: int = 5,
@@ -945,6 +985,8 @@ app.command()(maze_direction)
 app.command()(maze_tree)
 app.command()(maze_edges)
 app.command()(maze_noise)
+app.command()(maze_blocks)
+app.command()(maze_open)
 
 # noise generation
 app.command()(perlin_noise)
