@@ -73,6 +73,42 @@ def play_forever(rng, env, level_generator, debug=False):
         print(f"\x1b[{lines+6}A")
 
 
+def mutate_forever(
+    rng,
+    env,
+    level_generator,
+    level_mutator,
+    fps,
+    debug=False,
+):
+    """
+    Helper function to repeatedly mutate and display a level.
+    """
+    # initial level
+    rng_initial_level, rng_reset, rng = jax.random.split(rng, 3)
+    level = level_generator.sample(rng_initial_level)
+    obs, _ = env.reset_to_level(rng_reset, level)
+    img = img2str(obs)
+    lines = len(img.splitlines())
+    print("initial level:", img, sep="\n")
+
+    # mutation levels
+    i = 1
+    while True:
+        rng_mutate, rng_reset, rng = jax.random.split(rng, 3)
+        level = level_mutator.mutate(rng_mutate, level)
+        obs, _ = env.reset_to_level(rng_reset, level)
+        img = img2str(obs)
+        print(
+            "" if debug else f"\x1b[{lines+2}A",
+            f"level after {i} mutations:",
+            img,
+            sep="\n",
+        )
+        time.sleep(1/fps)
+        i += 1
+
+
 def img2str(im, colormap=None):
     """
     Render a small image using a grid of unicode half-characters with
@@ -660,6 +696,179 @@ def solve_keys(
 
     
 # # # 
+# ENVIRONMENT MUTATORS
+
+
+def mutate_corner(
+    height: int                 = 13,
+    width: int                  = 13,
+    layout: str                 = 'open',
+    corner_size: int            = 11,
+    prob_wall_spawn: float      = 0.04,
+    prob_wall_despawn: float    = 0.05,
+    mouse_scatter: bool         = False,
+    max_mouse_steps: int        = 2,
+    cheese_scatter: bool        = True,
+    max_cheese_steps: int       = 0,
+    mut_corner_size: int        = 11,
+    seed: int                   = 42,
+    fps: int                    = 25,
+    debug: bool                 = False,
+):
+    print(
+        "mutate-corner: generate mutations of a random cheese in the corner "
+        "level"
+    )
+    print_config(locals())
+
+    print("initialising...")
+    rng = jax.random.PRNGKey(seed=seed)
+    env = cheese_in_the_corner.Env(
+        rgb=True,
+    )
+    level_generator = cheese_in_the_corner.LevelGenerator(
+        height=height,
+        width=width,
+        layout=layout,
+        corner_size=corner_size,
+    )
+    level_mutator = cheese_in_the_corner.LevelMutator(
+        prob_wall_spawn=prob_wall_spawn,
+        prob_wall_despawn=prob_wall_despawn,
+        mouse_scatter=mouse_scatter,
+        max_mouse_steps=max_mouse_steps,
+        cheese_scatter=cheese_scatter,
+        max_cheese_steps=max_cheese_steps,
+        corner_size=mut_corner_size,
+    )
+
+    mutate_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        level_mutator=level_mutator,
+        fps=fps,
+        debug=debug,
+    )
+
+
+def mutate_keys(
+    height: int                 = 13,
+    width: int                  = 13,
+    layout: str                 = 'open',
+    num_keys_min: int           = 2,
+    num_keys_max: int           = 6,
+    num_chests_min: int         = 4,
+    num_chests_max: int         = 4,
+    prob_wall_spawn: float      = 0.04,
+    prob_wall_despawn: float    = 0.05,
+    prob_scatter: float         = 0.1,
+    max_steps: int              = 1,
+    prob_num_keys_step: float   = 0.1,
+    mut_num_keys_min: int       = 2,
+    mut_num_keys_max: int       = 6,
+    prob_num_chests_step: float = 0.1,
+    mut_num_chests_min: int     = 1,
+    mut_num_chests_max: int     = 4,
+    seed: int                   = 42,
+    fps: int                    = 25,
+    debug: bool                 = False,
+):
+    print(
+        "mutate-keys: generate mutations of a random keys and chests level"
+    )
+    print_config(locals())
+
+    print("initialising...")
+    rng = jax.random.PRNGKey(seed=seed)
+    env = keys_and_chests.Env(
+        rgb=True,
+    )
+    level_generator = keys_and_chests.LevelGenerator(
+        height=height,
+        width=width,
+        layout=layout,
+        num_keys_min=num_keys_min,
+        num_keys_max=num_keys_max,
+        num_chests_min=num_chests_min,
+        num_chests_max=num_chests_max,
+    )
+    level_mutator = keys_and_chests.LevelMutator(
+        prob_wall_spawn=prob_wall_spawn,
+        prob_wall_despawn=prob_wall_despawn,
+        prob_scatter=prob_scatter,
+        max_steps=max_steps,
+        prob_num_keys_step=prob_num_keys_step,
+        num_keys_min=mut_num_keys_min,
+        num_keys_max=mut_num_keys_max,
+        prob_num_chests_step=prob_num_chests_step,
+        num_chests_min=mut_num_chests_min,
+        num_chests_max=mut_num_chests_max,
+    )
+
+    mutate_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        level_mutator=level_mutator,
+        fps=fps,
+        debug=debug,
+    )
+
+
+def mutate_monsters(
+    height: int                     = 13,
+    width: int                      = 13,
+    layout: str                     = 'open',
+    num_apples: int                 = 5,
+    num_shields: int                = 5,
+    num_monsters: int               = 5,
+    monster_optimality: int         = 3,
+    prob_wall_spawn: float          = 0.01,
+    prob_wall_despawn: float        = 0.3,
+    prob_scatter: float             = 0.1,
+    max_steps: int                  = 1,
+    monster_optimality_step: float  = 0.5,
+    seed: int                       = 42,
+    fps: int                        = 25,
+):
+    print(
+        "mutate-monsters: generate mutations of a random monster world level"
+    )
+    print_config(locals())
+
+    print("initialising...")
+    rng = jax.random.PRNGKey(seed=seed)
+    env = monster_world.Env(
+        rgb=True,
+    )
+    level_generator = monster_world.LevelGenerator(
+        height=height,
+        width=width,
+        layout=layout,
+        num_apples=num_apples,
+        num_shields=num_shields,
+        num_monsters=num_monsters,
+        monster_optimality=monster_optimality,
+    )
+    level_mutator = monster_world.LevelMutator(
+        prob_wall_spawn=prob_wall_spawn,
+        prob_wall_despawn=prob_wall_despawn,
+        prob_scatter=prob_scatter,
+        max_steps=max_steps,
+        monster_optimality_step=monster_optimality_step,
+    )
+
+    mutate_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        level_mutator=level_mutator,
+        fps=fps,
+    )
+
+
+# # # 
 # ENTRY POINT
 app = typer.Typer(
     no_args_is_help=True,
@@ -686,6 +895,11 @@ app.command()(play_lava)
 # solve environments
 app.command()(solve_corner)
 app.command()(solve_keys)
+
+# mutate environments
+app.command()(mutate_corner)
+app.command()(mutate_keys)
+app.command()(mutate_monsters)
 
 # let's go!
 app()
