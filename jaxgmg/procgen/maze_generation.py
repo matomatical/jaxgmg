@@ -11,7 +11,7 @@ from flax import struct
 from jaxgmg.procgen import noise_generation
 
 
-def get_generator_class(name):
+def get_generator_class_from_name(name):
     """
     Maps a string descriptor to a maze generator struct class.
 
@@ -44,19 +44,11 @@ def get_generator_class(name):
 class MazeGenerator:
     """
     Abstract base class for maze generation.
-
-    Parameters:
-
-    * height : int (>= 3)
-        Maze height (number of rows in grid).
-    * width : int (>= 3)
-        Maze width (number of columns in grid).
     """
-    height: int
-    width: int
 
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def generate(self, key):
+
+    @functools.partial(jax.jit, static_argnames=('self', 'height', 'width'))
+    def generate(self, key, height, width):
         """
         Generate a `height` by `width` binary gridworld with a 1-wall thick
         border and a maze of some kind in the interior.
@@ -72,25 +64,15 @@ class TreeMazeGenerator(MazeGenerator):
 
     Parameters:
 
-    * height : int (>= 3)
-        Maze height (number of rows in grid).
-    * width : int (>= 3)
-        Maze width (number of columns in grid).
     * alt_kruskal_algorithm : bool (default False)
-        Whether to use an alternative implementation of Kruskal's algorithm
-        (probably slower after JAX acceleration).
+            Whether to use an alternative implementation of Kruskal's
+            algorithm (probably slower after JAX acceleration).
     """
     alt_kruskal_algorithm: bool = False
 
-    def __post_init__(self):
-        assert self.height >= 3, "height must be at least 3"
-        assert self.width >= 3, "width must be at least 3"
-        assert self.height % 2 == 1, "height must be odd"
-        assert self.width % 2 == 1,  "width must be odd"
 
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def generate(self, key):
+    @functools.partial(jax.jit, static_argnames=('self', 'height', 'width'))
+    def generate(self, key, height, width):
         """
         Generate a `height` by `width` binary gridworld with a 1-wall thick
         border and a random acyclic maze in the centre.
@@ -107,17 +89,25 @@ class TreeMazeGenerator(MazeGenerator):
 
         * key : PRNGKey
                 RNG state (will be consumed)
+        * height : int (>= 3, odd)
+                Maze height (number of rows in grid, including borders).
+        * width : int (>= 3, odd)
+                Maze width (number of columns in grid, including borders).
 
         Returns:
 
         * grid : bool[height, width]
                 the binary grid (True indicates a wall, False indicates a
                 path)
-
-
         """
+        # validate dimensions (static)
+        assert height >= 3, "height must be at least 3"
+        assert width >= 3, "width must be at least 3"
+        assert height % 2 == 1, "height must be odd"
+        assert width % 2 == 1, "width must be odd"
+
         # assign each 'junction' in the grid an integer node id
-        H, W = self.height // 2, self.width // 2
+        H, W = height // 2, width // 2
         nodes = jnp.arange(H * W)
         ngrid = nodes.reshape((H, W))
 
@@ -134,7 +124,7 @@ class TreeMazeGenerator(MazeGenerator):
             include_edges = self._kruskal(key, nodes, edges)
 
         # finally, generate the grid array
-        grid = jnp.ones((self.height, self.width), dtype=bool)
+        grid = jnp.ones((height, width), dtype=bool)
         grid = grid.at[1::2,1::2].set(False)        # carve out junctions
         include_edges_ijs = jnp.rint(jnp.stack((    # carve out edges
             include_edges // W,
@@ -153,16 +143,16 @@ class TreeMazeGenerator(MazeGenerator):
         Parameters:
 
         * key : PRNGKey
-            Random state (consumed).
+                Random state (consumed).
         * nodes : int[n]
-            Labels of the nodes of the graph. Should be unique.
+                Labels of the nodes of the graph. Should be unique.
         * edges : int[m,2]
-            Label pairs for the edges available. Pairs should be unique.
+                Label pairs for the edges available. Pairs should be unique.
 
         Returns:
             
         * include_edges : int[n-1,2]
-            Subset of edges included in the random spanning tree.
+                Subset of edges included in the random spanning tree.
 
         Note: if the node labels are not unique or the graph is not
         connected, some of the entries in `include_edges` may become invalid.
@@ -273,10 +263,6 @@ class EdgeMazeGenerator(MazeGenerator):
 
     Parameters:
 
-    * height : int (>= 3)
-        Maze height (number of rows in grid).
-    * width : int (>= 3)
-        Maze width (number of columns in grid).
     * edge_prob : float (probability, default 0.75).
         Independent probability for each edge between grid nodes to be
         available in the maze.
@@ -285,16 +271,12 @@ class EdgeMazeGenerator(MazeGenerator):
     """
     edge_prob: float = 0.75
 
-    def __post_init__(self):
-        assert self.height >= 3, "height must be at least 3"
-        assert self.width >= 3, "width must be at least 3"
-        assert self.height % 2 == 1, "height must be odd"
-        assert self.width % 2 == 1,  "width must be odd"
+    def __post_init(self):
         assert 0.0 <= self.edge_prob <= 1.0, "edge_prob must be a probability"
 
 
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def generate(self, key):
+    @functools.partial(jax.jit, static_argnames=('self', 'height', 'width'))
+    def generate(self, key, height, width):
         """
         Generate a `height` by `width` binary gridworld including a
         1-wall-thick border around the perimiter and a grid graph with random
@@ -313,6 +295,10 @@ class EdgeMazeGenerator(MazeGenerator):
 
         * key : PRNGKey
                 RNG state (will be consumed).
+        * height : int (>= 3, odd)
+                Maze height (number of rows in grid, including borders).
+        * width : int (>= 3, odd)
+                Maze width (number of columns in grid, including borders).
 
         Returns:
 
@@ -320,9 +306,15 @@ class EdgeMazeGenerator(MazeGenerator):
                 The binary grid (True indicates a wall, False indicates a
                 path).
         """
-        H = self.height // 2
-        W = self.width // 2
-        grid = jnp.ones((self.height, self.width), dtype=bool)
+        # validate dimensions (static)
+        assert height >= 3, "height must be at least 3"
+        assert width >= 3, "width must be at least 3"
+        assert height % 2 == 1, "height must be odd"
+        assert width % 2 == 1, "width must be odd"
+
+        grid_height = height // 2
+        grid_width = width // 2
+        grid = jnp.ones((height, width), dtype=bool)
 
         # junctions
         grid = grid.at[1:-1:2,1:-1:2].set(False)
@@ -332,12 +324,12 @@ class EdgeMazeGenerator(MazeGenerator):
         grid = grid.at[2:-2:2,1:-1:2].set(~jax.random.bernoulli(
             key=kh,
             p=self.edge_prob,
-            shape=(H-1, W),
+            shape=(grid_height-1, grid_width),
         ))
         grid = grid.at[1:-1:2,2:-2:2].set(~jax.random.bernoulli(
             key=kv,
             p=self.edge_prob,
-            shape=(H, W-1),
+            shape=(grid_height, grid_width-1),
         ))
 
         return grid
@@ -351,10 +343,6 @@ class NoiseMazeGenerator(MazeGenerator):
 
     Parameters:
 
-    * height : int (>= 3)
-        Maze height (number of rows in grid).
-    * width : int (>= 3)
-        Maze width (number of columns in grid).
     * wall_threshold : float (between -1.0 and 1.0, default 0.25)
         The noise threshold above which a wall spawns.
     * cell_size : int (>= 2, default 2)
@@ -368,33 +356,39 @@ class NoiseMazeGenerator(MazeGenerator):
 
 
     def __post_init__(self):
-        assert self.height >= 3, "height must be at least 3"
-        assert self.width >= 3, "width must be at least 3"
         assert -1.0 <= self.wall_threshold <= 1.0, "invalid threshold"
         assert self.cell_size >= 1, "cell size must be at least 2"
         assert self.num_octaves >= 1, "num octaves must be positive"
 
 
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def generate(self, key):
+    @functools.partial(jax.jit, static_argnames=('self', 'height', 'width'))
+    def generate(self, key, height, width):
         """
         Generate a `height` by `width` binary gridworld including a
         1-wall-thick border around the perimiter and an arrangement of walls
-        in the center determined by Perlin noise.
+        in the center determined by (a slice of) Perlin noise.
 
         Parameters:
 
         * key : PRNGKey
                 RNG state (will be consumed)
+        * height : int (>= 3)
+                Maze height (number of rows in grid, including borders).
+        * width : int (>= 3)
+                Maze width (number of columns in grid, including borders).
 
         Returns:
 
         * grid : bool[height, width]
                 the binary grid (True indicates a wall, False indicates a path)
         """
+        # validate dimensions (static)
+        assert height >= 3, "height must be at least 3"
+        assert width >= 3, "width must be at least 3"
+
         # make noise size a multiple of cell_size larger than the interior
-        interior_height = self.height - 2
-        interior_width = self.width - 2
+        interior_height = height - 2
+        interior_width = width - 2
         
         def next_multiple(number, divisor):
             quotient = (number // divisor) + ((number % divisor) > 0)
@@ -419,7 +413,7 @@ class NoiseMazeGenerator(MazeGenerator):
         )
 
         # build the grid
-        grid = jnp.ones((self.height, self.width), dtype=bool)
+        grid = jnp.ones((height, width), dtype=bool)
         grid = grid.at[1:-1,1:-1].set(interior_walls)
 
         return grid
@@ -432,23 +426,17 @@ class BlockMazeGenerator(MazeGenerator):
 
     Parameters:
 
-    * height : int (>= 3)
-            Maze height (number of rows in grid).
-    * width : int (>= 3)
-            Maze width (number of columns in grid).
     * wall_prob : float (probability, default 0.25)
     """
     wall_prob : float = 0.25
 
 
     def __post_init__(self):
-        assert self.height >= 3, "height must be at least 3"
-        assert self.width >= 3, "width must be at least 3"
         assert 0.0 <= self.wall_prob <= 1.0, "wall_prob must be a probability"
 
 
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def generate(self, key):
+    @functools.partial(jax.jit, static_argnames=('self', 'height', 'width'))
+    def generate(self, key, height, width):
         """
         Generate a `height` by `width` binary gridworld including a
         1-wall-thick border around the perimeter and randomly placed walls
@@ -458,18 +446,27 @@ class BlockMazeGenerator(MazeGenerator):
 
         * key : PRNGKey
                 Unused (here for compatibility with other methods)
+        * height : int (>= 3, odd)
+                Maze height (number of rows in grid, including borders).
+        * width : int (>= 3, odd)
+                Maze width (number of columns in grid, including borders).
+
         Returns:
 
         * grid : bool[height, width]
                 The binary grid (True indicates a wall, False indicates a
                 path)
         """
-        grid = jnp.ones((self.height, self.width), dtype=bool)
+        # validate (static)
+        assert height >= 3, "height must be at least 3"
+        assert width >= 3, "width must be at least 3"
+
+        grid = jnp.ones((height, width), dtype=bool)
 
         grid = grid.at[1:-1,1:-1].set(jax.random.bernoulli(
             key=key,
             p=self.wall_prob,
-            shape=(self.height-2, self.width-2),
+            shape=(height-2, width-2),
         ))
 
         return grid
@@ -479,23 +476,10 @@ class BlockMazeGenerator(MazeGenerator):
 class OpenMazeGenerator(MazeGenerator):
     """
     Generate open 'mazes' (mazes with no walls actually...).
-
-    Parameters:
-
-    * height : int (>= 3)
-            Maze height (number of rows in grid).
-    * width : int (>= 3)
-            Maze width (number of columns in grid).
     """
 
-
-    def __post_init__(self):
-        assert self.height >= 3, "height must be at least 3"
-        assert self.width >= 3, "width must be at least 3"
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def generate(self, key):
+    @functools.partial(jax.jit, static_argnames=('self', 'height', 'width'))
+    def generate(self, key, height, width):
         """
         Generate a `height` by `width` binary gridworld including a
         1-wall-thick border around the perimeter and an empry interior.
@@ -504,17 +488,26 @@ class OpenMazeGenerator(MazeGenerator):
 
         * key : PRNGKey
                 Unused (here for compatibility with other methods)
+        * height : int (>= 3, odd)
+                Maze height (number of rows in grid, including borders).
+        * width : int (>= 3, odd)
+                Maze width (number of columns in grid, including borders).
+
         Returns:
 
         * grid : bool[height, width]
                 The binary grid (True indicates a wall, False indicates a
                 path)
         """
+        # validate dimensions (static)
+        assert height >= 3, "height must be at least 3"
+        assert width >= 3, "width must be at least 3"
+
         # empty gridworld
-        grid = jnp.zeros((self.height, self.width), dtype=bool)
+        grid = jnp.zeros((height, width), dtype=bool)
         # fill in border
-        grid = grid.at[::self.height-1,:].set(True)
-        grid = grid.at[:,::self.width-1].set(True)
+        grid = grid.at[::height-1,:].set(True)
+        grid = grid.at[:,::width-1].set(True)
 
         return grid
 

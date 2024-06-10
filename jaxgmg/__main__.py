@@ -259,11 +259,13 @@ def mazegen_tree(
 
     rng = jax.random.PRNGKey(seed=seed)
     gen = maze_generation.TreeMazeGenerator(
-        height=height,
-        width=width,
         alt_kruskal_algorithm=alt_kruskal_algorithm,
     )
-    maze = gen.generate(key=rng)
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
 
@@ -278,11 +280,13 @@ def mazegen_edges(
 
     rng = jax.random.PRNGKey(seed=seed)
     gen = maze_generation.EdgeMazeGenerator(
-        height=height,
-        width=width,
         edge_prob=edge_prob,
     )
-    maze = gen.generate(key=rng)
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
 
@@ -299,13 +303,15 @@ def mazegen_noise(
 
     rng = jax.random.PRNGKey(seed=seed)
     gen = maze_generation.NoiseMazeGenerator(
-        height=height,
-        width=width,
         wall_threshold=wall_threshold,
         cell_size=cell_size,
         num_octaves=num_octaves,
     )
-    maze = gen.generate(key=rng)
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
 
@@ -320,11 +326,13 @@ def mazegen_blocks(
 
     rng = jax.random.PRNGKey(seed=seed)
     gen = maze_generation.BlockMazeGenerator(
-        height=height,
-        width=width,
         wall_prob=wall_prob,
     )
-    maze = gen.generate(key=rng)
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
 
@@ -337,11 +345,12 @@ def mazegen_open(
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.OpenMazeGenerator(
+    gen = maze_generation.OpenMazeGenerator()
+    maze = gen.generate(
+        key=rng,
         height=height,
         width=width,
     )
-    maze = gen.generate(key=rng)
     print(img2str(maze * .25))
 
 

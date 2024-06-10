@@ -32,6 +32,7 @@ from flax import struct
 
 from jaxgmg.procgen import maze_generation
 from jaxgmg.procgen import maze_solving
+
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -564,11 +565,12 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_class(self.layout)(
+        wall_map = maze_generation.get_generator_class_from_name(
+            name=self.layout
+        )().generate(
+            key=rng_walls,
             height=self.height,
             width=self.width,
-        ).generate(
-            key=rng_walls,
         )
 
         # spawn random mouse pos, keys pos, chests pos
