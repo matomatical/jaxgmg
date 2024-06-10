@@ -47,7 +47,7 @@ Core environments:
 * [x] Monster world
 * [x] Cheese on a dish
 * [x] Lava land
-* [ ] Follow the leader (simplified 'cultural transmission')
+* [x] Follow the leader (simplified 'cultural transmission')
 * [ ] Forest recovery
 
 Environment features:
@@ -63,8 +63,8 @@ RL baselines:
 
 Release:
 
-* [ ] Create this repository
-* [ ] Installable python package
+* [x] Create this repository
+* [x] Format project as an installable Python package
 * [ ] Document experiments in a report
 * [ ] Release v1 on arXiv and PyPI
 
