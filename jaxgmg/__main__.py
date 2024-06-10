@@ -16,6 +16,7 @@ from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import lava_land
+from jaxgmg.environments import follow_me
 
 
 # # # 
@@ -71,7 +72,8 @@ def play_forever(rng, env, level_generator, debug=False):
             )
             if d:
                 break
-        print(f"\x1b[{lines+6}A")
+        if not debug:
+            print(f"\x1b[{lines+6}A")
 
 
 def img2str(im, colormap=None):
@@ -395,7 +397,7 @@ def mazesoln_direction(
     soln = maze_solving.maze_optimal_directions(maze, stay_action=stay_action)
 
     print("visualising directions...")
-    # transform {0,1,2,3} -> {1,2,3,4} and walls -> 0
+    # transform {0,1,2,3,4} -> {1,2,3,4,5} and walls -> 0
     soln = (1 + soln) * ~maze * ~maze[:,:,None,None]
     # rearrange into macro/micro maze format
     print(img2str(
@@ -604,7 +606,7 @@ def play_lava(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("monsters: interact with a random monster world level")
+    print("lava: interact with a random 'lava land' level")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -616,6 +618,37 @@ def play_lava(
             name=layout
         )(),
         lava_threshold=lava_threshold,
+    )
+    play_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        debug=debug,
+    )
+    
+
+def play_follow(
+    height: int                 = 13,
+    width: int                  = 9,
+    layout: str                 = 'edges',
+    num_beacons: int            = 3,
+    trustworthy_leader: bool    = True,
+    seed: int                   = 42,
+    debug: bool                 = False,
+):
+    print("follow: interact with a random 'follow me' level")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = follow_me.Env(rgb=True)
+    level_generator = follow_me.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        num_beacons=num_beacons,
+        trustworthy_leader=trustworthy_leader,
     )
     play_forever(
         rng=rng,
@@ -803,6 +836,7 @@ app.command()(play_keys)
 app.command()(play_dish)
 app.command()(play_monsters)
 app.command()(play_lava)
+app.command()(play_follow)
 
 # solve environments
 app.command()(solve_corner)

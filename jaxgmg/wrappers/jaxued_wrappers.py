@@ -29,9 +29,10 @@ import chex
 from flax import struct
 from gymnax.environments import spaces
 
-from gmg_environments.base import Env, EnvState, Level
 from jaxued.environments import UnderspecifiedEnv
 from jaxued.environments.underspecified_env import EnvParams
+
+from jaxgmg.environments.base import Env, EnvState, Level
 
 
 Observation = chex.Array
