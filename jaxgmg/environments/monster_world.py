@@ -590,6 +590,8 @@ class LevelParser:
             The number of shields in the level.
     * monster_optimality : float
             The inverse temperature for the monster softmax distribution.
+    * inventory_map : int[num_keys_max] (all are < width)
+            The indices into the top row where successive keys are stored.
     * char_map : optional, dict{str: int}
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
@@ -608,6 +610,7 @@ class LevelParser:
     num_monsters: int
     num_shields: int
     monster_optimality: float
+    inventory_map: chex.Array
     char_map = {
         '#': Env.Channel.WALL,
         '@': Env.Channel.MOUSE,
@@ -639,7 +642,20 @@ class LevelParser:
         ... # # # # #
         ... ''')
         Level(
-            TODO!
+            wall_map=Array([
+                [1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 1],
+                [1, 0, 1, 0, 1],
+                [1, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1],
+            ], dtype=bool),
+            apples_pos=Array([[1,2], [3,3]]),
+            shields_pos=Array([[1,1], [2,3]]),
+            initial_monsters_pos=Array([[1,3], [3,2]]),
+            initial_mouse_pos=Array([2,1]),
+            dist_map=Array([[[[....]]]]),
+            monster_optimality=3.0,
+            inventory_map=Array([0,1]),
         )
         """
         # parse into grid of IntEnum elements
@@ -671,7 +687,7 @@ class LevelParser:
         )
 
         # extract monsters positions and number
-        monster_map = (level_map == Env.Channel.monster)
+        monster_map = (level_map == Env.Channel.MONSTER)
         num_monsters = monster_map.sum()
         assert num_monsters == self.num_monsters, "wrong number of monsters"
         monsters_pos = jnp.stack(
@@ -680,7 +696,7 @@ class LevelParser:
         )
 
         # extract shields positions and number
-        shield_map = (level_map == Env.Channel.shield)
+        shield_map = (level_map == Env.Channel.SHIELD)
         num_shields = shield_map.sum()
         assert num_shields == self.num_shields, "wrong number of shields"
         shields_pos = jnp.stack(
@@ -695,9 +711,6 @@ class LevelParser:
             jnp.where(mouse_spawn_map, size=1)
         )
 
-        # devise an arbitrary inventory ordering
-        inventory_map = jnp.arange(self.num_shields)
-        
         return Level(
             wall_map=wall_map,
             apples_pos=apples_pos,
@@ -706,7 +719,7 @@ class LevelParser:
             initial_mouse_pos=initial_mouse_pos,
             dist_map=dist_map,
             monster_optimality=self.monster_optimality,
-            inventory_map=inventory_map,
+            inventory_map=jnp.asarray(self.inventory_map),
         )
     
 

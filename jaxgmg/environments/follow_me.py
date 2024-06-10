@@ -511,8 +511,8 @@ class LevelParser:
         For example:
 
         >>> p = LevelParser(
-        ...     height=5,
-        ...     width=5,
+        ...     height=7,
+        ...     width=7,
         ...     num_beacons=3,
         ...     leader_order=(0,1,2),
         ... )
@@ -526,7 +526,20 @@ class LevelParser:
         ... # # # # # # #
         ... ''')
         Level(
-            TODO!
+            wall_map=Array([
+                [1,1,1,1,1,1,1],
+                [1,0,1,0,0,0,1],
+                [1,0,1,0,1,1,1],
+                [1,0,0,0,0,0,1],
+                [1,0,1,0,1,1,1],
+                [1,0,1,0,0,0,1],
+                [1,1,1,1,1,1,1],
+            ], dtype=bool),
+            beacons_pos=Array([[3,5],[1,5],[5,5]]),
+            initial_leader_pos=Array([4,1]),
+            leader_order=Array([0,1,2]),
+            dir_map=Array([[[...]]]),
+            initial_mouse_pos=Array([1,1]),
         )
         """
         # parse into grid of IntEnum elements
@@ -549,8 +562,8 @@ class LevelParser:
         beacon_map = (level_map == Env.Channel.BEACON)
         num_beacons = beacon_map.sum()
         assert num_beacons == self.num_beacons, "wrong number of beacons"
-        unordored_beacons_pos = jnp.stack(
-            jnp.where(beacons_map, size=self.num_beacons),
+        unordered_beacons_pos = jnp.stack(
+            jnp.where(beacon_map, size=self.num_beacons),
             axis=1,
         )
         # extract beacon order!
@@ -592,8 +605,8 @@ class LevelParser:
         return Level(
             wall_map=wall_map,
             beacons_pos=beacons_pos,
-            initial_leader_pos=leader_pos,
-            leader_order=leader_order,
+            initial_leader_pos=initial_leader_pos,
+            leader_order=jnp.asarray(self.leader_order),
             dir_map=dir_map,
             initial_mouse_pos=initial_mouse_pos,
         )
