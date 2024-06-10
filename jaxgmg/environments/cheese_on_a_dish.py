@@ -15,8 +15,6 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level.
-* `LevelMutator` class, provides `mutate` method for mutating an existing
-  level with configurable mutations.
 * `LevelParser` class, provides a `parse` and `parse_batch` method for
   designing Level structs based on ASCII depictions.
 """
@@ -31,7 +29,8 @@ import chex
 import einops
 from flax import struct
 
-from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_generation as mg
+from jaxgmg.procgen import maze_solving
 
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
@@ -286,27 +285,20 @@ class LevelGenerator(base.LevelGenerator):
     * width : int (>= 3, odd)
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('tree', 'bernoulli', 'blocks', 'noise', or 'open')
-            specifies the maze generation method to use (see module
-            `maze_generation` for details)
+    * maze_generator : maze_generation.MazeGenerator
+            Provides the maze generation method to use (see module
+            `maze_generation` for details).
+            The default is a tree maze generator using Kruskal's algorithm.
     * max_cheese_radius : int (>=0)
             the cheese will spawn within this many steps away from the
             location of the dish.
     """
     height: int = 13
     width: int = 13
-    layout : str = 'tree'
+    maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     max_cheese_radius: int = 0
     
     def __post_init__(self):
-        # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'noise', 'open'}
-        # validate dimensions
-        assert self.height >= 3
-        assert self.width >= 3
-        if self.layout == 'tree' or self.layout == 'edges':
-            assert self.height % 2 == 1, "height must be odd for this layout"
-            assert self.width % 2 == 1,  "width must be odd for this layout"
         # validate cheese radius
         assert self.max_cheese_radius >= 0
 
@@ -319,10 +311,10 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = self.maze_generator.generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
+            height=self.height,
+            width=self.width,
         )
 
         # sample spawn positions by sampling from a list of coordinate pairs
@@ -357,7 +349,7 @@ class LevelGenerator(base.LevelGenerator):
         )
 
         # cheese spawns in some remaining valid position near the dish
-        distance_to_dish = maze_generation.maze_distances(wall_map)[
+        distance_to_dish = maze_solving.maze_distances(wall_map)[
             dish_pos[0],
             dish_pos[1],
         ]

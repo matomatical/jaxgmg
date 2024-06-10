@@ -15,8 +15,6 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level.
-* `LevelMutator` class, provides `mutate` method for mutating an existing
-  level with configurable mutations.
 * `LevelParser` class, provides a `parse` and `parse_batch` method for
   designing Level structs based on ASCII depictions.
 """
@@ -31,7 +29,9 @@ import chex
 import einops
 from flax import struct
 
-from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_generation as mg
+from jaxgmg.procgen import maze_solving
+
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -287,7 +287,7 @@ class Env(base.Env):
           position rather than initial position.
         """
         # compute distance between mouse and cheese
-        dist = maze_generation.maze_distances(level.wall_map)
+        dist = maze_solving.maze_distances(level.wall_map)
         optimal_dist = dist[
             level.initial_mouse_pos[0],
             level.initial_mouse_pos[1],
@@ -323,33 +323,25 @@ class LevelGenerator(base.LevelGenerator):
     `sample` method that generates a random level.
 
     * height : int,(>= 3, odd)
-            the number of rows in the grid representing the maze
+            The number of rows in the grid representing the maze
             (including top and bottom boundary rows)
     * width : int (>= 3, odd)
-            the number of columns in the grid representing the maze
+            The number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('tree', 'bernoulli', 'blocks', 'noise', or 'open')
-            specifies the maze generation method to use (see module
-            `maze_generation` for details)
+    * maze_generator : maze_generation.MazeGenerator
+            Provides the maze generation method to use (see module
+            `maze_generation` for details).
+            The default is a tree maze generator using Kruskal's algorithm.
     * corner_size : int (>=1, <=width, <=height):
-            the cheese will spawn within a square of this width located in
+            The cheese will spawn within a square of this width located in
             the top left corner.
     """
     height: int = 13
     width: int = 13
-    layout : str = 'tree'
+    maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     corner_size: int = 1
     
     def __post_init__(self):
-        # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open', 'noise'}
-        # validate dimensions
-        assert self.height >= 3
-        assert self.width >= 3
-        if self.layout == 'tree' or self.layout == 'edges':
-            assert self.height % 2 == 1, "height must be odd for this layout"
-            assert self.width % 2 == 1,  "width must be odd for this layout"
-        # validate corner size
         assert self.corner_size >= 1
         assert self.corner_size <= self.width - 2
 
@@ -362,10 +354,10 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = self.maze_generator.generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
+            height=self.height,
+            width=self.width,
         )
 
         # sample spawn positions by sampling from a list of coordinate pairs
@@ -409,246 +401,6 @@ class LevelGenerator(base.LevelGenerator):
             cheese_pos=cheese_pos,
             initial_mouse_pos=initial_mouse_pos,
         )
-
-
-@struct.dataclass
-class LevelMutator(base.LevelMutator):
-    """
-    Configurable level mutator. Provides a 'mutate' method that transforms a
-    level into a slightly different level, with the configured mutation
-    operations.
-
-    Parameters:
-
-    * prob_wall_spawn : float
-            Probability that a given interior (non-border) wall will despawn
-            during a mutation.
-    * prob_wall_despawn : float
-            Probability that a given blank space (with no wall, also no
-            cheese or mouse) will spawn a wall during a mutation.
-    * mouse_scatter : bool
-            If true, then each mutation will resample a new initial mouse
-            position. If false, then the initial mouse position will only be
-            changed if `max_mouse_steps > 0`.
-    * max_mouse_steps : int (>= 0)
-            If positive and `mouse_scatter` is false, then sample this many
-            directions and apply them to the initial mouse position.
-            (If the position would move into the cheese or a wall, the move
-            is not applied).
-    * cheese_scatter : bool
-            If true, then each mutation will resample a new cheese position
-            within the top left `corner_size` by `corner_size` region of the
-            map. If false, then the cheese position will only be changed if
-            `max_cheese_steps > 0`.
-    * max_cheese_steps : int (>= 0)
-            If positive and `cheese_scatter` is false, then sample this many
-            directions and apply them to the cheese position.
-            (If the position would move into the mouse, into a wall, or out
-            of the top left `corner_size` by `corner_size` region, the move
-            is not applied).
-    * corner_size : int (>= 1)
-            The size of the region in the top left corner to which the cheese
-            is confined. Starts from 1 and doesn't count the border squares.
-            For example, a value of 1 means the cheese will be confined to
-            the position (1, 1), or a value of 2 means the cheese will be
-            confined to the positions (1, 1), (1, 2), (2, 1), (2, 2).
-    
-    Notes:
-
-    * The wall mutations are applied first, then the mouse position
-      mutations, then the cheese position mutations.
-    * As long as the input level initially has distinct locations for all
-      walls, the cheese, and the initial mouse location, and the cheese is in
-      the requested corner region, the mutation function should work as
-      expected. However, if these invariants are violated, then it's possible
-      that the mutation will crash or return an invalid level.
-      * For example, this could happen if the entire corner region is covered
-        by walls and so there is nowhere to scatter the cheese.
-    """
-    prob_wall_spawn: float
-    prob_wall_despawn: float
-    mouse_scatter: bool
-    max_mouse_steps: int
-    cheese_scatter: bool
-    max_cheese_steps: int
-    corner_size: int
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def mutate(self, rng: chex.PRNGKey, level: Level):
-        # toggle walls
-        if self.prob_wall_spawn > 0 or self.prob_wall_despawn > 0:
-            rng_walls, rng = jax.random.split(rng)
-            level = self._toggle_walls(rng_walls, level)
-
-        # moving mouse spawn location
-        if self.mouse_scatter:
-            rng_mouse, rng = jax.random.split(rng)
-            level = self._scatter_mouse(rng_mouse, level)
-        elif self.max_mouse_steps > 0:
-            rng_mouse, rng = jax.random.split(rng)
-            def _step(level, rng_step):
-                return self._step_mouse(rng_step, level), None
-            level, _ = jax.lax.scan(
-                _step,
-                level,
-                jax.random.split(rng_mouse, self.max_mouse_steps),
-                unroll=True,
-            )
-
-        # move cheese location
-        if self.cheese_scatter:
-            rng_cheese, rng = jax.random.split(rng)
-            level = self._scatter_cheese(rng_cheese, level)
-        elif self.max_cheese_steps > 0:
-            rng_cheese, rng = jax.random.split(rng)
-            def _step(level, rng_step):
-                return self._step_cheese(rng_step, level), None
-            level, _ = jax.lax.scan(
-                _step,
-                level,
-                jax.random.split(rng_cheese, self.max_cheese_steps),
-                unroll=True,
-            )
-
-        return level
-
-
-    def _toggle_walls(self, rng, level):
-        # decide which walls to toggle
-        h, w = level.wall_map.shape
-        prob_wall_toggle = jnp.where(
-            level.wall_map[1:-1,1:-1],
-            self.prob_wall_despawn,
-            self.prob_wall_spawn,
-        )
-        walls_to_toggle = jax.random.bernoulli(
-            key=rng,
-            p=prob_wall_toggle,
-            shape=(h-2, w-2),
-        )
-        walls_to_toggle = jnp.pad(
-            walls_to_toggle,
-            pad_width=1,
-            constant_values=False,
-        )
-        
-        # don't toggle the place where the cheese or the mouse is
-        walls_to_toggle = walls_to_toggle.at[
-            (level.cheese_pos[0], level.initial_mouse_pos[0]),
-            (level.cheese_pos[1], level.initial_mouse_pos[1]),
-        ].set(False)
-
-        # toggle!
-        new_wall_map = jnp.logical_xor(level.wall_map, walls_to_toggle)
-
-        return level.replace(wall_map=new_wall_map)
-
-    
-    def _scatter_mouse(self, rng, level):
-        coords = einops.rearrange(
-            jnp.indices(level.wall_map.shape),
-            'c h w -> (h w) c',
-        )
-
-        # avoid walls and cheese
-        no_wall = ~level.wall_map.flatten()
-        no_cheese = jnp.ones_like(level.wall_map).at[
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ].set(False).flatten()
-        
-        # resample a new mouse position
-        new_initial_mouse_pos = coords[jax.random.choice(
-            key=rng,
-            a=coords.shape[0],
-            shape=(),
-            p=no_wall & no_cheese,
-        )]
-
-        return level.replace(initial_mouse_pos=new_initial_mouse_pos)
-
-
-    def _scatter_cheese(self, rng, level):
-        coords = einops.rearrange(
-            jnp.indices(level.wall_map.shape),
-            'c h w -> (h w) c',
-        )
-
-        # identify the top corner region
-        in_corner = jnp.logical_and(
-            coords[:, 0] < self.corner_size + 1, # first `corner_size+1` rows
-            coords[:, 1] < self.corner_size + 1, # first `corner_size+1` cols
-            # (+1s account for boundary which is masked out by `no_wall` mask)
-        ).flatten()
-
-        # avoid walls and mouse
-        no_wall = ~level.wall_map.flatten()
-        no_mouse = jnp.ones_like(level.wall_map).at[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-        ].set(False).flatten()
-        
-        # resample a new cheese position
-        new_cheese_pos = coords[jax.random.choice(
-            key=rng,
-            a=coords.shape[0],
-            shape=(),
-            p=no_wall & no_mouse & in_corner,
-        )]
-
-        return level.replace(cheese_pos=new_cheese_pos)
-
-
-    def _step_mouse(self, rng, level):
-        # choose a random direction
-        steps = jnp.array((
-            (-1,  0),   # up
-            ( 0, -1),   # left
-            (+1,  0),   # down
-            ( 0, +1),   # right
-        ))
-        direction = jax.random.choice(rng, 4)
-
-        # check it's clear of obstacles
-        try_pos = level.initial_mouse_pos + steps[direction]
-        hit_wall = level.wall_map[try_pos[0], try_pos[1]]
-        hit_cheese = (try_pos == level.cheese_pos).all()
-
-        # if so, move
-        new_initial_mouse_pos = jax.lax.select(
-            hit_wall | hit_cheese,
-            level.initial_mouse_pos,
-            try_pos,
-        )
-
-        return level.replace(initial_mouse_pos=new_initial_mouse_pos)
-
-
-    def _step_cheese(self, rng, level):
-        # choose a random direction
-        steps = jnp.array((
-            (-1,  0),   # up
-            ( 0, -1),   # left
-            (+1,  0),   # down
-            ( 0, +1),   # right
-        ))
-        direction = jax.random.choice(rng, 4)
-
-        # check it's clear of obstacles and inside the corner
-        try_pos = level.cheese_pos + steps[direction]
-        hit_wall = level.wall_map[try_pos[0], try_pos[1]]
-        hit_mouse = (try_pos == level.initial_mouse_pos).all()
-        beyond_corner = (try_pos > self.corner_size).any()
-
-        # if so, move
-        new_cheese_pos = jax.lax.select(
-            hit_wall | hit_mouse | beyond_corner,
-            level.cheese_pos,
-            try_pos,
-        )
-        
-        return level.replace(cheese_pos=new_cheese_pos)
 
 
 @struct.dataclass

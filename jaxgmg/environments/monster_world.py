@@ -15,8 +15,6 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level from a configurable level distribution.
-* `LevelMutator` class, provides `mutate` method for mutating an existing
-  level with configurable 
 """
 
 from typing import Tuple
@@ -29,7 +27,9 @@ import chex
 import einops
 from flax import struct
 
-from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_generation as mg
+from jaxgmg.procgen import maze_solving
+
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -475,9 +475,10 @@ class LevelGenerator(base.LevelGenerator):
     * width : int (>= 3, odd)
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('open', 'tree', 'bernoulli', 'blocks', or 'noise')
-            specifies the maze generation method to use (see module
-            `maze_generation` for details)
+    * maze_generator : maze_generation.MazeGenerator
+            Provides the maze generation method to use (see module
+            `maze_generation` for details).
+            The default is an open maze generator (no obstacles).
     * num_shields : int
             the number of shields to randomly place in each generated maze
     * num_monsters : int
@@ -487,23 +488,15 @@ class LevelGenerator(base.LevelGenerator):
     * monster_optimality : float (positive, default 10)
             inverse temperature for the monster to step towards the player
     """
-    height: int                 = 13
-    width: int                  = 13
-    layout: str                 = 'open'
-    num_shields: int            = 5
-    num_monsters: int           = 5
-    num_apples: int             = 5
-    monster_optimality: float   = 3
+    height: int = 13
+    width: int = 13
+    maze_generator : mg.MazeGenerator = mg.OpenMazeGenerator()
+    num_shields: int = 5
+    num_monsters: int = 5
+    num_apples: int = 5
+    monster_optimality: float = 3
     
     def __post_init__(self):
-        # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open', 'noise'}
-        # validate dimensions
-        assert self.height >= 3
-        assert self.width >= 3
-        if self.layout == 'tree' or self.layout == 'edges':
-            assert self.height % 2 == 1, "height must be odd for this layout"
-            assert self.width % 2 == 1,  "width must be odd for this layout"
         # validate shields
         assert self.num_shields > 0
         assert self.num_shields <= self.width, "not enough space for inventory"
@@ -522,10 +515,10 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct the wall map
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = self.maze_generator.generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
+            height=self.height,
+            width=self.width,
         )
         
         # spawn random mouse, apple, shield and monster positions
@@ -549,7 +542,7 @@ class LevelGenerator(base.LevelGenerator):
         initial_monsters_pos = all_pos[num_all-self.num_monsters:num_all]
 
         # solve the map and cache the solution for the monsters
-        dist_map = maze_generation.maze_directional_distances(wall_map)
+        dist_map = maze_solving.maze_directional_distances(wall_map)
 
         # decide random positions for shield display
         rng_inventory, rng = jax.random.split(rng)
@@ -572,282 +565,3 @@ class LevelGenerator(base.LevelGenerator):
         )
 
 
-@struct.dataclass
-class LevelMutator(base.LevelMutator):
-    """
-    Configurable level mutator. Provides a 'mutate' method that transforms a
-    level into a slightly different level, with the configured mutation
-    operations.
-
-    Parameters:
-
-    * prob_wall_spawn : float (probability)
-            Probability that a given interior (non-border) wall will despawn
-            during a mutation.
-    * prob_wall_despawn : float (probability)
-            Probability that a given blank space (with no wall, shield,
-            monster, apple, or mouse) will spawn a wall during a mutation.
-    * prob_scatter : float (probability)
-            Probability that a given entity (shield/monster/mouse/apple
-            spawn) will have its position randomised during a mutation.
-    * max_steps : int (>= 0)
-            For each entity, sample this many directions and apply them to
-            the position (unless that would result in a collision with
-            another entity or with a wall).
-    * monster_optimality_step : float
-            The monster optimality is an inverse temperature parameter. Each
-            mutation may randomly leave the optimality the same, increase it
-            by this amount, or decrease it by this amount (to a minimum of
-            zero), each with equal probability.
-    
-    Notes:
-
-    * The wall mutations are applied first, then the scatter mutation, then
-      the step mutations are applied (stepwise, within each step the order is
-      mouse spawn, apples, shields, then monsters).
-    * The step mutations are implemented using a fully unrolled loop, which
-      should be slightly faster at the cost of slightly larger functions to
-      compile. This might become an issue if very large number of steps are
-      requested.
-    """
-    prob_wall_spawn: float
-    prob_wall_despawn: float
-    prob_scatter: float
-    max_steps: int
-    monster_optimality_step: float
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def mutate(self, rng: chex.PRNGKey, level: Level):
-        # toggle walls
-        if self.prob_wall_spawn > 0 or self.prob_wall_despawn > 0:
-            rng_walls, rng = jax.random.split(rng)
-            level = self._toggle_walls(rng_walls, level)
-
-        # moving entity spawn locations
-        if self.prob_scatter:
-            rng_scatter, rng = jax.random.split(rng)
-            level = self._scatter(rng_scatter, level)
-        
-        # moving entities locally
-        if self.max_steps > 0:
-            rng_steps, rng = jax.random.split(rng)
-            def _step(level, rng_step):
-                return self._step_entities(rng_step, level), None
-            level, _ = jax.lax.scan(
-                _step,
-                level,
-                jax.random.split(rng_steps, self.max_steps),
-                unroll=True,
-            )
-
-        # tweak monster optimality
-        if self.monster_optimality_step > 0:
-            rng_optimality, rng = jax.random.split(rng)
-            level = self._tweak_optimality(rng_optimality, level)
-
-        return level
-
-
-    def _toggle_walls(self, rng, level):
-        # decide which walls to toggle
-        h, w = level.wall_map.shape
-        prob_wall_toggle = jnp.where(
-            level.wall_map[1:-1,1:-1],
-            self.prob_wall_despawn,
-            self.prob_wall_spawn,
-        )
-        walls_to_toggle = jax.random.bernoulli(
-            key=rng,
-            p=prob_wall_toggle,
-            shape=(h-2, w-2),
-        )
-        walls_to_toggle = jnp.pad(
-            walls_to_toggle,
-            pad_width=1,
-            constant_values=False,
-        )
-        
-        # don't toggle the place where there are entities
-        entities_pos = jnp.concatenate((
-            level.initial_mouse_pos[jnp.newaxis],
-            level.apples_pos,
-            level.shields_pos,
-            level.initial_monsters_pos,
-        ))
-        walls_to_toggle = walls_to_toggle.at[
-            entities_pos[:,0],
-            entities_pos[:,1],
-        ].set(False)
-
-        # toggle!
-        new_wall_map = jnp.logical_xor(level.wall_map, walls_to_toggle)
-
-        return level.replace(wall_map=new_wall_map)
-
-
-    def _scatter(self, rng, level):
-        num_apples = level.apples_pos.shape[0]
-        num_shields = level.shields_pos.shape[0]
-        num_monsters = level.initial_monsters_pos.shape[0]
-        num_entities = 1 + num_apples + num_shields + num_monsters
-        all_pos = jnp.concatenate((
-            level.initial_mouse_pos[jnp.newaxis],
-            level.apples_pos,
-            level.shields_pos,
-            level.initial_monsters_pos,
-        ))
-        
-        # randomly decide a subset of entities to move
-        rng_subset, rng = jax.random.split(rng)
-        entities_to_move = jax.random.bernoulli(
-            key=rng_subset,
-            p=self.prob_scatter,
-            shape=(num_entities,),
-        )
-
-        # move them one at a time, avoiding collisions
-        initial_available_map = (~level.wall_map).at[
-            all_pos[:, 0],
-            all_pos[:, 1],
-        ].set(False)
-        coords = einops.rearrange(
-            jnp.indices(level.wall_map.shape),
-            'c h w -> (h w) c',
-        )
-
-        def _move(available_map, rng_pos_and_move):
-            rng, pos, move = rng_pos_and_move
-            available_map = available_map.at[
-                pos[0],
-                pos[1],
-            ].set(True)
-            try_pos = jax.random.choice(
-                key=rng,
-                a=coords,
-                axis=0,
-                p=available_map.flatten(),
-            )
-            new_pos = jnp.where(
-                move,
-                try_pos,
-                pos,
-            )
-            available_map = available_map.at[
-                new_pos[0],
-                new_pos[1],
-            ].set(False)
-            return available_map, new_pos
-
-        _, mut_pos = jax.lax.scan(
-            _move,
-            initial_available_map,
-            (
-                jax.random.split(rng, num_entities),
-                all_pos,
-                entities_to_move,
-            ),
-        )
-
-        # extract from unified position array
-        mut_initial_mouse_pos = mut_pos[0]
-        mut_apples_pos = mut_pos[1:1+num_apples]
-        mut_shields_pos = mut_pos[1+num_apples:num_entities-num_monsters]
-        mut_initial_monsters_pos = mut_pos[num_entities-num_monsters:]
-    
-        return level.replace(
-            initial_mouse_pos=mut_initial_mouse_pos,
-            apples_pos=mut_apples_pos,
-            shields_pos=mut_shields_pos,
-            initial_monsters_pos=mut_initial_monsters_pos,
-        )
-
-
-    def _step_entities(self, rng, level):
-        num_apples = level.apples_pos.shape[0]
-        num_shields = level.shields_pos.shape[0]
-        num_monsters = level.initial_monsters_pos.shape[0]
-        num_entities = 1 + num_apples + num_shields + num_monsters
-        
-        # unified array of all current positions
-        all_pos = jnp.concatenate((
-            level.initial_mouse_pos[jnp.newaxis],
-            level.apples_pos,
-            level.shields_pos,
-            level.initial_monsters_pos,
-        ))
-
-        # randomly sampled candidate position for each entity
-        steps = jnp.array((
-            (-1,  0),   # up
-            ( 0, -1),   # left
-            (+1,  0),   # down
-            ( 0, +1),   # right
-        ))
-        directions = jax.random.choice(
-            key=rng,
-            a=4,
-            shape=(num_entities,),
-        )
-        try_pos = all_pos + steps[directions]
-
-        # execute the steps, one by one, avoiding collisions
-        initial_collision_map = level.wall_map.at[
-            all_pos[:,0],
-            all_pos[:,1],
-        ].set(True)
-
-        def _step(collision_map, step):
-            old_pos, try_pos = step
-            hit_wall_or_another_entity = collision_map[
-                try_pos[0],
-                try_pos[1],
-            ]
-            new_pos = jnp.where(
-                hit_wall_or_another_entity,
-                old_pos,
-                try_pos,
-            )
-            collision_map = collision_map.at[
-                (old_pos[0], new_pos[0]),
-                (old_pos[1], new_pos[1]),
-            ].set(jnp.array((False, True))) # if same pos, 'True' will stick
-            return collision_map, new_pos
-        
-        _, mut_pos = jax.lax.scan(
-            _step,
-            initial_collision_map,
-            (all_pos, try_pos),
-            unroll=True,
-        )
-
-        # extract positions for different entities from unified results array
-        mut_initial_mouse_pos = mut_pos[0]
-        mut_apples_pos = mut_pos[1:1+num_apples]
-        mut_shields_pos = mut_pos[1+num_apples:num_entities-num_monsters]
-        mut_initial_monsters_pos = mut_pos[num_entities-num_monsters:]
-    
-        return level.replace(
-            initial_mouse_pos=mut_initial_mouse_pos,
-            apples_pos=mut_apples_pos,
-            shields_pos=mut_shields_pos,
-            initial_monsters_pos=mut_initial_monsters_pos,
-        )
-    
-
-    def _tweak_optimality(self, rng, level):
-        step = jax.random.choice(
-            key=rng,
-            a=jnp.array((
-                -self.monster_optimality_step,
-                0,
-                self.monster_optimality_step,
-            )),
-        )
-        new_monster_optimality = jnp.maximum(
-            0,
-            level.monster_optimality + step
-        )
-        return level.replace(
-            monster_optimality=new_monster_optimality,
-        )

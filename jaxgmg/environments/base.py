@@ -96,7 +96,7 @@ class Env:
         chex.Array,
         EnvState,
     ]:
-        start_state = self._reset(rng, level).replace(level=level)
+        start_state = self._reset(rng, level)
         obs = self.get_obs(start_state)
         return (obs, start_state)
     
@@ -317,46 +317,4 @@ class MixtureLevelGenerator:
 
         return chosen_level
 
-
-@struct.dataclass
-class LevelMutator:
-    """
-    Base class for level mutator. Given some mutation operation configuration
-    parameters, provides a `mutate` method that transforms a given level into
-    a similar level.
-    """
-
-
-    def mutate(
-        self,
-        rng: chex.PRNGKey,
-        level: Level,
-    ) -> Level:
-        """
-        Randomly transform `level` into a mutated level according to the
-        parameters provided in the constructor of this mutator object.
-        
-        Subclass should implement this method.
-        """
-
-    
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def vmutate(
-        self,
-        rng: chex.PRNGKey,
-        levels: Level,      # Level[num_levels]
-    ) -> Level:             # Level[num_levels]
-        """
-        Randomly mutate a pytree of `num_levels` levels.
-        """
-        num_levels = jax.tree.leaves(levels)[0].shape[0]
-        vectorised_mutate = jax.vmap(
-            self.mutate,
-            in_axes=(0, 0),
-            out_axes=0,
-        )
-        return vectorised_mutate(
-            jax.random.split(rng, num_levels),
-            levels,
-        )
 
