@@ -3,6 +3,12 @@ Goal misgeneralisation in JAX
 
 JAX-based environments and RL baselines for studying goal misgeneralisation.
 
+Environments
+------------
+
+Level generation
+----------------
+
 Install
 -------
 
@@ -28,6 +34,17 @@ After installing run the following:
 ```
 jaxgmg --help
 ```
+
+You can try the various subcommands to see demonstrations of the library's
+functionality. For example:
+
+* To play with an interactive demonstration of the environments, try
+  `jaxgmg play ENV_NAME` (see `jaxgmg play --help` for options).
+* To procedurally generate mazes , try `jaxgmg mazegen LAYOUT` (see `jaxgmg
+  mazegen --help` for options).
+
+Note: Most of the demos display colour images to the terminal using ANSI
+control codes, which may not work in some environments (e.g. on Windows?).
 
 Roadmap
 -------
