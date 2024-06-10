@@ -82,10 +82,10 @@ def maze_directional_distances(grid):
 
     Returns:
 
-    * dir_dists: int[h, w, h, w, 5]
-            Array of direction arrays. The first two axes specify the source
+    * dir_dists: float[h, w, h, w, 5]
+            Directional distance array. The first two axes specify the source
             square and the final two axes specify the target square. The
-            final axis has four or five values corresponding to:
+            final axis has five values corresponding to:
             * 0: the distance upon moving up (that is, decrementing row)
             * 1: the distance upon moving left (that is, decrementing column)
             * 2: the distance upon moving down (that is, incrementing row)
@@ -136,7 +136,7 @@ def maze_directional_distances(grid):
     return dir_dist
 
 
-@jax.jit
+@functools.partial(jax.jit, static_argnames=('stay_action',))
 def maze_optimal_directions(grid, stay_action=False):
     """
     All pairs shortest paths optimal policy. Breaks ties in up, left, down,
@@ -146,6 +146,11 @@ def maze_optimal_directions(grid, stay_action=False):
 
     * grid: bool[h, w]
             Array of walls, as returned by generate functions.
+    * stay_action : bool [static]
+            Whether to return a fifth 'stay' action index for source/target
+            pairs where the source equals the target, or where the either of
+            the source or target is a wall, or where the target is
+            unreachable from the source.
 
     Returns:
 
@@ -160,18 +165,17 @@ def maze_optimal_directions(grid, stay_action=False):
             * 3 (meaning right, that is, increment column)
             * (if `stay_action`) 4 (meaning stay at the same position)
 
-            If `stay_action` is True, then the stay action is optimal if and
-            only if the source is equal to the target and not a wall. If stay
-            action is False, then in such cases the action is arbitrary.
-            
-            In the case of an unreachable target or if the source is a wall,
-            an arbitrary action is returned.
+            If `stay_action` is True, then the stay action is returned
+            if the source is equal to the target, if the source or target is
+            a wall, or if the target is unreachable from the source.
+            Otherwise, the action returned in such cases is an arbitrary
+            choice of 0, 1, 2, or 3.
     
     Notes:
 
     * Unlike for `maze_distances`, the action matrix is not symmetric, so the
       distinction between source and target axes is crucial. This is an easy
-      error to make because the indexing will work fine. Beware.
+      error to make because the indexing will work fine. Beware!
     * Because of the ways in which ties are broken, the path from source A to
       target B might not be the reverse of the path from source B to target A.
     * I think a faster approach could be made to use the APSP methods
@@ -182,14 +186,31 @@ def maze_optimal_directions(grid, stay_action=False):
     # find the cost for each action
     dir_dist = maze_directional_distances(grid)
     
-    # (dynamically) correct for stay_action flag
-    # it will always have the lowest cost by at most 1 (when source = target)
-    # so, incrementing by 1 will sabotage it in the argmin operation below
-    # (1 is enough because ties are broken in array order and stay is last)
-    dir_dist = dir_dist.at[:,:,:,:,4].add(1-stay_action)
+    if not stay_action:
+        # find the lowest-cost action among 0, 1, 2, 3
+        actions = jnp.argmin(dir_dist[:,:,:,:,:4], axis=4)
+    
+    else:
+        # find the lowest-cost action including the possibility of staying
+        actions = jnp.argmin(dir_dist, axis=4)
+        # force other edge cases to use the stay action
+        edge_cases = (
+            grid[jnp.newaxis, jnp.newaxis, :, :]        # target walls
+            | grid[:, :, jnp.newaxis, jnp.newaxis]      # source walls
+            | jnp.isinf(dir_dist[:,:,:,:,4])            # unreachable
+        )
 
-    # find the lowest-cost action
-    actions = jnp.argmin(dir_dist, axis=4)
+        actions = jnp.where(
+            edge_cases,
+            4,
+            actions,
+        )
 
     return actions
 
+
+
+    # correct for stay_action flag
+    # it will always have the lowest cost by at most 1 (when source = target)
+    # so, incrementing by 1 will sabotage it in the argmin operation below
+    # (1 is enough because ties are broken in array order and stay is last)
