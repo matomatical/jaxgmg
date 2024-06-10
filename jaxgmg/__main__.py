@@ -656,7 +656,161 @@ def play_follow(
         level_generator=level_generator,
         debug=debug,
     )
-    
+
+
+# # # 
+# TESTING PARSERS
+
+
+def parsetest_corner():
+    test_string = """
+        # # # # #
+        # . . . #
+        # @ # . #
+        # . . * #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = cheese_in_the_corner.LevelParser(height=5, width=5)
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = cheese_in_the_corner.Env(rgb=True)
+    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    print(img2str(obs))
+
+
+def parsetest_keys():
+    test_string = """
+        # # # # #
+        # . k c #
+        # @ # k #
+        # k # c #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = keys_and_chests.LevelParser(
+        height=5,
+        width=5,
+        num_keys_max=3,
+        num_chests_max=3,
+        inventory_map=jnp.arange(3),
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = keys_and_chests.Env(rgb=True)
+    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    print(img2str(obs))
+
+
+def parsetest_dish():
+    test_string = """
+        # # # # #
+        # . . . #
+        # @ # d #
+        # . . c #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = cheese_on_a_dish.LevelParser(
+        height=5,
+        width=5,
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = cheese_on_a_dish.Env(rgb=True)
+    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    print(img2str(obs))
+
+
+def parsetest_monsters():
+    test_string = """
+        # # # # #
+        # s a m #
+        # @ # s #
+        # . m a #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = monster_world.LevelParser(
+        height=5,
+        width=5,
+        num_apples=2,
+        num_monsters=2,
+        num_shields=2,
+        monster_optimality=3.0,
+        inventory_map=jnp.array((0,1)),
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = monster_world.Env(rgb=True)
+    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    print(img2str(obs))
+
+
+def parsetest_lava():
+    test_string = """
+        # # # # #
+        # . . . #
+        # @ # . #
+        # . X * #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = lava_land.LevelParser(height=5, width=5)
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = lava_land.Env(rgb=True)
+    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    print(img2str(obs))
+
+
+def parsetest_follow():
+    test_string = """
+        # # # # # # #
+        # @ # . . 1 #
+        # . # . # # #
+        # . . . . 0 #
+        # * # . # # #
+        # . # . . 2 #
+        # # # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = follow_me.LevelParser(
+        height=7,
+        width=7,
+        num_beacons=3,
+        leader_order=(0,1,2),
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = follow_me.Env(rgb=True)
+    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    print(img2str(obs))
+
 
 # # # 
 # SOLVING ENVIRONMENTS
@@ -837,6 +991,14 @@ app.command()(play_dish)
 app.command()(play_monsters)
 app.command()(play_lava)
 app.command()(play_follow)
+
+# testing parsers
+app.command()(parsetest_corner)
+app.command()(parsetest_keys)
+app.command()(parsetest_dish)
+app.command()(parsetest_monsters)
+app.command()(parsetest_lava)
+app.command()(parsetest_follow)
 
 # solve environments
 app.command()(solve_corner)

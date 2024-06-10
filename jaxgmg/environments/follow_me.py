@@ -45,8 +45,6 @@ class Level(base.Level):
             Maze layout (True = wall)
     * beacons_pos: index[b, 2]
             Coordinates of the three beacon (index into `wall_map`)
-    * beacon_order : index[b]
-            Order in which the beacons light up.
     * initial_leader_pos : index[2]
             Coordinates of initial leader position (index into `wall_map`)
     * leader_order : index[b]
@@ -64,7 +62,6 @@ class Level(base.Level):
     """
     wall_map: chex.Array
     beacons_pos: chex.Array
-    beacon_order: chex.Array
     initial_leader_pos: chex.Array
     leader_order: chex.Array
     dir_map: chex.Array
@@ -194,7 +191,7 @@ class Env(base.Env):
             ( 0, +1),   # right
             ( 0,  0),   # stay
         ))
-        num_beacons = state.level.beacon_order.size
+        num_beacons, _2 = state.level.beacons_pos.shape
 
         # update leader position
         leader_action = state.level.dir_map[
@@ -210,7 +207,9 @@ class Env(base.Env):
 
         # check if leader got to its next beacon
         leader_next_beacon_pos = (
-            state.level.beacons_pos[state.leader_next_beacon_id]
+            state.level.beacons_pos[
+                state.level.leader_order[state.leader_next_beacon_id]
+            ]
         )
         leader_got_beacon = (state.leader_pos == leader_next_beacon_pos).all()
         # if so, increment next beacon id for leader (NOTE: WITH WRAPAROUND)
@@ -434,17 +433,10 @@ class LevelGenerator(base.LevelGenerator):
             beacons_pos[:, 1],
         ]
 
-        # randomise beacon order
-        rng_beacon_order, rng = jax.random.split(rng)
-        beacon_order = jax.random.permutation(
-            key=rng_beacon_order,
-            x=self.num_beacons,
-        )
-
         # determine leader order
         rng_leader_order, rng = jax.random.split(rng)
         if self.trustworthy_leader:
-            leader_order = beacon_order
+            leader_order = jnp.arange(self.num_beacons)
         else:
             leader_order = jax.random.permutation(
                 key=rng_leader_order,
@@ -455,7 +447,6 @@ class LevelGenerator(base.LevelGenerator):
         return Level(
             wall_map=wall_map,
             beacons_pos=beacons_pos,
-            beacon_order=beacon_order,
             initial_leader_pos=initial_leader_pos,
             leader_order=leader_order,
             dir_map=dir_map,
@@ -463,3 +454,188 @@ class LevelGenerator(base.LevelGenerator):
         )
 
 
+@struct.dataclass
+class LevelParser:
+    """
+    Level parser for Follow Me environment. Given some parameters determining
+    level shape, provides a `parse` method that converts an ASCII depiction
+    of a level into a Level struct. Also provides a `parse_batch` method that
+    parses a list of level strings into a single vectorised Level PyTree
+    object.
+
+    * height (int, >= 3):
+            The number of rows in the grid representing the maze
+            (including top and bottom boundary rows)
+    * width (int, >= 3):
+            The number of columns in the grid representing the maze
+            (including left and right boundary rows)
+    * num_beacons : int
+            The number of beacons in the level.
+    * leader_order : arraylike of type int of length num_beacons
+            The order in which the leader follows the beacons.
+    * char_map : optional, dict{str: int}
+            The keys in this dictionary are the symbols the parser will look
+            to define the location of the walls and each of the items. The
+            default map is as follows:
+            * The character '#' maps to `Env.Channel.WALL`.
+            * The character '@' maps to `Env.Channel.MOUSE`.
+            * The character '*' maps to `Env.Channel.LEADER`.
+            * The charcters '0' through '9' map to 'Env.Channel.BEACON`.
+            * The character '.' maps to `len(Env.Channel)`, i.e. none of the
+              above, representing the absence of an item.
+            The beacon order is determined by the lexicographic order of the
+            symbols used that map to `Env.Channel.BEACON`.
+    """
+    height: int
+    width: int
+    num_beacons: int
+    leader_order: tuple
+    char_map = {
+        '#': Env.Channel.WALL,
+        '@': Env.Channel.MOUSE,
+        '*': Env.Channel.LEADER,
+        # the following all map to BEACON, the lexicographic order is used to
+        # determine the beacon order.
+        '0': Env.Channel.BEACON, '1': Env.Channel.BEACON,
+        '2': Env.Channel.BEACON, '3': Env.Channel.BEACON,
+        '4': Env.Channel.BEACON, '5': Env.Channel.BEACON,
+        '6': Env.Channel.BEACON, '7': Env.Channel.BEACON,
+        '8': Env.Channel.BEACON, '9': Env.Channel.BEACON,
+        '.': len(Env.Channel), # PATH
+    }
+
+
+    def parse(self, level_str):
+        """
+        Convert an ASCII string depiction of a level into a Level struct.
+        For example:
+
+        >>> p = LevelParser(
+        ...     height=7,
+        ...     width=7,
+        ...     num_beacons=3,
+        ...     leader_order=(0,1,2),
+        ... )
+        >>> p.parse('''
+        ... # # # # # # #
+        ... # @ # . . 1 #
+        ... # . # . # # #
+        ... # . . . . 0 #
+        ... # * # . # # #
+        ... # . # . . 2 #
+        ... # # # # # # #
+        ... ''')
+        Level(
+            wall_map=Array([
+                [1,1,1,1,1,1,1],
+                [1,0,1,0,0,0,1],
+                [1,0,1,0,1,1,1],
+                [1,0,0,0,0,0,1],
+                [1,0,1,0,1,1,1],
+                [1,0,1,0,0,0,1],
+                [1,1,1,1,1,1,1],
+            ], dtype=bool),
+            beacons_pos=Array([[3,5],[1,5],[5,5]]),
+            initial_leader_pos=Array([4,1]),
+            leader_order=Array([0,1,2]),
+            dir_map=Array([[[...]]]),
+            initial_mouse_pos=Array([1,1]),
+        )
+        """
+        # parse into grid of IntEnum elements
+        level_grid = [
+            [self.char_map[e] for e in line.split()]
+            for line in level_str.strip().splitlines()
+        ]
+        assert len(level_grid) == self.height, "wrong height"
+        assert all([len(r) == self.width for r in level_grid]), "wrong width"
+        level_map = jnp.asarray(level_grid)
+        
+        # extract wall map
+        wall_map = (level_map == Env.Channel.WALL)
+        assert wall_map[0,:].all(), "top border incomplete"
+        assert wall_map[:,0].all(), "left border incomplete"
+        assert wall_map[-1,:].all(), "bottom border incomplete"
+        assert wall_map[:,-1].all(), "right border incomplete"
+    
+        # extract beacon positions and number
+        beacon_map = (level_map == Env.Channel.BEACON)
+        num_beacons = beacon_map.sum()
+        assert num_beacons == self.num_beacons, "wrong number of beacons"
+        unordered_beacons_pos = jnp.stack(
+            jnp.where(beacon_map, size=self.num_beacons),
+            axis=1,
+        )
+        # extract beacon order!
+        ord_map = jnp.asarray([
+            [ord(e) for e in line.split()]
+            for line in level_str.strip().splitlines()
+        ])
+        beacon_order = jnp.argsort(ord_map[
+            unordered_beacons_pos[:,0],
+            unordered_beacons_pos[:,1],
+        ])
+        beacons_pos = unordered_beacons_pos[beacon_order]
+        
+        # extract leader spawn position
+        leader_spawn_map = (level_map == Env.Channel.LEADER)
+        assert leader_spawn_map.sum() == 1, "there must be exactly one leader"
+        initial_leader_pos = jnp.concatenate(
+            jnp.where(leader_spawn_map, size=1)
+        )
+
+        # extract mouse spawn position
+        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
+        initial_mouse_pos = jnp.concatenate(
+            jnp.where(mouse_spawn_map, size=1)
+        )
+        
+        # solve the wall map for the leader
+        dir_map = maze_solving.maze_optimal_directions(
+            wall_map,
+            stay_action=True,
+        )[
+            :,
+            :,
+            beacons_pos[:, 0],
+            beacons_pos[:, 1],
+        ]
+
+        return Level(
+            wall_map=wall_map,
+            beacons_pos=beacons_pos,
+            initial_leader_pos=initial_leader_pos,
+            leader_order=jnp.asarray(self.leader_order),
+            dir_map=dir_map,
+            initial_mouse_pos=initial_mouse_pos,
+        )
+    
+
+    def parse_batch(self, level_strs):
+        """
+        Convert a list of ASCII string depiction of length `num_levels`
+        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
+        the details of the string depiction.
+        """
+        levels = [self.parse(level_str) for level_str in level_strs]
+        return Level(
+            wall_map=jnp.stack(
+                [l.wall_map for l in levels]
+            ),
+            beacons_pos=jnp.stack(
+                [l.beacons_pos for l in levels]
+            ),
+            initial_leader_pos=jnp.stack(
+                [l.initial_leader_pos for l in levels]
+            ),
+            leader_order=jnp.stack(
+                [l.leader_order for l in levels]
+            ),
+            initial_mouse_pos=jnp.stack(
+                [l.initial_mouse_pos for l in levels]
+            ),
+            dir_map=jnp.stack(
+                [l.dir_map for l in levels]
+            ),
+        )

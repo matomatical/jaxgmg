@@ -499,10 +499,10 @@ class LevelGenerator(base.LevelGenerator):
     configuration parameters and key/chest sparsity parameters, provides a
     `sample` method that generates a random level.
 
-    * height (int, >= 3, odd):
+    * height (int, >= 3):
             the number of rows in the grid representing the maze
             (including top and bottom boundary rows)
-    * width (int, >= 3, odd):
+    * width (int, >= 3):
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
     * maze_generator : maze_generation.MazeGenerator
@@ -631,25 +631,19 @@ class LevelParser:
     `parse_batch` method that parses a list of level strings into a single
     vectorised Level PyTree object.
 
-    * height (int, >= 3, odd):
+    * height (int, >= 3):
             The number of rows in the grid representing the maze
             (including top and bottom boundary rows)
-    * width (int, >= 3, odd):
+    * width (int, >= 3):
             The number of columns in the grid representing the maze
             (including left and right boundary rows)
     * num_keys_max : int (>0, >= num_keys_min, <= width)
-            the largest number of keys to randomly place in each generated
-            maze. the actual number will be uniformly random between this and
-            num_keys_min (inclusive).
-            this one also determines the shape of the key-related arrays in
-            the level struct.
+            The largest number of keys that might appear in the level.
             Note: Cannot exceed width as inventory is shown along top row.
     * num_chests_max : int (>-, >= num_chests_min)
-            the largest number of chests to randomly place in each generated
-            maze. the actual number will be uniformly random between this and
-            num_chests_min (inclusive).
-            this one also determines the shape of the chest-related arrays in
-            the level struct.
+            the largest number of chests that might appear in the level.
+    * inventory_map : int[num_keys_max] (all are < width)
+            The indices into the top row where successive keys are stored.
     * char_map : optional, dict{str: int}
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
@@ -665,6 +659,7 @@ class LevelParser:
     width: int
     num_keys_max: int
     num_chests_max: int
+    inventory_map: chex.Array
     char_map = {
         '#': Env.Channel.WALL,
         '@': Env.Channel.MOUSE,
@@ -746,15 +741,12 @@ class LevelParser:
             jnp.where(mouse_spawn_map, size=1)
         )
 
-        # devise an arbitrary inventory ordering
-        inventory_map = jnp.arange(self.num_keys_max)
-        
         return Level(
             wall_map=wall_map,
             keys_pos=keys_pos,
             chests_pos=chests_pos,
             initial_mouse_pos=initial_mouse_pos,
-            inventory_map=inventory_map,
+            inventory_map=jnp.asarray(self.inventory_map),
             hidden_keys=hidden_keys,
             hidden_chests=hidden_chests,
         )

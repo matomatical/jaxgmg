@@ -15,6 +15,8 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level from a configurable level distribution.
+* `LevelParser` class, provides a `parse` and `parse_batch` method for
+  designing Level structs based on ASCII depictions.
 """
 
 from typing import Tuple
@@ -469,10 +471,10 @@ class LevelGenerator(base.LevelGenerator):
     configuration parameters and key/chest sparsity parameters, provides a
     `sample` method that generates a random level.
 
-    * height : int (>= 3, odd)
+    * height : int (>= 3)
             the number of rows in the grid representing the maze
             (including top and bottom boundary rows)
-    * width : int (>= 3, odd)
+    * width : int (>= 3)
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
     * maze_generator : maze_generation.MazeGenerator
@@ -565,3 +567,192 @@ class LevelGenerator(base.LevelGenerator):
         )
 
 
+@struct.dataclass
+class LevelParser:
+    """
+    Level parser for Monster World environment. Given some parameters
+    determining level shape, provides a `parse` method that converts an
+    ASCII depiction of a level into a Level struct. Also provides a
+    `parse_batch` method that parses a list of level strings into a single
+    vectorised Level PyTree object.
+
+    * height (int, >= 3):
+            The number of rows in the grid representing the maze
+            (including top and bottom boundary rows)
+    * width (int, >= 3):
+            The number of columns in the grid representing the maze
+            (including left and right boundary rows)
+    * num_apples : int
+            The number of apples in the level.
+    * num_monsters : int
+            The number of monsters in the level.
+    * num_shields : int
+            The number of shields in the level.
+    * monster_optimality : float
+            The inverse temperature for the monster softmax distribution.
+    * inventory_map : int[num_keys_max] (all are < width)
+            The indices into the top row where successive keys are stored.
+    * char_map : optional, dict{str: int}
+            The keys in this dictionary are the symbols the parser will look
+            to define the location of the walls and each of the items. The
+            default map is as follows:
+            * The character '#' maps to `Env.Channel.WALL`.
+            * The character '@' maps to `Env.Channel.MOUSE`.
+            * The character 'a' maps to `Env.Channel.APPLE`.
+            * The character 'm' maps to `Env.Channel.MONSTER`.
+            * The character 's' maps to `Env.Channel.SHIELD`.
+            * The character '.' maps to `len(Env.Channel)`, i.e. none of the
+              above, representing the absence of an item.
+    """
+    height: int
+    width: int
+    num_apples: int
+    num_monsters: int
+    num_shields: int
+    monster_optimality: float
+    inventory_map: chex.Array
+    char_map = {
+        '#': Env.Channel.WALL,
+        '@': Env.Channel.MOUSE,
+        'a': Env.Channel.APPLE,
+        'm': Env.Channel.MONSTER,
+        's': Env.Channel.SHIELD,
+        '.': len(Env.Channel), # PATH
+    }
+
+
+    def parse(self, level_str):
+        """
+        Convert an ASCII string depiction of a level into a Level struct.
+        For example:
+
+        >>> p = LevelParser(
+        ...     height=5,
+        ...     width=5,
+        ...     num_apples=2,
+        ...     num_monsters=2,
+        ...     num_shields=2,
+        ...     monster_optimality=3.0,
+        ... )
+        >>> p.parse('''
+        ... # # # # #
+        ... # s a m #
+        ... # @ # s #
+        ... # . m a #
+        ... # # # # #
+        ... ''')
+        Level(
+            wall_map=Array([
+                [1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 1],
+                [1, 0, 1, 0, 1],
+                [1, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1],
+            ], dtype=bool),
+            apples_pos=Array([[1,2], [3,3]]),
+            shields_pos=Array([[1,1], [2,3]]),
+            initial_monsters_pos=Array([[1,3], [3,2]]),
+            initial_mouse_pos=Array([2,1]),
+            dist_map=Array([[[[....]]]]),
+            monster_optimality=3.0,
+            inventory_map=Array([0,1]),
+        )
+        """
+        # parse into grid of IntEnum elements
+        level_grid = [
+            [self.char_map[e] for e in line.split()]
+            for line in level_str.strip().splitlines()
+        ]
+        assert len(level_grid) == self.height, "wrong height"
+        assert all([len(r) == self.width for r in level_grid]), "wrong width"
+        level_map = jnp.asarray(level_grid)
+        
+        # extract wall map
+        wall_map = (level_map == Env.Channel.WALL)
+        assert wall_map[0,:].all(), "top border incomplete"
+        assert wall_map[:,0].all(), "left border incomplete"
+        assert wall_map[-1,:].all(), "bottom border incomplete"
+        assert wall_map[:,-1].all(), "right border incomplete"
+    
+        # solve the wall map
+        dist_map = maze_solving.maze_directional_distances(wall_map)
+
+        # extract apple positions and number
+        apple_map = (level_map == Env.Channel.APPLE)
+        num_apples = apple_map.sum()
+        assert num_apples == self.num_apples, "wrong number of apples"
+        apples_pos = jnp.stack(
+            jnp.where(apple_map, size=self.num_apples),
+            axis=1,
+        )
+
+        # extract monsters positions and number
+        monster_map = (level_map == Env.Channel.MONSTER)
+        num_monsters = monster_map.sum()
+        assert num_monsters == self.num_monsters, "wrong number of monsters"
+        monsters_pos = jnp.stack(
+            jnp.where(monster_map, size=self.num_monsters),
+            axis=1,
+        )
+
+        # extract shields positions and number
+        shield_map = (level_map == Env.Channel.SHIELD)
+        num_shields = shield_map.sum()
+        assert num_shields == self.num_shields, "wrong number of shields"
+        shields_pos = jnp.stack(
+            jnp.where(shield_map, size=self.num_shields),
+            axis=1,
+        )
+        
+        # extract mouse spawn position
+        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
+        initial_mouse_pos = jnp.concatenate(
+            jnp.where(mouse_spawn_map, size=1)
+        )
+
+        return Level(
+            wall_map=wall_map,
+            apples_pos=apples_pos,
+            shields_pos=shields_pos,
+            initial_monsters_pos=monsters_pos,
+            initial_mouse_pos=initial_mouse_pos,
+            dist_map=dist_map,
+            monster_optimality=self.monster_optimality,
+            inventory_map=jnp.asarray(self.inventory_map),
+        )
+    
+
+    def parse_batch(self, level_strs):
+        """
+        Convert a list of ASCII string depiction of length `num_levels`
+        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
+        the details of the string depiction.
+        """
+        levels = [self.parse(level_str) for level_str in level_strs]
+        return Level(
+            wall_map=jnp.stack(
+                [l.wall_map for l in levels]
+            ),
+            apples_pos=jnp.stack(
+                [l.apples_pos for l in levels]
+            ),
+            shields_pos=jnp.stack(
+                [l.shields_pos for l in levels]
+            ),
+            initial_monsters_pos=jnp.stack(
+                [l.initial_monsters_pos for l in levels]
+            ),
+            initial_mouse_pos=jnp.stack(
+                [l.initial_mouse_pos for l in levels]
+            ),
+            dist_map=jnp.stack(
+                [l.dist_map for l in levels]
+            ),
+            monster_optimality=jnp.stack(
+                [l.monster_optimality for l in levels]
+            ),
+            inventory_map=jnp.stack(
+                [l.inventory_map for l in levels]
+            ),
+        )

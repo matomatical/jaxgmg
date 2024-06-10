@@ -380,10 +380,10 @@ class LevelParser:
     method that parses a list of level strings into a single vectorised Level
     PyTree object.
 
-    * height (int, >= 3, odd):
+    * height (int, >= 3):
             The number of rows in the grid representing the maze
             (including top and bottom boundary rows)
-    * width (int, >= 3, odd):
+    * width (int, >= 3):
             The number of columns in the grid representing the maze
             (including left and right boundary rows)
     * char_map : optional, dict{str: int}
@@ -404,7 +404,7 @@ class LevelParser:
     char_map = {
         '#': Env.Channel.WALL,
         '@': Env.Channel.MOUSE,
-        'd': Env.Channel.CHEESE,
+        'd': Env.Channel.DISH,
         'c': Env.Channel.CHEESE,
         'b': len(Env.Channel),   # BOTH
         '.': len(Env.Channel)+1, # PATH
@@ -475,8 +475,8 @@ class LevelParser:
         
         # extract cheese position
         cheese_map = (
-            level_map == Env.Channel.CHEESE
-            | level_map == len(Env.Channel) # both dish and cheese
+            (level_map == Env.Channel.CHEESE)
+            | (level_map == len(Env.Channel)) # both dish and cheese
         )
         assert cheese_map.sum() == 1, "there must be exactly one cheese"
         cheese_pos = jnp.concatenate(
@@ -485,8 +485,8 @@ class LevelParser:
         
         # extract dish position
         dish_map = (
-            level_map == Env.Channel.DISH
-            | level_map == len(Env.Channel) # both dish and cheese
+            (level_map == Env.Channel.DISH)
+            | (level_map == len(Env.Channel)) # both dish and cheese
         )
         assert dish_map.sum() == 1, "there must be exactly one dish"
         dish_pos = jnp.concatenate(

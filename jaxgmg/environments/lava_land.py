@@ -381,10 +381,10 @@ class LevelParser:
     parses a list of level strings into a single vectorised Level PyTree
     object.
 
-    * height (int, >= 3, odd):
+    * height (int, >= 3):
             The number of rows in the grid representing the maze
             (including top and bottom boundary rows)
-    * width (int, >= 3, odd):
+    * width (int, >= 3):
             The number of columns in the grid representing the maze
             (including left and right boundary rows)
     * char_map : optional, dict{str: int}
