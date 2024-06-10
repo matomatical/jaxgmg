@@ -30,7 +30,9 @@ import chex
 import einops
 from flax import struct
 
-from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_generation as mg
+from jaxgmg.procgen import maze_solving
+
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -398,7 +400,7 @@ class Env(base.Env):
         Having said all that---seems like this will be enough for now.
         """
         # compute distances between the mouse, and each key, and each chest
-        dist = maze_generation.maze_distances(level.wall_map)
+        dist = maze_solving.maze_distances(level.wall_map)
         pos = jnp.concatenate((
             level.initial_mouse_pos[jnp.newaxis],
             level.keys_pos,
@@ -503,9 +505,10 @@ class LevelGenerator(base.LevelGenerator):
     * width (int, >= 3, odd):
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('tree', 'edge', 'blocks', 'noise', or 'open')
-            specifies the maze generation method to use (see module
-            `maze_generation` for details)
+    * maze_generator : maze_generation.MazeGenerator
+            Provides the maze generation method to use (see module
+            `maze_generation` for details).
+            The default is a tree maze generator using Kruskal's algorithm.
     * num_keys_min : int (>= 0)
             the smallest number of keys to randomly place in each generated
             maze. the actual number will be uniformly random between this and
@@ -529,23 +532,13 @@ class LevelGenerator(base.LevelGenerator):
     """
     height: int = 13
     width: int = 13
-    layout: str = 'tree'
+    maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     num_keys_min: int = 1
     num_keys_max: int = 4
     num_chests_min: int = 4
     num_chests_max: int = 4
 
     def __post_init__(self):
-        # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open', 'noise'}
-        # validate dimensions
-        assert self.height >= 3
-        assert self.width >= 3
-        if self.layout == 'tree' or self.layout == 'edges':
-            assert self.height % 2 == 1, "height must be odd for this layout"
-            assert self.width % 2 == 1,  "width must be odd for this layout"
-        # TODO: somehow prevent or handle too many walls to spawn all items?
-        # validate items
         assert self.num_keys_min >= 0
         assert self.num_keys_max > 0
         assert self.num_keys_max >= self.num_keys_min
@@ -553,6 +546,7 @@ class LevelGenerator(base.LevelGenerator):
         assert self.num_chests_max > 0
         assert self.num_chests_max >= self.num_chests_min
         assert self.num_keys_max <= self.width, "need width for inventory"
+        # TODO: somehow prevent or handle too many walls to spawn all items?
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
@@ -563,10 +557,10 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = self.maze_generator.generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
+            height=self.height,
+            width=self.width,
         )
 
         # spawn random mouse pos, keys pos, chests pos

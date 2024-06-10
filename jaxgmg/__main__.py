@@ -8,6 +8,7 @@ import time
 import typer
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
 from jaxgmg.procgen import noise_generation
 
 from jaxgmg.environments import cheese_in_the_corner
@@ -15,6 +16,7 @@ from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import lava_land
+from jaxgmg.environments import follow_me
 
 
 # # # 
@@ -70,7 +72,8 @@ def play_forever(rng, env, level_generator, debug=False):
             )
             if d:
                 break
-        print(f"\x1b[{lines+6}A")
+        if not debug:
+            print(f"\x1b[{lines+6}A")
 
 
 def img2str(im, colormap=None):
@@ -211,45 +214,141 @@ def print_histogram(data, bins=10, range=None, width=40):
 # MAZE GENERATION/SOLUTION FUNCTIONALITY
 
 
-def maze_gen(
-    layout: str = 'tree',
-    height: int = 15,
-    width:  int = 79,
+def mazegen_tree(
+    height: int = 79,
+    width: int = 79,
+    alt_kruskal_algorithm: bool = False,
     seed: int = 42,
 ):
-    print("maze-gen: generate and visualise a random maze")
+    print("tree: generate and visualise a random tree maze")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.get_generator_function(layout)
-    maze = gen(
+    gen = maze_generation.TreeMazeGenerator(
+        alt_kruskal_algorithm=alt_kruskal_algorithm,
+    )
+    maze = gen.generate(
         key=rng,
-        h=height,
-        w=width,
+        height=height,
+        width=width,
     )
     print(img2str(maze * .25))
 
 
-def maze_distance(
+def mazegen_edges(
+    height: int = 79,
+    width: int = 79,
+    edge_prob: float = 0.75,
+    seed: int = 42,
+):
+    print("edges: generate and visualise a random edge maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.EdgeMazeGenerator(
+        edge_prob=edge_prob,
+    )
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
+    print(img2str(maze * .25))
+
+
+def mazegen_noise(
+    height: int = 79,
+    width: int = 79,
+    wall_threshold: float = 0.25,
+    cell_size: int = 3,
+    num_octaves: int = 1,
+    seed: int = 42,
+):
+    print("noise: generate and visualise a random noise maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.NoiseMazeGenerator(
+        wall_threshold=wall_threshold,
+        cell_size=cell_size,
+        num_octaves=num_octaves,
+    )
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
+    print(img2str(maze * .25))
+
+
+def mazegen_blocks(
+    height: int = 79,
+    width: int = 79,
+    wall_prob: float = 0.25,
+    seed: int = 42,
+):
+    print("blocks: generate and visualise a random block maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.BlockMazeGenerator(
+        wall_prob=wall_prob,
+    )
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
+    print(img2str(maze * .25))
+
+
+def mazegen_open(
+    height: int = 79,
+    width: int = 79,
+    seed: int = 42, # unused
+):
+    print("open: generate and visualise an open maze")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    gen = maze_generation.OpenMazeGenerator()
+    maze = gen.generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
+    print(img2str(maze * .25))
+
+
+# # # 
+# MAZE SOLVING FUNCTIONALITY
+
+
+def mazesoln_distance(
     layout: str = 'tree',
-    height: int = 5,
-    width:  int = 5,
+    height: int = 7,
+    width:  int = 7,
     seed: int = 42,
 ):
     print(
-        "maze-distance: solve a maze and plot the optimal distance "
+        "distance: solve a maze and plot the optimal distance "
         "from any source to any destination"
     )
     print_config(locals())
 
     print("generating maze...")
     rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.get_generator_function(layout)
-    maze = gen(key=rng, h=height, w=width)
+    maze = maze_generation.get_generator_class_from_name(
+        name=layout,
+    )().generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
     print("solving maze...")
-    dist = maze_generation.maze_distances(maze)
+    dist = maze_solving.maze_distances(maze)
 
     print("visualising solution...")
     # transform inf -> -inf, [0,max] -> [0.5,1.0] for visualisation
@@ -270,10 +369,10 @@ def maze_distance(
     print("the target is represented by the square in the micromaze")
 
 
-def maze_direction(
+def mazesoln_direction(
     layout: str = 'tree',
-    height: int = 5,
-    width:  int = 5,
+    height: int = 7,
+    width:  int = 7,
     stay_action: bool = True,
     seed: int = 42,
 ):
@@ -285,15 +384,20 @@ def maze_direction(
 
     print("generating maze...")
     rng = jax.random.PRNGKey(seed=seed)
-    gen = maze_generation.get_generator_function(layout)
-    maze = gen(key=rng, h=height, w=width)
+    maze = maze_generation.get_generator_class_from_name(
+        name=layout,
+    )().generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
     print("solving maze...")
-    soln = maze_generation.maze_optimal_directions(maze, stay_action=stay_action)
+    soln = maze_solving.maze_optimal_directions(maze, stay_action=stay_action)
 
     print("visualising directions...")
-    # transform {0,1,2,3} -> {1,2,3,4} and walls -> 0
+    # transform {0,1,2,3,4} -> {1,2,3,4,5} and walls -> 0
     soln = (1 + soln) * ~maze * ~maze[:,:,None,None]
     # rearrange into macro/micro maze format
     print(img2str(
@@ -316,7 +420,7 @@ def maze_direction(
 # NOISE GENERATION FUNCTIONALITY
 
 
-def perlin_noise(
+def noisegen_perlin(
     height: int = 64,
     width:  int = 64,
     num_rows: int = 8,
@@ -338,7 +442,7 @@ def perlin_noise(
     print(img2str(noise_0to1, colormap=viridis))
 
 
-def fractal_noise(
+def noisegen_fractal(
     height: int = 64,
     width:  int = 64,
     base_num_rows: int = 8,
@@ -382,7 +486,9 @@ def play_corner(
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         corner_size=corner_size,
     )
     play_forever(
@@ -412,7 +518,9 @@ def play_keys(
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         num_keys_min=num_keys_min,
         num_keys_max=num_keys_max,
         num_chests_min=num_chests_min,
@@ -442,7 +550,9 @@ def play_dish(
     level_generator = cheese_on_a_dish.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         max_cheese_radius=max_cheese_radius,
     )
     play_forever(
@@ -472,7 +582,9 @@ def play_monsters(
     level_generator = monster_world.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         num_apples=num_apples,
         num_shields=num_shields,
         num_monsters=num_monsters,
@@ -494,7 +606,7 @@ def play_lava(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("monsters: interact with a random monster world level")
+    print("lava: interact with a random 'lava land' level")
     print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -502,8 +614,41 @@ def play_lava(
     level_generator = lava_land.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         lava_threshold=lava_threshold,
+    )
+    play_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        debug=debug,
+    )
+    
+
+def play_follow(
+    height: int                 = 13,
+    width: int                  = 9,
+    layout: str                 = 'edges',
+    num_beacons: int            = 3,
+    trustworthy_leader: bool    = True,
+    seed: int                   = 42,
+    debug: bool                 = False,
+):
+    print("follow: interact with a random 'follow me' level")
+    print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = follow_me.Env(rgb=True)
+    level_generator = follow_me.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        num_beacons=num_beacons,
+        trustworthy_leader=trustworthy_leader,
     )
     play_forever(
         rng=rng,
@@ -543,7 +688,9 @@ def solve_corner(
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         corner_size=corner_size,
     )
 
@@ -610,7 +757,9 @@ def solve_keys(
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         num_keys_min=num_keys_min,
         num_keys_max=num_keys_max,
         num_chests_min=num_chests_min,
@@ -644,7 +793,6 @@ def solve_keys(
     }, colormap=sweetie16)
 
     print("solving levels...")
-    
     v = jax.vmap(
         env.optimal_value,
         in_axes=(0,None),
@@ -667,14 +815,20 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False, # can turn on during debugging
 )
 
-# maze generation and solving
-app.command()(maze_gen)
-app.command()(maze_distance)
-app.command()(maze_direction)
-
 # noise generation
-app.command()(perlin_noise)
-app.command()(fractal_noise)
+app.command()(noisegen_perlin)
+app.command()(noisegen_fractal)
+
+# maze generation
+app.command()(mazegen_tree)
+app.command()(mazegen_edges)
+app.command()(mazegen_noise)
+app.command()(mazegen_blocks)
+app.command()(mazegen_open)
+
+# maze solving
+app.command()(mazesoln_distance)
+app.command()(mazesoln_direction)
 
 # play environments
 app.command()(play_corner)
@@ -682,6 +836,7 @@ app.command()(play_keys)
 app.command()(play_dish)
 app.command()(play_monsters)
 app.command()(play_lava)
+app.command()(play_follow)
 
 # solve environments
 app.command()(solve_corner)

@@ -27,7 +27,9 @@ import chex
 import einops
 from flax import struct
 
-from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_generation as mg
+from jaxgmg.procgen import maze_solving
+
 from jaxgmg.environments import base
 from jaxgmg.environments import spritesheet
 
@@ -473,9 +475,10 @@ class LevelGenerator(base.LevelGenerator):
     * width : int (>= 3, odd)
             the number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('open', 'tree', 'bernoulli', 'blocks', or 'noise')
-            specifies the maze generation method to use (see module
-            `maze_generation` for details)
+    * maze_generator : maze_generation.MazeGenerator
+            Provides the maze generation method to use (see module
+            `maze_generation` for details).
+            The default is an open maze generator (no obstacles).
     * num_shields : int
             the number of shields to randomly place in each generated maze
     * num_monsters : int
@@ -485,23 +488,15 @@ class LevelGenerator(base.LevelGenerator):
     * monster_optimality : float (positive, default 10)
             inverse temperature for the monster to step towards the player
     """
-    height: int                 = 13
-    width: int                  = 13
-    layout: str                 = 'open'
-    num_shields: int            = 5
-    num_monsters: int           = 5
-    num_apples: int             = 5
-    monster_optimality: float   = 3
+    height: int = 13
+    width: int = 13
+    maze_generator : mg.MazeGenerator = mg.OpenMazeGenerator()
+    num_shields: int = 5
+    num_monsters: int = 5
+    num_apples: int = 5
+    monster_optimality: float = 3
     
     def __post_init__(self):
-        # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open', 'noise'}
-        # validate dimensions
-        assert self.height >= 3
-        assert self.width >= 3
-        if self.layout == 'tree' or self.layout == 'edges':
-            assert self.height % 2 == 1, "height must be odd for this layout"
-            assert self.width % 2 == 1,  "width must be odd for this layout"
         # validate shields
         assert self.num_shields > 0
         assert self.num_shields <= self.width, "not enough space for inventory"
@@ -520,10 +515,10 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct the wall map
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_function(self.layout)(
+        wall_map = self.maze_generator.generate(
             key=rng_walls,
-            h=self.height,
-            w=self.width,
+            height=self.height,
+            width=self.width,
         )
         
         # spawn random mouse, apple, shield and monster positions
@@ -547,7 +542,7 @@ class LevelGenerator(base.LevelGenerator):
         initial_monsters_pos = all_pos[num_all-self.num_monsters:num_all]
 
         # solve the map and cache the solution for the monsters
-        dist_map = maze_generation.maze_directional_distances(wall_map)
+        dist_map = maze_solving.maze_directional_distances(wall_map)
 
         # decide random positions for shield display
         rng_inventory, rng = jax.random.split(rng)
