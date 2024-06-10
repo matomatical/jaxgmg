@@ -29,7 +29,7 @@ import chex
 import einops
 from flax import struct
 
-from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 
 from jaxgmg.environments import base
@@ -323,33 +323,25 @@ class LevelGenerator(base.LevelGenerator):
     `sample` method that generates a random level.
 
     * height : int,(>= 3, odd)
-            the number of rows in the grid representing the maze
+            The number of rows in the grid representing the maze
             (including top and bottom boundary rows)
     * width : int (>= 3, odd)
-            the number of columns in the grid representing the maze
+            The number of columns in the grid representing the maze
             (including left and right boundary rows)
-    * layout : str ('tree', 'bernoulli', 'blocks', 'noise', or 'open')
-            specifies the maze generation method to use (see module
-            `maze_generation` for details)
+    * maze_generator : maze_generation.MazeGenerator
+            Provides the maze generation method to use (see module
+            `maze_generation` for details).
+            The default is a tree maze generator using Kruskal's algorithm.
     * corner_size : int (>=1, <=width, <=height):
-            the cheese will spawn within a square of this width located in
+            The cheese will spawn within a square of this width located in
             the top left corner.
     """
     height: int = 13
     width: int = 13
-    layout : str = 'tree'
+    maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     corner_size: int = 1
     
     def __post_init__(self):
-        # validate layout
-        assert self.layout in {'tree', 'edges', 'blocks', 'open', 'noise'}
-        # validate dimensions
-        assert self.height >= 3
-        assert self.width >= 3
-        if self.layout == 'tree' or self.layout == 'edges':
-            assert self.height % 2 == 1, "height must be odd for this layout"
-            assert self.width % 2 == 1,  "width must be odd for this layout"
-        # validate corner size
         assert self.corner_size >= 1
         assert self.corner_size <= self.width - 2
 
@@ -362,9 +354,7 @@ class LevelGenerator(base.LevelGenerator):
         """
         # construct a random maze
         rng_walls, rng = jax.random.split(rng)
-        wall_map = maze_generation.get_generator_class_from_name(
-            name=self.layout
-        )().generate(
+        wall_map = self.maze_generator.generate(
             key=rng_walls,
             height=self.height,
             width=self.width,

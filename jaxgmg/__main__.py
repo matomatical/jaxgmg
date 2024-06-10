@@ -372,8 +372,13 @@ def mazesoln_distance(
 
     print("generating maze...")
     rng = jax.random.PRNGKey(seed=seed)
-    MazeGenerator = maze_generation.get_generator_class(layout)
-    maze = MazeGenerator(height=height, width=width).generate(key=rng)
+    maze = maze_generation.get_generator_class_from_name(
+        name=layout,
+    )().generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
     print("solving maze...")
@@ -413,8 +418,13 @@ def mazesoln_direction(
 
     print("generating maze...")
     rng = jax.random.PRNGKey(seed=seed)
-    MazeGenerator = maze_generation.get_generator_class(layout)
-    maze = MazeGenerator(height=height, width=width).generate(key=rng)
+    maze = maze_generation.get_generator_class_from_name(
+        name=layout,
+    )().generate(
+        key=rng,
+        height=height,
+        width=width,
+    )
     print(img2str(maze * .25))
 
     print("solving maze...")
@@ -510,7 +520,9 @@ def play_corner(
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         corner_size=corner_size,
     )
     play_forever(
@@ -540,7 +552,9 @@ def play_keys(
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         num_keys_min=num_keys_min,
         num_keys_max=num_keys_max,
         num_chests_min=num_chests_min,
@@ -570,7 +584,9 @@ def play_dish(
     level_generator = cheese_on_a_dish.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         max_cheese_radius=max_cheese_radius,
     )
     play_forever(
@@ -600,7 +616,9 @@ def play_monsters(
     level_generator = monster_world.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         num_apples=num_apples,
         num_shields=num_shields,
         num_monsters=num_monsters,
@@ -630,7 +648,9 @@ def play_lava(
     level_generator = lava_land.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         lava_threshold=lava_threshold,
     )
     play_forever(
@@ -671,7 +691,9 @@ def solve_corner(
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         corner_size=corner_size,
     )
 
@@ -738,7 +760,9 @@ def solve_keys(
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
-        layout=layout,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
         num_keys_min=num_keys_min,
         num_keys_max=num_keys_max,
         num_chests_min=num_chests_min,
