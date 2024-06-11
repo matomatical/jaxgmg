@@ -210,6 +210,55 @@ trial, mean and standard deviation calculated after discarding the first
 trial since that includes the compilation step.*
 
 
+Maze solving
+------------
+
+Some environments (Follow Me, Monster World) don't just require a maze
+layout, they have transition dynamics ('NPCs') that depend on optimal
+navigation within the arbitrary generated layout.
+This library's solution is to compute all-pairs shortest path information
+during level generation and cache this navigation information as part of the
+level struct for quick use during rollouts.
+Caching the 'solution' to a maze layout at level generation time should be
+faster overall than running a shortest path algorithm during each step, but
+we still want level generation to be accelerated, so we need a
+JAX-accelerated all-pairs shortest path algorithm.
+
+The module `jaxgmg.procgen.maze_solving` provides a JAX-accelerated all-pairs
+shortest path algorithm, with methods returning a tensor that encodes the
+distance or optimal direction to move from any source node to any destination
+node. The following is a visualisation of the result for a tree maze (the
+algorithms work for arbitrary maze layouts).
+
+<img src="img/mazesoln.png" alt="Visualisation of a maze solution.">
+
+How to read:
+  The square in the 'macromaze' represents the source and the square in the
+  'micromaze' (the maze within that square) represents the shortest path
+  distance (left) or optimal direction (right) to reach that square from
+  this source.
+For the shortest path distances (left) the colour indicates the distance:
+  ![](https://badgen.net/badge/color/wall/440154?label=),
+  ![](https://badgen.net/badge/color/0/21918c?label=),
+  ![](https://badgen.net/badge/color/15/3b528b?label=),
+  ![](https://badgen.net/badge/color/30/fde725?label=).
+For the optimal directions (right) the colour indicates the direction:
+  ![](https://badgen.net/badge/color/up/29366f?label=),
+  ![](https://badgen.net/badge/color/left/257179?label=),
+  ![](https://badgen.net/badge/color/down/38b764?label=),
+  ![](https://badgen.net/badge/color/right/a7f070?label=),
+  ![](https://badgen.net/badge/color/stay/ffcd75?label=).
+
+*Visualisation generated with `jaxgmg mazesoln distance-direction`.*
+
+TODO: speedtest
+
+Level solving
+-------------
+
+TODO: Some environments also support optimal or heuristic policies (using
+these same maze solving methods).
+
 RL baselines
 ------------
 

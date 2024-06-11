@@ -83,6 +83,7 @@ app.add_typer(util.make_typer_app(
     subcommands=(
         mazesoln.distance,
         mazesoln.direction,
+        mazesoln.distance_direction,
     ),
     **TYPER_CONFIG,
 ))

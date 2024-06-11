@@ -209,8 +209,3 @@ def maze_optimal_directions(grid, stay_action=False):
     return actions
 
 
-
-    # correct for stay_action flag
-    # it will always have the lowest cost by at most 1 (when source = target)
-    # so, incrementing by 1 will sabotage it in the argmin operation below
-    # (1 is enough because ties are broken in array order and stay is last)
