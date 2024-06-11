@@ -9,14 +9,82 @@ JAX-accelerated environments
 
 The following environments are provided.
 
-| Environment name     | Example | Description |
-| -------------------- | ------- | ----------- |
-| Cheese in the Corner | ![](animations/corner13x13.gif) | Navigate a mouse through a maze looking for cheese. During training, the cheese is in or near the top corner. |
-| Cheese on a Dish | ![](animations/dish13x13.gif) | Navigate a mouse through a maze looking for cheese. During training, the cheese is on or near a dish. |
-| Follow Me | ![](animations/follow13x13.gif) | Navigate a mouse around a maze to a sequence of beacons. During training, an expert reliably leads the way. |
-| Keys and Chests | ![](animations/keys13x13.gif) | Navigate a mouse around a maze unlocking chests with keys. During training, keys are very sparse (not shown). |
-| Lava Land | ![](animations/lava13x13.gif) | Navigate a mouse through a forest world looking for cheese. During training, lava tiles are rare (not shown). |
-| Monster World | ![](animations/monsters13x13.gif) | Navigate a mouse around an arena looking for apples while dodging monsters. Pick up shields to defeat monsters. During training, there is only time to avoid monsters (not shown). |
+<table>
+  <thead><tr>
+    <th>Name</th>
+    <th>Example</th>
+    <th>Description</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td>Cheese in the Corner</td>
+      <td>![](animations/corner13x13.gif)</td>
+      <td>
+        Navigate a mouse through a maze looking for cheese. During training,
+        the cheese is in or near the top corner.
+      </td>
+    </tr>
+    <tr>
+      <td>Cheese on a Dish</td>
+      <td>![](animations/dish13x13.gif)</td>
+      <td>
+        A mouse navigates through a maze looking for cheese (positive
+        reward).
+        <br>
+        When restricting to levels where the cheese always spawns in the top
+        left corner, navigating to that corner becomes a viable proxy.
+      </td>
+    </tr>
+    <tr>
+      <td>Follow Me</td>
+      <td>![](animations/follow13x13.gif)</td>
+      <td>
+        A mouse navigates around a maze activating beacons in a specific
+        sequence (positive reward). A second mouse is also navigating the
+        maze in its own sequence.
+        <br>
+        When restricting to levels where the second mouse follows the beacons
+        in the correct sequence, following the second mouse around becomes a
+        viable proxy.
+      </td>
+    </tr>
+    <tr>
+      <td>Keys and Chests</td>
+      <td>![](animations/keys13x13.gif)</td>
+      <td>
+        A mouse navigates around a maze collecting keys (zero reward) in
+        order to unlock chests (positive reward).
+        <br>
+        When restricting to levels where keys are rare and chests are
+        plentiful, intrinsically valuing keys and ignoring chests becomes a
+        viable proxy.
+      </td>
+    </tr>
+    <tr>
+      <td>Lava Land</td>
+      <td>![](animations/lava13x13.gif)</td>
+      <td>
+        A mouse navigates a forest world, avoiding lava tiles (negative
+        reward) while looking for cheese (positive reward).
+        <br>
+        When restricting to levels without lava, seeking cheese without
+        avoiding lava becomes a viable proxy.
+      </td>
+    </tr>
+    <tr>
+      <td>Monster World</td>
+      <td>![](animations/monsters13x13.gif)</td>
+      <td>
+        A mouse navigates around an arena looking for apples (positive
+        reward) while dodging monsters (negative reward). The mouse picks up
+        shields to defeat monsters.
+        <br>
+        When restricting to short episodes, avoiding monsters and ignoring
+        apples becomes a viable proxy.
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 
 TODO: speedtests.
