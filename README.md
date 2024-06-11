@@ -42,7 +42,7 @@ The following environments are provided.
     <tr>
       <td>Follow Me</td>
       <td>
-        <img src="animations/dish13x13.gif" alt="Cheese on a Dish">
+        <img src="animations/follow13x13.gif" alt="Follow Me">
       </td>
       <td>
         A mouse navigates around a maze activating beacons in a specific
