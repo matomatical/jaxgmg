@@ -6,8 +6,10 @@ import jax
 import jax.numpy as jnp
 import readchar
 import time
+import chex
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import keys_and_chests
@@ -21,11 +23,19 @@ from jaxgmg.cli import util
 # HELPER FUNCTION
 
 
-def play_forever(rng, env, level_generator, debug=False):
+def play_forever(
+    rng: chex.PRNGKey,
+    env: base.Env,
+    level_generator: base.LevelGenerator,
+    record: bool = False,
+    debug: bool = False,
+):
     """
     Helper function for interacting with a given environment.
     """
-    while True:
+    if record: frames = []
+    playing = True
+    while playing:
         print("generating level...")
         rng_level, rng = jax.random.split(rng)
         level = level_generator.sample(rng_level)
@@ -33,7 +43,7 @@ def play_forever(rng, env, level_generator, debug=False):
 
         print("playing level...")
         print("initial state")
-        image = util.img2str(env.get_obs(state))
+        image = util.img2str(obs)
         lines = len(str(image).splitlines())
         print(
             image,
@@ -41,32 +51,45 @@ def play_forever(rng, env, level_generator, debug=False):
             "controls: w = up | a = left | s = down | d = right | q = quit",
             sep="\n",
         )
+        if record: frames.append(obs)
     
         rng_steps, rng = jax.random.split(rng)
         while True:
             key = readchar.readkey()
             if key == "q":
                 print("bye!")
-                return
+                playing = False
+                break # will then exit the outer loop
             if key == "r":
+                # next level
                 break
             if key not in "wsda":
                 continue
             a = "wasd".index(key)
             rng_step, rng_steps = jax.random.split(rng_steps)
-            _, state, r, d, _ = env.step(rng_step, state, a)
+            obs, state, r, d, _ = env.step(rng_step, state, a)
             print(
                 "" if debug else f"\x1b[{lines+4}A",
                 f"action: {a} ({'uldr'[a]})",
-                util.img2str(env.get_obs(state)),
+                util.img2str(obs),
                 f"reward: {r:.2f} done: {d}",
                 "controls: w = up | a = left | s = down | d = right | q = quit",
                 sep="\n",
             )
+            if record and not d: frames.append(obs)
             if d:
                 break
         if not debug:
             print(f"\x1b[{lines+6}A")
+    if record:
+        print(f"{len(frames)} frames recorded, saving to './out.gif'...")
+        util.save_gif(
+            frames=frames,
+            path="./out.gif",
+            upscale=2,
+            fps=8,
+            repeat=True,
+        )
 
 
 # # # 
@@ -80,6 +103,7 @@ def corner(
     corner_size: int            = 3,
     seed: int                   = 42,
     debug: bool                 = False,
+    record: bool                = False,
 ):
     """
     Interactive Cheese in the Corner environment.
@@ -101,6 +125,7 @@ def corner(
         env=env,
         level_generator=level_generator,
         debug=debug,
+        record=record,
     )
 
 
@@ -111,6 +136,7 @@ def dish(
     max_cheese_radius: int      = 3,
     seed: int                   = 42,
     debug: bool                 = False,
+    record: bool                = False,
 ):
     """
     Interactive Cheese on a Dish environment.
@@ -132,6 +158,7 @@ def dish(
         env=env,
         level_generator=level_generator,
         debug=debug,
+        record=record,
     )
 
 
@@ -143,6 +170,7 @@ def follow(
     trustworthy_leader: bool    = True,
     seed: int                   = 42,
     debug: bool                 = False,
+    record: bool                = False,
 ):
     """
     Interactive Follow Me environment.
@@ -165,6 +193,7 @@ def follow(
         env=env,
         level_generator=level_generator,
         debug=debug,
+        record=record,
     )
 
 
@@ -178,6 +207,7 @@ def keys(
     num_chests_max: int         = 6,
     seed: int                   = 42,
     debug: bool                 = False,
+    record: bool                = False,
 ):
     """
     Interactive Keys and Chests environment.
@@ -202,6 +232,7 @@ def keys(
         env=env,
         level_generator=level_generator,
         debug=debug,
+        record=record,
     )
 
 
@@ -212,6 +243,7 @@ def lava(
     lava_threshold: float       = -0.25,
     seed: int                   = 42,
     debug: bool                 = False,
+    record: bool                = False,
 ):
     """
     Interactive Lava Land environment.
@@ -233,6 +265,7 @@ def lava(
         env=env,
         level_generator=level_generator,
         debug=debug,
+        record=record,
     )
     
 
@@ -246,6 +279,7 @@ def monsters(
     monster_optimality: float   = 3,
     seed: int                   = 42,
     debug: bool                 = False,
+    record: bool                = False,
 ):
     """
     Interactive Monster World environment.
@@ -270,6 +304,7 @@ def monsters(
         env=env,
         level_generator=level_generator,
         debug=debug,
+        record=record,
     )
     
 

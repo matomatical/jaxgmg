@@ -5,6 +5,7 @@ Utilities supporting jaxgmg CLI applications.
 import numpy as np
 import jax.numpy as jnp
 import einops
+import PIL.Image as pillow
 import typer
 
 
@@ -46,6 +47,10 @@ def print_legend(legend, colormap=None):
         print(img2str(jnp.full((2,2), value), colormap=colormap,), name)
 
 
+# # # 
+# Image and animation rendering
+
+
 def img2str(im, colormap=None):
     """
     Render a small image using a grid of unicode half-characters with
@@ -83,13 +88,64 @@ def img2str(im, colormap=None):
     ]) + _reset
 
 
+def save_gif(
+    frames,
+    path,
+    upscale=1,
+    fps=12,
+    repeat=True,
+):
+    """
+    Take a (time, height, width, rgb) matrix and save it as an animated gif.
+    
+    Parameters:
+
+    * frames : float[t, h, w, rgb]
+            The animation. First axis is time, remaining axes represent the
+            image data. Each point should be a float between 0 and 1.
+    * path : str
+            Where to save the gif.
+    * upscale : int (>=1, default is 1)
+            Width/height of pixel representation of each matrix entry.
+    * fps : int
+            Approx. frames per second encoded into the gif.
+    * repeat : bool (default True)
+            Whether the gif loops indefinitely (True, default) or only plays
+            once (False).
+    """
+    frames = np.asarray(frames)
+    T, H, W, C = frames.shape
+    assert C == 3, f"Wrong number of channels for GIF (C={C}!=3)"
+        
+    # preprocess image data
+    frames_u8 = (frames * 255).astype(np.uint8)
+    frames_u8_upscaled = einops.repeat(
+        frames_u8,
+        't h w rgb -> t (h sh) (w sw) rgb',
+        sh=upscale,
+        sw=upscale,
+    )
+    # PIL images for each frame
+    imgs = [pillow.fromarray(i) for i in frames_u8_upscaled]
+    # compile gif
+    imgs[0].save(
+        path,
+        save_all=True,
+        append_images=imgs[1:],
+        duration=1000 // fps,
+        loop=1-repeat, # 1 = loop once, 0 = loop forever
+    )
+
+
 # # # 
 # COLORMAPS
 
 
 def viridis(x):
     """
-    https://youtu.be/xAoljeRJ3lU
+    Viridis colormap.
+
+    Details: https://youtu.be/xAoljeRJ3lU
     """
     return np.array([
         [.267,.004,.329],[.268,.009,.335],[.269,.014,.341],[.271,.019,.347],
@@ -161,7 +217,9 @@ def viridis(x):
 
 def sweetie16(x):
     """
-    https://lospec.com/palette-list/sweetie-16
+    Sweetie-16 colour palette.
+
+    Details: https://lospec.com/palette-list/sweetie-16
     """
     return np.array([
         [.101,.109,.172],[.364,.152,.364],[.694,.243,.325],[.937,.490,.341],
@@ -173,7 +231,9 @@ def sweetie16(x):
 
 def pico8(x):
     """
-    https://pico-8.fandom.com/wiki/Palette
+    PICO-8 colour palette.
+
+    Details: https://pico-8.fandom.com/wiki/Palette
     """
     return (np.array([
         [  0,   0,   0], [ 29,  43,  83], [126,  37,  83], [  0, 135,  81],

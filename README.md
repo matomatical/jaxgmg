@@ -7,7 +7,17 @@ JAX-based environments and RL baselines for studying goal misgeneralisation.
 JAX-accelerated environments
 ----------------------------
 
-TODO: demo gifs.
+The following environments are provided.
+
+| Environment name     | Example | Description |
+| -------------------- | ------- | ----------- |
+| Cheese in the Corner | ![](animations/corner13x13.gif) | Navigate a mouse through a maze looking for cheese. During training, the cheese is in or near the top corner. |
+| Cheese on a Dish | ![](animations/dish13x13.gif) | Navigate a mouse through a maze looking for cheese. During training, the cheese is on or near a dish. |
+| Follow Me | ![](animations/follow13x13.gif) | Navigate a mouse around a maze to a sequence of beacons. During training, an expert reliably leads the way. |
+| Keys and Chests | ![](animations/keys13x13.gif) | Navigate a mouse around a maze unlocking chests with keys. During training, keys are very sparse (not shown). |
+| Lava Land | ![](animations/lava13x13.gif) | Navigate a mouse through a forest world looking for cheese. During training, lava tiles are rare (not shown). |
+| Monster World | ![](animations/monsters13x13.gif) | Navigate a mouse around an arena looking for apples while dodging monsters. Pick up shields to defeat monsters. During training, there is only time to avoid monsters (not shown). |
+
 
 TODO: speedtests.
 
