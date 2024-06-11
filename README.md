@@ -1,7 +1,49 @@
 `jaxgmg`: JAX-accelerated Goal MisGeneralisation
 ================================================
 
-JAX-based environments and RL baselines for studying goal misgeneralisation.
+JAX-based environments (WIP) and RL baselines (TODO) for studying goal
+misgeneralisation.
+
+
+Installation
+------------
+
+Install the latest master version from GitHub:
+
+```
+pip install git+ssh://git@github.com/matomatical/jaxgmg.git
+```
+
+Install from a local clone:
+
+```
+git clone git@github.com:matomatical/jaxgmg.git
+cd jaxgmg
+pip install -e .
+```
+
+TODO: list on PyPI
+
+
+Explore the library
+-------------------
+
+After installing run the following:
+
+```
+jaxgmg --help
+```
+
+You can try the various subcommands to see demonstrations of the library's
+functionality. For example:
+
+* To play with an interactive demonstration of the environments, try
+  `jaxgmg play ENV_NAME` (see `jaxgmg play --help` for options).
+* To procedurally generate mazes , try `jaxgmg mazegen LAYOUT` (see `jaxgmg
+  mazegen --help` for options).
+
+Note: Most of the demos display colour images to the terminal using ANSI
+control codes, which may not work in some environments (e.g. on Windows?).
 
 
 JAX-accelerated environments
@@ -22,8 +64,11 @@ The following environments are provided.
         <img src="img/corner13x13.gif" alt="Cheese in the Corner">
       </td>
       <td>
-        Navigate a mouse through a maze looking for cheese. During training,
-        the cheese is in or near the top corner.
+        A mouse navigates through a maze looking for cheese (positive
+        reward).
+        <br>
+        When restricting to levels where the cheese always spawns in the top
+        left corner, navigating to that corner becomes a viable proxy.
       </td>
     </tr>
     <tr>
@@ -35,8 +80,8 @@ The following environments are provided.
         A mouse navigates through a maze looking for cheese (positive
         reward).
         <br>
-        When restricting to levels where the cheese always spawns in the top
-        left corner, navigating to that corner becomes a viable proxy.
+        When restricting to levels where the cheese always spawns on or near
+        a dish, navigating to the dish becomes a viable proxy.
       </td>
     </tr>
     <tr>
@@ -98,6 +143,9 @@ The following environments are provided.
   </tbody>
 </table>
 
+*Animations in this table produced with `jaxgmg play ENV_NAME`. The actions
+are chosen by a human.*
+
 
 TODO: speedtests.
 
@@ -111,11 +159,13 @@ TODO: implement baselines.
 Procedural level generation
 ---------------------------
 
-Various configurable maze generation algorithms are supported.
+Each environment supports a wide distribution of 'levels', and the library
+includes tools for procedural level generation. At the core of these
+generators is a suite of configurable procedural maze generation methods, any
+of which can be paired with any environment.
 
-<img src="img/mazegen.png" alt="Demonstration of maze generation methods">
-
-The above image shows several maze generation methods:
+The library includes various configurable maze generation methods, depicted
+in the below mural.
 
 * Row 1: **Tree mazes,** acyclic mazes based on spanning trees of a grid
   graph, generated using Kruskal's algorithm.
@@ -129,49 +179,12 @@ The above image shows several maze generation methods:
   such as testing RL algorithms and as a starting point for RL algorithms
   that build their own maze layouts.
 
+<img src="img/mazegen.png" alt="Demonstration of maze generation methods">
+
+*Mural produced with `jaxgmg mazegen mural --num_cols=12`*
+
 
 TODO: speedtests.
-
-
-Installation
-------------
-
-Install the latest master version from GitHub:
-
-```
-pip install git+ssh://git@github.com/matomatical/jaxgmg.git
-```
-
-Install from a local clone:
-
-```
-git clone git@github.com:matomatical/jaxgmg.git
-cd jaxgmg
-pip install -e .
-```
-
-TODO: list on PyPI
-
-
-Explore the library
--------------------
-
-After installing run the following:
-
-```
-jaxgmg --help
-```
-
-You can try the various subcommands to see demonstrations of the library's
-functionality. For example:
-
-* To play with an interactive demonstration of the environments, try
-  `jaxgmg play ENV_NAME` (see `jaxgmg play --help` for options).
-* To procedurally generate mazes , try `jaxgmg mazegen LAYOUT` (see `jaxgmg
-  mazegen --help` for options).
-
-Note: Most of the demos display colour images to the terminal using ANSI
-control codes, which may not work in some environments (e.g. on Windows?).
 
 
 Roadmap: Towards jaxgmg 1.0

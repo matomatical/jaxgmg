@@ -126,7 +126,7 @@ def open(
     print(util.img2str(maze * .25))
 
 
-def image(
+def mural(
     height: int = 23,
     width: int = 23,
     num_cols: int = 3,
