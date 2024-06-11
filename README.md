@@ -207,9 +207,9 @@ On a M2 Macbook Air (without using Metal):
 
 TODO: test on a GPU.
 
-*Rates collected with `jaxgmg speedtest`, batch size 32, 512 iterations per
-trial, mean and standard deviation calculated after discarding the first
-trial since that includes the compilation step.*
+*Rates collected with `jaxgmg speedtest mazegen-METHOD`, batch size 32, 512
+iterations per trial, mean (and standard deviation) calculated after
+discarding the first trial since that includes the compilation step.*
 
 
 Maze solving
@@ -257,20 +257,43 @@ For the optimal directions (right) the colour indicates the direction:
 
 *Visualisation generated with `jaxgmg mazesoln distance-direction`.*
 
-TODO: speedtest
+The maze solution algorithms are fully accelerated with JAX. The following
+tables report rates of maze solving (mazes per second) for different
+configurations and hardware.
+
+Note: the time taken to generate the mazes is not included, and not all
+generators are tested because the solution methods run similar operations
+independent of the maze contents.
+
+On a M2 Macbook Air (without using Metal):
+
+| Type of solution      | Gen.  | 13x13 mazes | 25x25 mazes | 49x49 mazes |
+| --------------------- | ----- | ----------- | ----------- | ----------- |
+| Distance              | Tree  | 1.35K (21)  | TODO        | TODO        |
+| Distance              | Edges | 1.34K (17)  |             |             |
+| Directional distances | Edges | 1.16K (38)  |             |             |
+| Direction (uldr)      | Edges | 1.06K (7.4) |             |             |
+| Direction (uldr+stay) | Edges | 1.01K (3.1) |             |             |
+
+TODO: test on a GPU.
+
+*Rates collected with `jaxgmg speedtest mazesoln-METHOD`, batch size 32,
+128 iterations per trial, mean (and standard deviation) calculated after
+discarding the first trial since that includes the compilation step.*
 
 Level solving
 -------------
 
-TODO: Some environments also support optimal or heuristic policies (using
-these same maze solving methods).
+Some environments also support optimal or heuristic policies (using these
+same maze solving methods as a foundation).
+
+TODO: Document.
+
 
 RL baselines
 ------------
 
 TODO: implement baselines.
-
-
 
 
 Roadmap: Towards jaxgmg 1.0
@@ -311,8 +334,8 @@ Packaging:
 * [x] Create this repository
 * [x] Format project as an installable Python package
 * [x] CLI easily demonstrating core features
-* [x] GIF animation of core environments
-* [ ] Speedtests of generation methods, environments, baselines
+* [x] Animation/images of core environments, procedural generation methods
+* [x] Speedtests of generation methods, environments, (TODO: baselines)
 * [ ] Document speedtests and RL experiments in a report
 * [ ] Release jaxgmg v1 on arXiv and PyPI...!
 

@@ -81,9 +81,9 @@ app.add_typer(util.make_typer_app(
     name='mazesoln',
     help=mazesoln.__doc__,
     subcommands=(
-        mazesoln.distance,
-        mazesoln.direction,
-        mazesoln.distance_direction,
+        mazesoln.distances,
+        mazesoln.directions,
+        mazesoln.distances_and_directions,
     ),
     **TYPER_CONFIG,
 ))
@@ -147,6 +147,9 @@ app.add_typer(util.make_typer_app(
         speedtest.mazegen_blocks,
         speedtest.mazegen_noise,
         speedtest.mazegen_open,
+        speedtest.mazesoln_distances,
+        speedtest.mazesoln_directional_distances,
+        speedtest.mazesoln_optimal_directions,
     ),
     **TYPER_CONFIG,
 ))

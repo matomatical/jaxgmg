@@ -1,8 +1,9 @@
 """
-Profiling speed of maze generation methods, level generation methods, and
-environment update and render methods.
+Profiling speed of maze generation and solution methods, level generation
+methods, and environment update and render methods.
 """
 
+import functools
 import time
 import tqdm
 import numpy as np
@@ -12,6 +13,7 @@ import jax.numpy as jnp
 import chex
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import follow_me
@@ -72,6 +74,75 @@ def speedtest_mazegen(
     print('  subseq. stdv:', mazes_per_second[1:].std(), 'mazes/sec')
 
 
+def speedtest_mazesoln(
+    # configure the maze generator
+    rng : chex.PRNGKey,
+    height : int,
+    width : int,
+    generator : maze_generation.MazeGenerator,
+    # the actual solution function
+    solve_fn, # function from maze to some form of solution
+    # how many mazes to generate and solve
+    batch_size : int,
+    num_iters : int,
+    num_trials : int,
+):
+    # accelerated maze generation
+    @jax.jit
+    def generate_mazes(rng):
+        def iterate(_carry, rng_i):
+            vgenerate = jax.vmap(generator.generate, in_axes=(0,None,None))
+            rng_batch = jax.random.split(rng_i, batch_size)
+            mazes = vgenerate(rng_batch, height, width)
+            return None, mazes
+        _carry, mazes = jax.lax.scan(
+            iterate,
+            None,
+            jax.random.split(rng, num_iters),
+        )
+        return mazes # shape: iters batch h w
+
+    # accelerated solution trial
+    @jax.jit
+    def trial(mazes):
+        def iterate(_carry, mazes_i):
+            vsolve = jax.vmap(solve_fn, in_axes=(0,))
+            solns = vsolve(mazes_i)
+            return None, solns
+        _carry, solns = jax.lax.scan(
+            iterate,
+            None,
+            mazes,
+        )
+        return solns
+    
+    # execute and time the trials
+    trial_times = []
+    for _ in tqdm.trange(num_trials, unit="trials"):
+        # generate the mazes (not timed)
+        rng_trial, rng = jax.random.split(rng)
+        mazes = generate_mazes(rng=rng_trial)
+        # solve the mazes (timed)
+        start_time = time.perf_counter()
+        trial(mazes)
+        end_time = time.perf_counter()
+        trial_times.append(end_time - start_time)
+    trial_times = np.array(trial_times)
+
+    # summarise the results
+    batches_per_second = num_iters / trial_times
+    mazes_per_second = batches_per_second * batch_size
+    print('trial times:')
+    print('  first trial: ', trial_times[0], 'seconds')
+    print('  subseq. mean:', trial_times[1:].mean(), 'seconds')
+    print('  subseq. stdv:', trial_times[1:].std(), 'seconds')
+    print('mazes solved per second:')
+    print('  first trial: ', mazes_per_second[0], 'mazes/sec')
+    print('  subseq. mean:', mazes_per_second[1:].mean(), 'mazes/sec')
+    print('  subseq. stdv:', mazes_per_second[1:].std(), 'mazes/sec')
+    print('NOTE: time to generate mazes not counted in these results')
+
+
 # # # 
 # Entry points for each maze generation method
 
@@ -89,9 +160,8 @@ def mazegen_tree(
     Speedtest for tree maze generator.
     """
     util.print_config(locals())
-    rng = jax.random.PRNGKey(seed=seed)
     speedtest_mazegen(
-        rng=rng,
+        rng=jax.random.PRNGKey(seed=seed),
         height=height,
         width=width,
         generator=maze_generation.TreeMazeGenerator(
@@ -116,9 +186,8 @@ def mazegen_edges(
     Speedtest for edge maze generator.
     """
     util.print_config(locals())
-    rng = jax.random.PRNGKey(seed=seed)
     speedtest_mazegen(
-        rng=rng,
+        rng=jax.random.PRNGKey(seed=seed),
         height=height,
         width=width,
         generator=maze_generation.EdgeMazeGenerator(
@@ -143,9 +212,8 @@ def mazegen_blocks(
     Speedtest for tree maze generator.
     """
     util.print_config(locals())
-    rng = jax.random.PRNGKey(seed=seed)
     speedtest_mazegen(
-        rng=rng,
+        rng=jax.random.PRNGKey(seed=seed),
         height=height,
         width=width,
         generator=maze_generation.BlockMazeGenerator(
@@ -172,9 +240,8 @@ def mazegen_noise(
     Speedtest for noise maze generator.
     """
     util.print_config(locals())
-    rng = jax.random.PRNGKey(seed=seed)
     speedtest_mazegen(
-        rng=rng,
+        rng=jax.random.PRNGKey(seed=seed),
         height=height,
         width=width,
         generator=maze_generation.NoiseMazeGenerator(
@@ -200,12 +267,105 @@ def mazegen_open(
     Speedtest for open maze generator.
     """
     util.print_config(locals())
-    rng = jax.random.PRNGKey(seed=seed)
     speedtest_mazegen(
-        rng=rng,
+        rng=jax.random.PRNGKey(seed=seed),
         height=height,
         width=width,
         generator=maze_generation.OpenMazeGenerator(),
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+# # # 
+# Entry points for each kind of maze solution method
+
+
+def mazesoln_distances(
+    height: int = 13,
+    width: int = 13,
+    layout: str = 'tree',
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 32,
+):
+    """
+    Speedtest for maze solving (APSP distances).
+    """
+    util.print_config(locals())
+    speedtest_mazesoln(
+        # configure the maze generator
+        rng=jax.random.PRNGKey(seed=seed),
+        height=height,
+        width=width,
+        generator=maze_generation.get_generator_class_from_name(layout)(),
+        # the actual solution function
+        solve_fn=maze_solving.maze_distances,
+        # how many mazes to generate and solve
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def mazesoln_directional_distances(
+    height: int = 13,
+    width: int = 13,
+    layout: str = 'tree',
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 32,
+):
+    """
+    Speedtest for maze solving (APSP distances after moving once in each
+    direction or staying put).
+    """
+    util.print_config(locals())
+    speedtest_mazesoln(
+        # configure the maze generator
+        rng=jax.random.PRNGKey(seed=seed),
+        height=height,
+        width=width,
+        generator=maze_generation.get_generator_class_from_name(layout)(),
+        # the actual solution function
+        solve_fn=maze_solving.maze_directional_distances,
+        # how many mazes to generate and solve
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def mazesoln_optimal_directions(
+    height: int = 13,
+    width: int = 13,
+    layout: str = 'tree',
+    stay_action: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 32,
+):
+    """
+    Speedtest for maze solving (APSP optimal directions with or without stay
+    action filtering).
+    """
+    util.print_config(locals())
+    speedtest_mazesoln(
+        # configure the maze generator
+        rng=jax.random.PRNGKey(seed=seed),
+        height=height,
+        width=width,
+        generator=maze_generation.get_generator_class_from_name(layout)(),
+        # the actual solution function
+        solve_fn=functools.partial(
+            maze_solving.maze_optimal_directions,
+            stay_action=stay_action,
+        ),
+        # how many mazes to generate and solve
         batch_size=batch_size,
         num_iters=num_iters,
         num_trials=num_trials,

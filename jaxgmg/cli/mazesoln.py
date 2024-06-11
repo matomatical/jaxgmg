@@ -10,7 +10,7 @@ from jaxgmg.procgen import maze_solving
 from jaxgmg.cli import util
 
 
-def distance(
+def distances(
     layout: str = 'tree',
     height: int = 7,
     width:  int = 7,
@@ -55,7 +55,7 @@ def distance(
     print("the target is represented by the square in the micromaze")
 
 
-def direction(
+def directions(
     layout: str = 'tree',
     height: int = 7,
     width:  int = 7,
@@ -102,7 +102,7 @@ def direction(
     print("the target is represented by the square in the micromaze")
 
 
-def distance_direction(
+def distances_and_directions(
     layout: str = 'tree',
     height: int = 7,
     width: int = 7,
