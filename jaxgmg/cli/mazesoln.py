@@ -16,10 +16,10 @@ def distance(
     width:  int = 7,
     seed: int = 42,
 ):
-    print(
-        "distance: solve a maze and plot the optimal distance "
-        "from any source to any destination"
-    )
+    """
+    Solve a maze and plot the optimal distance from any source to any
+    destination.
+    """
     util.print_config(locals())
 
     print("generating maze...")
@@ -62,10 +62,10 @@ def direction(
     stay_action: bool = True,
     seed: int = 42,
 ):
-    print(
-        "maze-direction: solve a maze and plot the optimal direction "
-        "from any source to any destination"
-    )
+    """
+    Solve a maze and plot the optimal direction to take from any source to
+    get to any destination.
+    """
     util.print_config(locals())
 
     print("generating maze...")

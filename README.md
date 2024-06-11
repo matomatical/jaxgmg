@@ -6,8 +6,12 @@ JAX-based environments and RL baselines for studying goal misgeneralisation.
 Environments
 ------------
 
+TODO: demo gifs.
+
 Level generation
 ----------------
+
+TODO: demo gifs.
 
 Install
 -------
@@ -49,15 +53,15 @@ control codes, which may not work in some environments (e.g. on Windows?).
 Roadmap
 -------
 
-Core maze generation methods:
+Core maze generation methods (JAX accelerated):
 
 * [x] Kruskal's algorithm
 * [x] Random block mazes
 * [x] Perlin noise
-* [ ] Rooms? BSP? Tunnelling? Cellular automata? See notes
+* [ ] More: Rooms? BSP? Tunnelling? Cellular automata? See notes
       [here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/).
 
-Core environments:
+Core environments (JAX accelerated):
 
 * [x] Cheese in the corner
 * [x] Keys and chests

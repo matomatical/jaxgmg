@@ -23,7 +23,7 @@ from jaxgmg.cli import util
 
 def play_forever(rng, env, level_generator, debug=False):
     """
-    Helper function to interact with an environment.
+    Helper function for interacting with a given environment.
     """
     while True:
         print("generating level...")
@@ -81,7 +81,9 @@ def corner(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("corner: interact with a random cheese in the corner level")
+    """
+    Interactive Cheese in the Corner environment.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -110,7 +112,9 @@ def dish(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("dish: interact with a random cheese on a dish level")
+    """
+    Interactive Cheese on a Dish environment.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -140,7 +144,9 @@ def follow(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("follow: interact with a random 'follow me' level")
+    """
+    Interactive Follow Me environment.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -173,7 +179,9 @@ def keys(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("keys: interact with a random keys and chests level")
+    """
+    Interactive Keys and Chests environment.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -205,7 +213,9 @@ def lava(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("lava: interact with a random 'lava land' level")
+    """
+    Interactive Lava Land environment.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -237,7 +247,9 @@ def monsters(
     seed: int                   = 42,
     debug: bool                 = False,
 ):
-    print("monsters: interact with a random monster world level")
+    """
+    Interactive Monster World environment.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)

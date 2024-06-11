@@ -13,7 +13,9 @@ def tree(
     alt_kruskal_algorithm: bool = False,
     seed: int = 42,
 ):
-    print("tree: generate and visualise a random tree maze")
+    """
+    Generate and visualise a random tree maze.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -34,7 +36,9 @@ def edges(
     edge_prob: float = 0.75,
     seed: int = 42,
 ):
-    print("edges: generate and visualise a random edge maze")
+    """
+    Generate and visualise a random edge maze.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -57,7 +61,9 @@ def noise(
     num_octaves: int = 1,
     seed: int = 42,
 ):
-    print("noise: generate and visualise a random noise maze")
+    """
+    Generate and visualise a maze based on (fractal) Perlin noise.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -80,7 +86,9 @@ def blocks(
     wall_prob: float = 0.25,
     seed: int = 42,
 ):
-    print("blocks: generate and visualise a random block maze")
+    """
+    Generate and visualise a random block maze.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -100,7 +108,9 @@ def open(
     width: int = 79,
     seed: int = 42, # unused
 ):
-    print("open: generate and visualise an open maze")
+    """
+    Generate and visualise an open maze.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)

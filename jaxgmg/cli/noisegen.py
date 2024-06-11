@@ -14,7 +14,9 @@ def perlin(
     num_cols: int = 8,
     seed: int = 42,
 ):
-    print("perlin-noise: generate and visualise 2d perlin noise")
+    """
+    Generate and visualise some 2d Perlin noise.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
@@ -37,7 +39,9 @@ def fractal(
     num_octaves: int = 4,
     seed: int = 42,
 ):
-    print("fractal-noise: generate and visualise 2d fractal perlin noise")
+    """
+    Generate and visualise some 2d fractal Perlin noise.
+    """
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)

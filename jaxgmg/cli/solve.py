@@ -25,9 +25,9 @@ def corner(
     num_levels: int             = 64,
     seed: int                   = 42,
 ):
-    print(
-        "solve-corner: optimal value for a random cheese in the corner level"
-    )
+    """
+    Optimal values for a batch of random Cheese in the Corner levels.
+    """
     util.print_config(locals())
 
     print("initialising...")
@@ -94,7 +94,9 @@ def keys(
     num_levels: int             = 64,
     seed: int                   = 42,
 ):
-    print("solve-keys: optimal value for a random keys and chests level")
+    """
+    Optimal values for a batch of random Keys and Chests levels.
+    """
     util.print_config(locals())
     if num_keys_max + num_chests_max > 9:
         print(

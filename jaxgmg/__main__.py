@@ -27,66 +27,105 @@ TYPER_CONFIG = {
     'pretty_exceptions_show_locals': False, # can turn on during debugging
 }
 
+def make_typer_app(name, help, subcommands):
+    """
+    Transform a list of functions into a typer application.
+    """
+    app = typer.Typer(name=name, help=help, **TYPER_CONFIG)
+    for subcommand in subcommands:
+        app.command()(subcommand)
+    return app
+
 
 # # # 
-# Assemble entry points into a Typer application object
+# Assemble various entrypoints into a Typer app
 
 app = typer.Typer(**TYPER_CONFIG)
 
 
 # noise generation
-app_noisegen = typer.Typer(**TYPER_CONFIG)
-app_noisegen.command()(noisegen.perlin)
-app_noisegen.command()(noisegen.fractal)
-app.add_typer(app_noisegen, name='noisegen')
+app.add_typer(make_typer_app(
+    name='noisegen',
+    help=noisegen.__doc__,
+    subcommands=(
+        noisegen.perlin,
+        noisegen.fractal,
+    ),
+))
 
 
 # maze generation
-app_mazegen = typer.Typer(**TYPER_CONFIG)
-app_mazegen.command()(mazegen.tree)
-app_mazegen.command()(mazegen.edges)
-app_mazegen.command()(mazegen.noise)
-app_mazegen.command()(mazegen.blocks)
-app_mazegen.command()(mazegen.open)
-app.add_typer(app_mazegen, name='mazegen')
+app.add_typer(make_typer_app(
+    name='mazegen',
+    help=mazegen.__doc__,
+    subcommands=(
+        mazegen.tree,
+        mazegen.edges,
+        mazegen.noise,
+        mazegen.blocks,
+        mazegen.open,
+    ),
+))
 
 
 # maze solving
-app_mazesoln = typer.Typer(**TYPER_CONFIG)
-app_mazesoln.command()(mazesoln.distance)
-app_mazesoln.command()(mazesoln.direction)
-app.add_typer(app_mazesoln, name='mazesoln')
+app.add_typer(make_typer_app(
+    name='mazesoln',
+    help=mazesoln.__doc__,
+    subcommands=(
+        mazesoln.distance,
+        mazesoln.direction,
+    ),
+))
 
 
 # play environments
-app_play = typer.Typer(**TYPER_CONFIG)
-app_play.command()(play.corner)
-app_play.command()(play.dish)
-app_play.command()(play.follow)
-app_play.command()(play.keys)
-app_play.command()(play.lava)
-app_play.command()(play.monsters)
-app.add_typer(app_play, name='play')
+app.add_typer(make_typer_app(
+    name='play',
+    help=play.__doc__,
+    subcommands=(
+        play.corner,
+        play.dish,
+        play.follow,
+        play.keys,
+        play.lava,
+        play.monsters,
+    ),
+))
 
 
 # testing parsers
-app_parse = typer.Typer(**TYPER_CONFIG)
-app_parse.command()(parse.corner)
-app_parse.command()(parse.dish)
-app_parse.command()(parse.follow)
-app_parse.command()(parse.keys)
-app_parse.command()(parse.monsters)
-app_parse.command()(parse.lava)
-app.add_typer(app_parse, name='parse')
+app.add_typer(make_typer_app(
+    name='parse',
+    help=parse.__doc__,
+    subcommands=(
+        parse.corner,
+        parse.dish,
+        parse.follow,
+        parse.keys,
+        parse.lava,
+        parse.monsters,
+    ),
+))
 
 
 # solve environments
-app_solve = typer.Typer(**TYPER_CONFIG)
-app_solve.command()(solve.corner)
-app_solve.command()(solve.keys)
-app.add_typer(app_solve, name='solve')
+app.add_typer(make_typer_app(
+    name='solve',
+    help=solve.__doc__,
+    subcommands=(
+        solve.corner,
+        # solve.dish, # not yet implemented
+        # solve.follow, # not yet implemented
+        solve.keys,
+        # solve.lava, # not yet implemented
+        # solve.monsters, # not yet implemented
+    ),
+))
 
 
-# let's go!
+# # # 
+# Launch the Typer application
+
 app()
 

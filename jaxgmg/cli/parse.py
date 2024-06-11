@@ -16,6 +16,9 @@ from jaxgmg.cli import util
 
 
 def corner():
+    """
+    Test the level parser from the Cheese in the Corner environment.
+    """
     test_string = """
         # # # # #
         # . . . #
@@ -37,6 +40,9 @@ def corner():
 
 
 def dish():
+    """
+    Test the level parser from the Cheese on a Dish environment.
+    """
     test_string = """
         # # # # #
         # . . . #
@@ -61,6 +67,9 @@ def dish():
 
 
 def follow():
+    """
+    Test the level parser from the Follow Me environment.
+    """
     test_string = """
         # # # # # # #
         # @ # . . 1 #
@@ -89,6 +98,9 @@ def follow():
 
 
 def keys():
+    """
+    Test the level parser from the Keys and Chests environment.
+    """
     test_string = """
         # # # # #
         # . k c #
@@ -116,6 +128,9 @@ def keys():
 
 
 def lava():
+    """
+    Test the level parser from the Lava Land environment.
+    """
     test_string = """
         # # # # #
         # . . . #
@@ -137,6 +152,9 @@ def lava():
 
 
 def monsters():
+    """
+    Test the level parser from the Monster World environment.
+    """
     test_string = """
         # # # # #
         # s a m #
