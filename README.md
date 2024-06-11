@@ -143,7 +143,3 @@ More RL baselines:
 * [ ] Train PPO agents in the stretch environments (symbolic and pixels)
 * [ ] Train DQN agents in all environments (symbolic and pixels)
 
-
-Packaging:
-
-* [ ] 
