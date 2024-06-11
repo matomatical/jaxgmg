@@ -13,7 +13,7 @@ TODO: speedtests.
 
 
 RL baselines
----------
+------------
 
 TODO: implement baselines.
 
@@ -26,8 +26,8 @@ TODO: demo gifs.
 TODO: speedtests.
 
 
-Install
--------
+Installation
+------------
 
 Install the latest master version from GitHub:
 
@@ -43,9 +43,11 @@ cd jaxgmg
 pip install -e .
 ```
 
+TODO: list on PyPI
 
-Explore
--------
+
+Explore the library
+-------------------
 
 After installing run the following:
 
@@ -65,18 +67,16 @@ Note: Most of the demos display colour images to the terminal using ANSI
 control codes, which may not work in some environments (e.g. on Windows?).
 
 
-Roadmap
--------
+Roadmap: Towards jaxgmg 1.0
+---------------------------
 
-Core maze generation methods (JAX accelerated):
+Procedural generation methods:
 
 * [x] Kruskal's algorithm
 * [x] Random block mazes
-* [x] Perlin noise
-* [ ] More: Rooms? BSP? Tunnelling? Cellular automata? See notes
-      [here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/).
+* [x] Perlin noise and fractal noise
 
-Core environments (JAX accelerated):
+Environments (JAX accelerated):
 
 * [x] Cheese in the corner
 * [x] Keys and chests
@@ -88,8 +88,11 @@ Core environments (JAX accelerated):
 
 Environment features:
 
-* [ ] Variable-resolution RGB rendering
-* [ ] Partially observable versions of environments
+* [x] Boolean rendering
+* [x] 8x8 RGB rendering
+* [ ] Rendering in other resolutions
+* [ ] Partially observable versions
+* [ ] Gymnax API wrappers and registration
 
 RL baselines:
 
@@ -97,25 +100,50 @@ RL baselines:
 * [ ] Train PPO agents in the above environments (small pixels)
 * [ ] Qualitative and quantitative demonstration of goal misgeneralisation
 
-Release:
+Packaging:
 
 * [x] Create this repository
 * [x] Format project as an installable Python package
-* [ ] Document experiments in a report
-* [ ] Release v1 on arXiv and PyPI
+* [x] CLI easily demonstrating core features
+* [ ] GIF animation of core environments
+* [ ] Speedtests of generation methods, environments, baselines
+* [ ] Document speedtests and RL experiments in a report
+* [ ] Release jaxgmg v1 on arXiv and PyPI...!
 
----
 
-Stretch environments:
+Stretch roadmap: Towards jaxgmg 2.0
+-----------------------------------
+
+More procedural generation methods (see notes
+[here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/):
+  
+* [ ] Rooms?
+* [ ] BSP?
+* [ ] Tunnellers?
+* [ ] Cellular automata?
+* [ ] Drunkard's walk?
+
+
+More environments:
 
 * [ ] Coin at the end (simplified 'coinrun'-style platformer)
 * [ ] Survivor ('crafter'-style mining/farming grid world)
 * [ ] Dungeon (a simple roguelike)
-* [ ] More procgen games
+* [ ] More games inspired by Procgen
 
-Stretch environment features:
+
+More environment features:
 
 * [ ] Procgen-style variable-size mazes
 * [ ] Procgen-style sprite and background diversity
 
 
+More RL baselines:
+
+* [ ] Train PPO agents in the stretch environments (symbolic and pixels)
+* [ ] Train DQN agents in all environments (symbolic and pixels)
+
+
+Packaging:
+
+* [ ] 
