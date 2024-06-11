@@ -26,6 +26,7 @@ from jaxgmg.cli import mazesoln
 from jaxgmg.cli import parse
 from jaxgmg.cli import play
 from jaxgmg.cli import solve
+from jaxgmg.cli import speedtest
 
 
 # # #
@@ -130,6 +131,21 @@ app.add_typer(util.make_typer_app(
         solve.keys,
         # solve.lava, # not yet implemented
         # solve.monsters, # not yet implemented
+    ),
+    **TYPER_CONFIG,
+))
+
+
+# speedtests
+app.add_typer(util.make_typer_app(
+    name='speedtest',
+    help=speedtest.__doc__,
+    subcommands=(
+        speedtest.mazegen_tree,
+        speedtest.mazegen_edges,
+        speedtest.mazegen_blocks,
+        speedtest.mazegen_noise,
+        speedtest.mazegen_open,
     ),
     **TYPER_CONFIG,
 ))

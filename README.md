@@ -176,7 +176,7 @@ paired with any of the above environment.
     superimposed Perlin noise with cell sizes 4 and 2 onto the base noise
     with cell size 8).
 * **Open mazes:** an empty maze with no obstacles and no procedural variation
-  (row 8).
+    (row 8).
   This case is trivial, nevertheless it is useful in some cases such as
   testing RL algorithms and as a starting point for RL algorithms that build
   their own maze layouts.
@@ -185,8 +185,29 @@ paired with any of the above environment.
 
 *Mural produced with `jaxgmg mazegen mural --num_cols=12`*
 
+Given a generator configuration and a target maze size, these maze generation
+algorithms are fully acceleratable with JAX.
+The following tables report rates of maze generation (mazes per second) for
+different configurations and hardware.
 
-TODO: speedtests.
+On a M2 Macbook Air (without Metal):
+
+| Generator                    | 13x13 mazes  | 25x25 mazes  | 49x49 mazes  |
+| ---------------------------- | ------------ | ------------ | ------------ |
+| Tree                         |  119K (430)  | 22K (61)     | TODO         |
+| Tree (alt. Kruskal impl.)    | 90.4K (303)  | TODO         |              |
+| Edges                        | 1.55M (17K)  |              |              |
+| Blocks                       |  963K (12K)  |              |              |
+| Noise (2x2 cells)            |  651K (5.0K) |              |              |
+| Noise (8x8 cells)            | 1.08M (10K)  |              |              |
+| Noise (8x8 cells, 3 octaves) |  244K (1.5K) |              |              |
+| Open                         | 13.8M (592K) |              |              |
+
+TODO: test on a GPU.
+
+*Rates collected with `jaxgmg speedtest`, batch size 32, 512 iterations per
+trial, mean and standard deviation calculated after discarding the first
+trial since that includes the compilation step.*
 
 
 RL baselines

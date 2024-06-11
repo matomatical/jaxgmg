@@ -25,6 +25,7 @@ dependencies = [
     "flax",
     "readchar",
     "typer",
+    "tqdm",
 ]
 
 [project.scripts]
