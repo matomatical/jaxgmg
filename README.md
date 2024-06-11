@@ -181,7 +181,9 @@ paired with any of the above environment.
   testing RL algorithms and as a starting point for RL algorithms that build
   their own maze layouts.
 
-<img src="img/mazegen.png" alt="Mural depicting maze generation methods">
+<p align="center">
+  <img src="img/mazegen.png" alt="Mural depicting maze generation methods.">
+</p>
 
 *Mural produced with `jaxgmg mazegen mural --num_cols=16`*
 
@@ -190,7 +192,7 @@ algorithms are fully acceleratable with JAX.
 The following tables report rates of maze generation (mazes per second) for
 different configurations and hardware.
 
-On a M2 Macbook Air (without Metal):
+On a M2 Macbook Air (without using Metal):
 
 | Generator                    | 13x13 mazes  | 25x25 mazes  | 49x49 mazes  |
 | ---------------------------- | ------------ | ------------ | ------------ |
@@ -230,24 +232,28 @@ distance or optimal direction to move from any source node to any destination
 node. The following is a visualisation of the result for a tree maze (the
 algorithms work for arbitrary maze layouts).
 
-<img src="img/mazesoln.png" alt="Visualisation of a maze solution.">
+<p align="center">
+  <img src="img/mazesoln.png" alt="Visualisation of a maze solution.">
+</p>
 
-How to read:
-  The square in the 'macromaze' represents the source and the square in the
-  'micromaze' (the maze within that square) represents the shortest path
-  distance (left) or optimal direction (right) to reach that square from
-  this source.
+**How to read:**
+  The position in the 'macromaze' represents the source and the position in
+  the 'micromaze' (the small version of the maze at that position) represents
+  the destination.
+The colour indicates the shortest path distance (in the left maze) or the
+  optimal direction (in the right maze) to reach the destination position
+  from the source position.
 For the shortest path distances (left) the colour indicates the distance:
-  ![](https://badgen.net/badge/color/wall/440154?label=),
-  ![](https://badgen.net/badge/color/0/21918c?label=),
-  ![](https://badgen.net/badge/color/15/3b528b?label=),
-  ![](https://badgen.net/badge/color/30/fde725?label=).
+  ![](https://flat.badgen.net/badge/color/wall/440154?label=),
+  ![](https://flat.badgen.net/badge/color/0/3b528b?label=), ...,
+  ![](https://flat.badgen.net/badge/color/15/21918c?label=), ...,
+  ![](https://flat.badgen.net/badge/color/30/fde725?label=).
 For the optimal directions (right) the colour indicates the direction:
-  ![](https://badgen.net/badge/color/up/29366f?label=),
-  ![](https://badgen.net/badge/color/left/257179?label=),
-  ![](https://badgen.net/badge/color/down/38b764?label=),
-  ![](https://badgen.net/badge/color/right/a7f070?label=),
-  ![](https://badgen.net/badge/color/stay/ffcd75?label=).
+  ![](https://flat.badgen.net/badge/color/up/29366f?label=),
+  ![](https://flat.badgen.net/badge/color/left/257179?label=),
+  ![](https://flat.badgen.net/badge/color/down/38b764?label=),
+  ![](https://flat.badgen.net/badge/color/right/a7f070?label=),
+  ![](https://flat.badgen.net/badge/color/stay/ffcd75?label=).
 
 *Visualisation generated with `jaxgmg mazesoln distance-direction`.*
 

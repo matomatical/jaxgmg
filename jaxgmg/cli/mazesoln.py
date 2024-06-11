@@ -108,6 +108,7 @@ def distance_direction(
     width: int = 7,
     seed: int = 42,
     save_image: bool = False,
+    image_upscale: int = 4,
 ):
     """
     Solve a maze and plot the optimal distance as well as the direction to
@@ -170,6 +171,6 @@ def distance_direction(
             'both h w rgb -> h (both w) rgb',
         )
         print("saving to ./out.png...")
-        util.save_image(both, "out.png", upscale=2)
+        util.save_image(both, "out.png", upscale=image_upscale)
 
 
