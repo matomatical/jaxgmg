@@ -1,17 +1,30 @@
-Goal misgeneralisation in JAX
-=============================
+`jaxgmg`: JAX-accelerated Goal MisGeneralisation
+================================================
 
 JAX-based environments and RL baselines for studying goal misgeneralisation.
 
-Environments
-------------
+
+JAX-accelerated environments
+----------------------------
 
 TODO: demo gifs.
 
-Level generation
-----------------
+TODO: speedtests.
+
+
+RL baselines
+---------
+
+TODO: implement baselines.
+
+
+Procedural level generation
+---------------------------
 
 TODO: demo gifs.
+
+TODO: speedtests.
+
 
 Install
 -------
@@ -29,6 +42,7 @@ git clone git@github.com:matomatical/jaxgmg.git
 cd jaxgmg
 pip install -e .
 ```
+
 
 Explore
 -------
@@ -49,6 +63,7 @@ functionality. For example:
 
 Note: Most of the demos display colour images to the terminal using ANSI
 control codes, which may not work in some environments (e.g. on Windows?).
+
 
 Roadmap
 -------
@@ -89,6 +104,8 @@ Release:
 * [ ] Document experiments in a report
 * [ ] Release v1 on arXiv and PyPI
 
+---
+
 Stretch environments:
 
 * [ ] Coin at the end (simplified 'coinrun'-style platformer)
@@ -100,4 +117,5 @@ Stretch environment features:
 
 * [ ] Procgen-style variable-size mazes
 * [ ] Procgen-style sprite and background diversity
+
 
