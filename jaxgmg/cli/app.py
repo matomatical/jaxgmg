@@ -69,6 +69,7 @@ app.add_typer(util.make_typer_app(
         mazegen.noise,
         mazegen.blocks,
         mazegen.open,
+        mazegen.image,
     ),
     **TYPER_CONFIG,
 ))

@@ -348,7 +348,13 @@ class NoiseMazeGenerator(MazeGenerator):
     * cell_size : int (>= 2, default 2)
         Width and height of the gradient grid for the noise (in the case of
         multiple octaves, this is the size of the largest grid, and should be
-        repeatedly divisible by two).
+        repeatedly divisible by two a number of times one less than the
+        number of octaves).
+    * num_octaves : int (>= 1, default 1)
+        Number of octaves in fractal noise. If set to 1, this is plain Perlin
+        noise. If set higher, then its a normalised sum of this many samples
+        of Perlin noise each with half the amplitude and cell size of the
+        previous one.
     """
     wall_threshold: float = 0.25
     cell_size : int = 2

@@ -137,6 +137,42 @@ def save_gif(
     )
 
 
+def save_image(
+    image,
+    path,
+    upscale=1,
+):
+    """
+    Take a (height, width, rgb) matrix and save it as a png.
+    
+    Parameters:
+
+    * image: float[h, w, rgb]
+            The image. Axes represent the image data. Each point should be a
+            float between 0 and 1.
+    * path : str
+            Where to save the image.
+    * upscale : int (>=1, default is 1)
+            Width/height of pixel representation of each matrix entry.
+    """
+    image = np.asarray(image)
+    H, W, C = image.shape
+    assert C == 3, f"Wrong number of channels for GIF (C={C}!=3)"
+        
+    # preprocess image data
+    image_u8 = (image * 255).astype(np.uint8)
+    image_u8_upscaled = einops.repeat(
+        image_u8,
+        'h w rgb -> (h sh) (w sw) rgb',
+        sh=upscale,
+        sw=upscale,
+    )
+    # PIL images for each frame
+    img = pillow.fromarray(image_u8_upscaled)
+    # save!
+    img.save(path)
+
+
 # # # 
 # COLORMAPS
 

@@ -19,7 +19,7 @@ The following environments are provided.
     <tr>
       <td>Cheese in the Corner</td>
       <td>
-        <img src="animations/corner13x13.gif" alt="Cheese in the Corner">
+        <img src="img/corner13x13.gif" alt="Cheese in the Corner">
       </td>
       <td>
         Navigate a mouse through a maze looking for cheese. During training,
@@ -29,7 +29,7 @@ The following environments are provided.
     <tr>
       <td>Cheese on a Dish</td>
       <td>
-        <img src="animations/dish13x13.gif" alt="Cheese on a Dish">
+        <img src="img/dish13x13.gif" alt="Cheese on a Dish">
       </td>
       <td>
         A mouse navigates through a maze looking for cheese (positive
@@ -42,7 +42,7 @@ The following environments are provided.
     <tr>
       <td>Follow Me</td>
       <td>
-        <img src="animations/follow13x13.gif" alt="Follow Me">
+        <img src="img/follow13x13.gif" alt="Follow Me">
       </td>
       <td>
         A mouse navigates around a maze activating beacons in a specific
@@ -57,7 +57,7 @@ The following environments are provided.
     <tr>
       <td>Keys and Chests</td>
       <td>
-        <img src="animations/keys13x13.gif" alt="Keys and Chests">
+        <img src="img/keys13x13.gif" alt="Keys and Chests">
       </td>
       <td>
         A mouse navigates around a maze collecting keys (zero reward) in
@@ -71,7 +71,7 @@ The following environments are provided.
     <tr>
       <td>Lava Land</td>
       <td>
-        <img src="animations/lava13x13.gif" alt="Lava Land">
+        <img src="img/lava13x13.gif" alt="Lava Land">
       </td>
       <td>
         A mouse navigates a forest world, avoiding lava tiles (negative
@@ -84,7 +84,7 @@ The following environments are provided.
     <tr>
       <td>Monster World</td>
       <td>
-        <img src="animations/monsters13x13.gif" alt="Monster World">
+        <img src="img/monsters13x13.gif" alt="Monster World">
       </td>
       <td>
         A mouse navigates around an arena looking for apples (positive
@@ -111,7 +111,24 @@ TODO: implement baselines.
 Procedural level generation
 ---------------------------
 
-TODO: demo gifs.
+Various configurable maze generation algorithms are supported.
+
+<img src="img/mazegen.png" alt="Demonstration of maze generation methods">
+
+The above image shows several maze generation methods:
+
+* Row 1: **Tree mazes,** acyclic mazes based on spanning trees of a grid
+  graph, generated using Kruskal's algorithm.
+* Rows 2 and 3: **Edge mazes,** a grid maze where each edge is traversable
+  with independent probability 75% (respectively 85%, configurable).
+* Row 4: **Block mazes,** wherein each cell has a block/wall with independent
+  probability 25% (configurable).
+* Rows 5, 6, 7: **Noise mazes,** based on thresholding Perlin noise (or
+  fractal noise) with a gradient grid of configurable cell size.
+* Row 8: **Open mazes,** a trivial case nevertheless useful in some cases
+  such as testing RL algorithms and as a starting point for RL algorithms
+  that build their own maze layouts.
+
 
 TODO: speedtests.
 
@@ -195,7 +212,7 @@ Packaging:
 * [x] Create this repository
 * [x] Format project as an installable Python package
 * [x] CLI easily demonstrating core features
-* [ ] GIF animation of core environments
+* [x] GIF animation of core environments
 * [ ] Speedtests of generation methods, environments, baselines
 * [ ] Document speedtests and RL experiments in a report
 * [ ] Release jaxgmg v1 on arXiv and PyPI...!
@@ -205,9 +222,9 @@ Stretch roadmap: Towards jaxgmg 2.0
 -----------------------------------
 
 More procedural generation methods (see notes
-[here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/):
+[here](https://christianjmills.com/posts/procedural-map-generation-techniques-notes/)):
   
-* [ ] Rooms?
+* [ ] Simple room placement?
 * [ ] BSP?
 * [ ] Tunnellers?
 * [ ] Cellular automata?

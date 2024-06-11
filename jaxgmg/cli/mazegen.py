@@ -3,6 +3,9 @@ Demonstrations of maze generation methods.
 """
 
 import jax
+import jax.numpy as jnp
+import einops
+
 from jaxgmg.procgen import maze_generation
 from jaxgmg.cli import util
 
@@ -121,5 +124,54 @@ def open(
         width=width,
     )
     print(util.img2str(maze * .25))
+
+
+def image(
+    height: int = 23,
+    width: int = 23,
+    num_cols: int = 3,
+    seed: int = 42,
+    save: bool = False,
+):
+    """
+    Generate an image demonstrating the core maze generation algorithms.
+    """
+    util.print_config(locals())
+    rng = jax.random.PRNGKey(seed=seed)
+
+    print("defining maze generators...")
+    generators = [
+        maze_generation.TreeMazeGenerator(),
+        maze_generation.EdgeMazeGenerator(edge_prob=0.75),
+        maze_generation.EdgeMazeGenerator(edge_prob=0.85),
+        maze_generation.BlockMazeGenerator(wall_prob=0.25),
+        maze_generation.NoiseMazeGenerator(cell_size=2, num_octaves=1),
+        maze_generation.NoiseMazeGenerator(cell_size=3, num_octaves=1),
+        maze_generation.NoiseMazeGenerator(cell_size=8, num_octaves=2),
+        maze_generation.OpenMazeGenerator(),
+    ]
+    
+    print("generating mazes...")
+    mazes = []
+    for i, g in enumerate(generators, 1):
+        rng_g, rng = jax.random.split(rng)
+        vgenerate = jax.vmap(g.generate, in_axes=(0,None,None))
+        rng_gs = jax.random.split(rng_g, num_cols)
+        mazes.append(i * vgenerate(rng_gs, height, width))
+    
+    print("reformatting to one image...")
+    mural = jnp.stack(mazes) # -> len(generators) col_width height width
+    mural = jnp.pad(mural, ((0,0),(0,0),(0,1),(0,1)))
+    mural = einops.rearrange(mural, 'len col h w -> (len h) (col w)')
+    mural = mural[:-1,:-1] # remove excess padding
+    mural = util.sweetie16(mural) # colorise
+
+    print("printing...")
+    print(util.img2str(mural))
+
+    if save:
+        print("saving to ./out.png...")
+        util.save_image(mural, "out.png", upscale=4,)
+
 
 
