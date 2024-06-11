@@ -183,7 +183,7 @@ paired with any of the above environment.
 
 <img src="img/mazegen.png" alt="Mural depicting maze generation methods">
 
-*Mural produced with `jaxgmg mazegen mural --num_cols=12`*
+*Mural produced with `jaxgmg mazegen mural --num_cols=16`*
 
 Given a generator configuration and a target maze size, these maze generation
 algorithms are fully acceleratable with JAX.
@@ -194,14 +194,14 @@ On a M2 Macbook Air (without Metal):
 
 | Generator                    | 13x13 mazes  | 25x25 mazes  | 49x49 mazes  |
 | ---------------------------- | ------------ | ------------ | ------------ |
-| Tree                         |  119K (430)  | 22K (61)     | TODO         |
-| Tree (alt. Kruskal impl.)    | 90.4K (303)  | TODO         |              |
-| Edges                        | 1.55M (17K)  |              |              |
-| Blocks                       |  963K (12K)  |              |              |
-| Noise (2x2 cells)            |  651K (5.0K) |              |              |
-| Noise (8x8 cells)            | 1.08M (10K)  |              |              |
-| Noise (8x8 cells, 3 octaves) |  244K (1.5K) |              |              |
-| Open                         | 13.8M (592K) |              |              |
+| Tree                         |  119K (430)  | 22.0K (41)   | 4.56K (16)   |
+| Tree (alt. Kruskal impl.)    | 90.4K (300)  | 13.6K (25)   | 860 (1.5)    |
+| Edges                        | 1.55M (17K)  | 389K (13K)   | 108K (4.7K)  |
+| Blocks                       |  963K (12K)  | 221K (11K)   | 106K (1.2K)  |
+| Noise (2x2 cells)            |  651K (5.0K) | 141K (970)   | 37.4K (130)  |
+| Noise (8x8 cells)            | 1.08M (10K)  | 366K (4.6K)  | 82.9K (920)  |
+| Noise (8x8 cells, 3 octaves) |  244K (1.5K) |  78K (160)   | 19.9K (61)   |
+| Open                         | 13.8M (592K) | 7.22M (340K) | 2.10M (720K) |
 
 TODO: test on a GPU.
 

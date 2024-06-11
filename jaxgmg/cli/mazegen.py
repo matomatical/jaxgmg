@@ -171,7 +171,7 @@ def mural(
 
     if save:
         print("saving to ./out.png...")
-        util.save_image(mural, "out.png", upscale=4,)
+        util.save_image(mural, "out.png", upscale=2)
 
 
 
