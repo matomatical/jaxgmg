@@ -18,7 +18,9 @@ The following environments are provided.
   <tbody>
     <tr>
       <td>Cheese in the Corner</td>
-      <td>![](animations/corner13x13.gif)</td>
+      <td>
+        <img src="animations/corner13x13.gif" alt="Cheese in the Corner">
+      </td>
       <td>
         Navigate a mouse through a maze looking for cheese. During training,
         the cheese is in or near the top corner.
@@ -26,7 +28,9 @@ The following environments are provided.
     </tr>
     <tr>
       <td>Cheese on a Dish</td>
-      <td>![](animations/dish13x13.gif)</td>
+      <td>
+        <img src="animations/dish13x13.gif" alt="Cheese on a Dish">
+      </td>
       <td>
         A mouse navigates through a maze looking for cheese (positive
         reward).
@@ -37,7 +41,9 @@ The following environments are provided.
     </tr>
     <tr>
       <td>Follow Me</td>
-      <td>![](animations/follow13x13.gif)</td>
+      <td>
+        <img src="animations/dish13x13.gif" alt="Cheese on a Dish">
+      </td>
       <td>
         A mouse navigates around a maze activating beacons in a specific
         sequence (positive reward). A second mouse is also navigating the
@@ -50,7 +56,9 @@ The following environments are provided.
     </tr>
     <tr>
       <td>Keys and Chests</td>
-      <td>![](animations/keys13x13.gif)</td>
+      <td>
+        <img src="animations/keys13x13.gif" alt="Keys and Chests">
+      </td>
       <td>
         A mouse navigates around a maze collecting keys (zero reward) in
         order to unlock chests (positive reward).
@@ -62,7 +70,9 @@ The following environments are provided.
     </tr>
     <tr>
       <td>Lava Land</td>
-      <td>![](animations/lava13x13.gif)</td>
+      <td>
+        <img src="animations/lava13x13.gif" alt="Lava Land">
+      </td>
       <td>
         A mouse navigates a forest world, avoiding lava tiles (negative
         reward) while looking for cheese (positive reward).
@@ -73,7 +83,9 @@ The following environments are provided.
     </tr>
     <tr>
       <td>Monster World</td>
-      <td>![](animations/monsters13x13.gif)</td>
+      <td>
+        <img src="animations/monsters13x13.gif" alt="Monster World">
+      </td>
       <td>
         A mouse navigates around an arena looking for apples (positive
         reward) while dodging monsters (negative reward). The mouse picks up
