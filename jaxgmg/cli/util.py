@@ -5,11 +5,45 @@ Utilities supporting jaxgmg CLI applications.
 import numpy as np
 import jax.numpy as jnp
 import einops
+import typer
 
 
-def print_config(config):
+def make_typer_app(name, help, subcommands, **kwargs):
+    """
+    Transform a list of functions into a typer application.
+    """
+    app = typer.Typer(name=name, help=help, **kwargs)
+    for subcommand in subcommands:
+        app.command()(subcommand)
+    return app
+
+
+def print_config(config: dict):
+    """
+    Dump a dictionary's contents to stdout.
+    """
     for key, value in config.items():
         print(f"  {key:30s}: {value}")
+
+
+def print_histogram(data, bins=10, range=None, width=40):
+    """
+    Bin and count a sequence of values and print them to stdout as an ASCII
+    histogram.
+    """
+    hist, bin_edges = jnp.histogram(data, bins=bins, range=range)
+    norm_counts = hist / hist.max()
+    for count, lo, hi in zip(norm_counts, bin_edges, bin_edges[1:]):
+        print(f"  {lo:.2f} to {hi:.2f} | {int(count * width + 1) * '*'}")
+
+
+def print_legend(legend, colormap=None):
+    """
+    Render a mapping from colors to values to stdout.
+    """
+    print("legend:")
+    for value, name in legend.items():
+        print(img2str(jnp.full((2,2), value), colormap=colormap,), name)
 
 
 def img2str(im, colormap=None):
@@ -47,6 +81,10 @@ def img2str(im, colormap=None):
         "".join([_switch_color(fg, bg) + "▀" for fg, bg in row])
         for row in im
     ]) + _reset
+
+
+# # # 
+# COLORMAPS
 
 
 def viridis(x):
@@ -133,16 +171,13 @@ def sweetie16(x):
     ])[x]
 
 
-def print_legend(legend, colormap=None):
-    print("legend:")
-    for value, name in legend.items():
-        print(img2str(jnp.full((2,2), value), colormap=colormap,), name)
-
-
-def print_histogram(data, bins=10, range=None, width=40):
-    hist, bin_edges = jnp.histogram(data, bins=bins, range=range)
-    norm_counts = hist / hist.max()
-    for count, lo, hi in zip(norm_counts, bin_edges, bin_edges[1:]):
-        print(f"  {lo:.2f} to {hi:.2f} | {int(count * width + 1) * '*'}")
-
-
+def pico8(x):
+    """
+    https://pico-8.fandom.com/wiki/Palette
+    """
+    return (np.array([
+        [  0,   0,   0], [ 29,  43,  83], [126,  37,  83], [  0, 135,  81],
+        [171,  82,  54], [ 95,  87,  79], [194, 195, 199], [255, 241, 232],
+        [255,   0,  77], [255, 163,   0], [255, 236,  39], [  0, 228,  54],
+        [ 41, 173, 255], [131, 118, 156], [255, 119, 168], [255, 204, 170],
+    ]) / 255)[x]

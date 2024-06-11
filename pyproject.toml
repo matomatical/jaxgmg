@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.scripts]
-jaxgmg = "jaxgmg.__main__:int"
+jaxgmg = "jaxgmg.cli.app:app"
 
 [project.urls]
 Homepage = "https://github.com/matomatical/jaxgmg"
