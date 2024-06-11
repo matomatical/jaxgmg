@@ -146,6 +146,45 @@ The following environments are provided.
 *Animations in this table produced with `jaxgmg play ENV_NAME`. The actions
 are chosen by a human.*
 
+TODO: speedtests.
+
+
+Procedural level generation
+---------------------------
+
+Each environment supports a wide distribution of 'levels', and the library
+includes easily configurable tools for procedural level generation.
+
+At the core of these level generators is a suite of configurable procedural
+maze generation methods, some outputs of which are depicted in the below
+mural. There are currently five maze generation methods, any of which can be
+paired with any of the above environment.
+
+* **Tree mazes:** acyclic mazes based on spanning trees of a grid
+  graph, generated using Kruskal's random spanning tree algorithm
+    (Mural row 1).
+* **Edge mazes:** a grid maze where each edge is independently determined to
+  be traversable with configurable probability
+    (Mural rows 2 and 3, edge probabilities 75% and 85% respectively).
+* **Block mazes:** wherein each cell is determined to have a block/wall
+  independently with configurable probability
+    (Mural row 4, block probability 25%).
+* **Noise mazes:** based on thresholding Perlin noise (or associated fractal
+  noise) with a gradient grid of configurable cell size
+    (Rows 5, 6, and 7, respectively with gradient cell size 2, 3, and 8; row
+    8 depicts fractal noise with three octaves which just means we
+    superimposed Perlin noise with cell sizes 4 and 2 onto the base noise
+    with cell size 8).
+* **Open mazes:** an empty maze with no obstacles and no procedural variation
+  (row 8).
+  This case is trivial, nevertheless it is useful in some cases such as
+  testing RL algorithms and as a starting point for RL algorithms that build
+  their own maze layouts.
+
+<img src="img/mazegen.png" alt="Mural depicting maze generation methods">
+
+*Mural produced with `jaxgmg mazegen mural --num_cols=12`*
+
 
 TODO: speedtests.
 
@@ -156,35 +195,6 @@ RL baselines
 TODO: implement baselines.
 
 
-Procedural level generation
----------------------------
-
-Each environment supports a wide distribution of 'levels', and the library
-includes tools for procedural level generation. At the core of these
-generators is a suite of configurable procedural maze generation methods, any
-of which can be paired with any environment.
-
-The library includes various configurable maze generation methods, depicted
-in the below mural.
-
-* Row 1: **Tree mazes,** acyclic mazes based on spanning trees of a grid
-  graph, generated using Kruskal's algorithm.
-* Rows 2 and 3: **Edge mazes,** a grid maze where each edge is traversable
-  with independent probability 75% (respectively 85%, configurable).
-* Row 4: **Block mazes,** wherein each cell has a block/wall with independent
-  probability 25% (configurable).
-* Rows 5, 6, 7: **Noise mazes,** based on thresholding Perlin noise (or
-  fractal noise) with a gradient grid of configurable cell size.
-* Row 8: **Open mazes,** a trivial case nevertheless useful in some cases
-  such as testing RL algorithms and as a starting point for RL algorithms
-  that build their own maze layouts.
-
-<img src="img/mazegen.png" alt="Demonstration of maze generation methods">
-
-*Mural produced with `jaxgmg mazegen mural --num_cols=12`*
-
-
-TODO: speedtests.
 
 
 Roadmap: Towards jaxgmg 1.0
