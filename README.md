@@ -6,8 +6,8 @@ misgeneralisation.
 
 > [!NOTE]  
 > `jaxgmg` is a work in progress. This is a pre-1.0 research codebase. Not
-> everything is finished, tested, or documented. Keep this in mind if you
-> want to use it.
+> everything is finished, tested, or documented.
+> See also the [roadmap](#roadmap-towards-jaxgmg-10).
 
 Installation
 ------------
