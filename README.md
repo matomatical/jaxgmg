@@ -171,6 +171,8 @@ On a M2 Macbook Air (without using Metal):
 | Lava Land            | 7.29M      | 2.94M      | 46.7K     | 13.4K     |
 | Monster World        |  597K      |  315K      | 46.7K     | 13.9K     |
 
+TODO: Test on a GPU.
+
 *Rates collected with `jaxgmg speedtest envstep-ENVIRONMENT`, batch size 32,
 128 steps per trial, showing the mean (and standard deviation in parentheses)
 as calculated after discarding the first trial since that includes the
