@@ -4,11 +4,15 @@
 JAX-based environments (WIP) and RL baselines (TODO) for studying goal
 misgeneralisation.
 
+> [!NOTE]  
+> `jaxgmg` is a work in progress. This is a pre-1.0 research codebase. Not
+> everything is finished, tested, or documented. Keep this in mind if you
+> want to use it.
 
 Installation
 ------------
 
-Install the latest master version from GitHub:
+Install the latest main version from GitHub:
 
 ```
 pip install git+ssh://git@github.com/matomatical/jaxgmg.git
