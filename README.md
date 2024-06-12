@@ -150,8 +150,31 @@ The following environments are provided.
 *Animations in this table produced with `jaxgmg play ENV_NAME`. The actions
 are chosen by a human.*
 
-TODO: speedtests.
+Procedural level generation and environment update and rendering are fully
+JAX-accelerable. The speed of level generation depends on the generator
+configuration and whether we need to cache level solutions, as explored in
+the next sections. However, the speed of the environment's *step* method
+depends only on the size of the level and the number of entities (such as
+keys or chests) and not the procedurally generated layout. The following
+tables report speeds from rollouts of a random policy (steps per second,
+including rendering a Boolean or RGB observation) for each environment with
+different level sizes and different hardware.
 
+On a M2 Macbook Air (without using Metal):
+
+| Environment          | 13x13 bool | 25x25 bool | 13x13 rgb | 25x25 rgb |
+| -------------------- | ---------- | ---------- | --------- | --------- |
+| Cheese in the Corner | 3.20M      |  968K      | 50.2K     | 14.0K     |
+| Cheese on a Dish     | 6.90M      | 2.78M      | 47.3K     | 13.3K     |
+| Follow Me            | 2.10M      |  620K      | 44.3K     | 12.4K     |
+| Keys and Chests      | 1.77M      |  580K      | 47.2K     | 13.1K     |
+| Lava Land            | 7.29M      | 2.94M      | 46.7K     | 13.4K     |
+| Monster World        |  597K      |  315K      | 46.7K     | 13.9K     |
+
+*Rates collected with `jaxgmg speedtest envstep-ENVIRONMENT`, batch size 32,
+128 steps per trial, showing the mean (and standard deviation in parentheses)
+as calculated after discarding the first trial since that includes the
+compilation step.*
 
 Procedural level generation
 ---------------------------

@@ -142,6 +142,12 @@ app.add_typer(util.make_typer_app(
     name='speedtest',
     help=speedtest.__doc__,
     subcommands=(
+        speedtest.envstep_corner,
+        speedtest.envstep_dish,
+        speedtest.envstep_follow,
+        speedtest.envstep_keys,
+        speedtest.envstep_lava,
+        speedtest.envstep_monsters,
         speedtest.mazegen_tree,
         speedtest.mazegen_edges,
         speedtest.mazegen_blocks,

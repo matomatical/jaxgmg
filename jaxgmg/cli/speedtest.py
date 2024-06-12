@@ -14,6 +14,7 @@ import chex
 
 from jaxgmg.procgen import maze_generation
 from jaxgmg.procgen import maze_solving
+from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import follow_me
@@ -141,6 +142,72 @@ def speedtest_mazesoln(
     print('  subseq. mean:', mazes_per_second[1:].mean(), 'mazes/sec')
     print('  subseq. stdv:', mazes_per_second[1:].std(), 'mazes/sec')
     print('NOTE: time to generate mazes not counted in these results')
+
+
+def speedtest_env(
+    rng : chex.PRNGKey,
+    env : base.Env,
+    generator : base.LevelGenerator,
+    batch_size : int,
+    num_iters : int,
+    num_trials : int,
+):
+    # accelerated rollout (with rendering included)
+    @jax.jit
+    def trial(rng, levels):
+        rng_reset, rng_rollout = jax.random.split(rng)
+        def random_rollout_step(carry, rng_rollout_step):
+            prev_obss, states = carry
+            # select a random action (may depend on prev_obss)
+            rng_policy, rng_env = jax.random.split(rng_rollout_step)
+            actions = jax.random.choice(
+                key=rng_policy,
+                a=env.num_actions,
+                shape=(batch_size,),
+            )
+            # perform the action to generate next obs/state
+            obss, states, rewards, dones, _ = env.vstep(
+                rng=rng_env,
+                states=states,
+                actions=actions,
+            )
+            return (obss, states), obss
+        init_obss, init_states = env.vreset_to_level(rng_reset, levels)
+        final_carry, obsss = jax.lax.scan(
+            random_rollout_step,
+            (init_obss, init_states),
+            jax.random.split(rng_rollout, num_iters),
+        )
+        return obsss
+    
+    # execute and time the trials
+    trial_times = []
+    for _ in tqdm.trange(num_trials, unit="trials"):
+        # generate a batch of levels (not timed)
+        rng_levels, rng_rollout, rng = jax.random.split(rng, 3)
+        levels = generator.vsample(
+            rng=rng_levels,
+            num_levels=batch_size,
+        )
+        # rollout (timed)
+        start_time = time.perf_counter()
+        _ = trial(rng_rollout, levels)
+        end_time = time.perf_counter()
+        trial_times.append(end_time - start_time)
+    trial_times = np.array(trial_times)
+
+    # summarise the results
+    batches_per_second = num_iters / trial_times
+    steps_per_second = batches_per_second * batch_size
+    print('trial times:')
+    print('  first trial: ', trial_times[0], 'seconds')
+    print('  subseq. mean:', trial_times[1:].mean(), 'seconds')
+    print('  subseq. stdv:', trial_times[1:].std(), 'seconds')
+    print('environment steps per second:')
+    print('  first trial: ', steps_per_second[0], 'mazes/sec')
+    print('  subseq. mean:', steps_per_second[1:].mean(), 'mazes/sec')
+    print('  subseq. stdv:', steps_per_second[1:].std(), 'mazes/sec')
+    print('NOTE: time to generate levels not counted in these results')
 
 
 # # # 
@@ -285,7 +352,7 @@ def mazegen_open(
 def mazesoln_distances(
     height: int = 13,
     width: int = 13,
-    layout: str = 'tree',
+    layout: str = 'edges',
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -313,7 +380,7 @@ def mazesoln_distances(
 def mazesoln_directional_distances(
     height: int = 13,
     width: int = 13,
-    layout: str = 'tree',
+    layout: str = 'edges',
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -342,7 +409,7 @@ def mazesoln_directional_distances(
 def mazesoln_optimal_directions(
     height: int = 13,
     width: int = 13,
-    layout: str = 'tree',
+    layout: str = 'edges',
     stay_action: bool = True,
     seed: int = 42,
     batch_size: int = 32,
@@ -366,6 +433,252 @@ def mazesoln_optimal_directions(
             stay_action=stay_action,
         ),
         # how many mazes to generate and solve
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+# # # 
+# Entry points for each environment speedtest
+
+
+def envstep_corner(
+    height: int = 13,
+    width: int = 9,
+    layout: str = 'edges',
+    corner_size: int = 3,
+    rgb: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 64,
+):
+    """
+    Speedtest for Cheese in the Corner environment.
+    """
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = cheese_in_the_corner.Env(
+        rgb=rgb,
+    )
+    generator = cheese_in_the_corner.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        corner_size=corner_size,
+    )
+    speedtest_env(
+        rng=rng,
+        env=env,
+        generator=generator,
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def envstep_dish(
+    height: int = 13,
+    width: int = 9,
+    layout: str = 'edges',
+    max_cheese_radius: int = 3,
+    rgb: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 64,
+):
+    """
+    Speedtest for Cheese on a Dish environment.
+    """
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = cheese_on_a_dish.Env(
+        rgb=rgb,
+    )
+    generator = cheese_on_a_dish.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        max_cheese_radius=max_cheese_radius,
+    )
+    speedtest_env(
+        rng=rng,
+        env=env,
+        generator=generator,
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def envstep_follow(
+    height: int = 13,
+    width: int = 9,
+    layout: str = 'edges',
+    num_beacons: int = 3,
+    trustworthy_leader: bool = True,
+    rgb: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 64,
+):
+    """
+    Speedtest for Follow Me environment.
+    """
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = follow_me.Env(
+        rgb=rgb,
+    )
+    generator = follow_me.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        num_beacons=num_beacons,
+        trustworthy_leader=trustworthy_leader,
+    )
+    speedtest_env(
+        rng=rng,
+        env=env,
+        generator=generator,
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def envstep_keys(
+    height: int = 13,
+    width: int = 9,
+    layout: str = 'edges',
+    num_keys_min: int = 2,
+    num_keys_max: int = 6,
+    num_chests_min: int = 6,
+    num_chests_max: int = 6,
+    rgb: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 64,
+):
+    """
+    Speedtest for Keys and Chests environment.
+    """
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = keys_and_chests.Env(
+        rgb=rgb,
+    )
+    generator = keys_and_chests.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        num_keys_min=num_keys_min,
+        num_keys_max=num_keys_max,
+        num_chests_min=num_chests_min,
+        num_chests_max=num_chests_max,
+    )
+    speedtest_env(
+        rng=rng,
+        env=env,
+        generator=generator,
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def envstep_lava(
+    height: int = 13,
+    width: int = 9,
+    layout: str = 'edges',
+    lava_threshold: float = -0.25,
+    rgb: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 64,
+):
+    """
+    Speedtest for Lava Land environment.
+    """
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = lava_land.Env(
+        rgb=rgb,
+    )
+    generator = lava_land.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        lava_threshold=lava_threshold,
+    )
+    speedtest_env(
+        rng=rng,
+        env=env,
+        generator=generator,
+        batch_size=batch_size,
+        num_iters=num_iters,
+        num_trials=num_trials,
+    )
+
+
+def envstep_monsters(
+    height: int = 13,
+    width: int = 9,
+    layout: str = 'edges',
+    num_apples: int = 5,
+    num_shields: int = 5,
+    num_monsters: int = 5,
+    monster_optimality: float = 3,
+    rgb: bool = True,
+    seed: int = 42,
+    batch_size: int = 32,
+    num_iters: int = 128,
+    num_trials: int = 64,
+):
+    """
+    Speedtest for Monster World environment.
+    """
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = monster_world.Env(
+        rgb=rgb,
+    )
+    generator = monster_world.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        num_apples=num_apples,
+        num_shields=num_shields,
+        num_monsters=num_monsters,
+        monster_optimality=monster_optimality,
+    )
+    speedtest_env(
+        rng=rng,
+        env=env,
+        generator=generator,
         batch_size=batch_size,
         num_iters=num_iters,
         num_trials=num_trials,
