@@ -160,3 +160,7 @@ app.add_typer(util.make_typer_app(
     **TYPER_CONFIG,
 ))
 
+
+# training (FIXME: MOVE ENTRY POINT TO CLI MODULE)
+from jaxgmg.baselines.run import train
+app.command()(train)

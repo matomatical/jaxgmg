@@ -49,6 +49,23 @@ functionality. For example:
 Note: Most of the demos display colour images to the terminal using ANSI
 control codes, which may not work in some environments (e.g. on Windows?).
 
+Run an RL experiment
+--------------------
+
+WORK IN PROGRESS / SUBJECT TO CHANGE
+
+Currently, the baselines only run on `baselines` branch. If you installed the
+library while on a different branch, you will need to `pip install -e .`
+again because there are more dependencies.
+
+Then to see the API for running an experiment, run:
+
+```
+jaxgmg train --help
+```
+
+Include the flag --wandb-log to log results to wandb, etc.
+
 
 JAX-accelerated environments
 ----------------------------

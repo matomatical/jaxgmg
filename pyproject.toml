@@ -23,9 +23,11 @@ dependencies = [
     "einops",
     "chex",
     "flax",
+    "distrax",
     "readchar",
-    "typer",
+    "argh",
     "tqdm",
+    "wandb",
 ]
 
 [project.scripts]
