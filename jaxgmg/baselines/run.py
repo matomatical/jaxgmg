@@ -65,6 +65,8 @@ def train(
     rgb: bool = False,                  # obs are boolean (default) or rgb
     env_height: int = 13,
     env_width: int = 13,
+    env_height: int = 13,
+    env_width: int = 13,
     env_layout: str = 'blocks',
     env_corner_size: int = 1,
     
@@ -74,6 +76,8 @@ def train(
     # training dimensions
     #num_total_env_steps: int = 20_000_000,
     num_total_env_steps: int = 100_000_000,
+    #num_total_env_steps: int = 20_000_000,
+    num_total_env_steps: int = 100_000_000,
     num_env_steps_per_cycle: int = 256,
     num_parallel_envs: int = 32,
     num_train_levels: int = 2048,
@@ -81,12 +85,17 @@ def train(
     # PPO hyperparameters
     ppo_lr: float = 5e-4,               # learning rate
     ppo_gamma: float = 0.999,           # discount rate
+    ppo_lr: float = 5e-4,               # learning rate
+    ppo_gamma: float = 0.999,           # discount rate
     ppo_clip_eps: float = 0.2,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.01,
     ppo_gae_lambda: float = 0.95,
     ppo_entropy_coeff: float = 0.01,
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
+    num_minibatches_per_epoch: int = 8,
     num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
     
@@ -98,10 +107,12 @@ def train(
     # logging
     console_log: bool = True,           # whether to log metrics to stdout
     wandb_log: bool = True,            # whether to log metrics to wandb
+    wandb_log: bool = True,            # whether to log metrics to wandb
     num_cycles_per_log: int = 16,
     
     # wandb config
     wandb_entity: str = None,
+    wandb_project: str = "Phase1 Karim",
     wandb_project: str = "Phase1 Karim",
     wandb_group: str = None,
     wandb_name: str = None,
@@ -186,6 +197,7 @@ def train(
     )
     rng_train_levels, rng = jax.random.split(rng)
     train_levels = train_level_generator.vsample(
+    train_levels = train_level_generator.vsample(
         rng_train_levels,
         num_levels=num_train_levels,
     )
@@ -197,6 +209,23 @@ def train(
         rng_eval_on_levels,
         num_levels=num_eval_levels,
     )
+    
+    print(f"setting up {num_eval_levels} off-distribution evaluation levels...")
+    shift_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_height,
+        width=env_width,
+        maze_generator=maze_generator,
+        corner_size=max(env_height, env_width), # larger than necessary
+    )
+    rng_eval_off_levels, rng = jax.random.split(rng)
+    eval_off_levels = shift_level_generator.vsample(
+        rng_eval_off_levels,
+        num_levels=num_eval_levels,
+    )
+
+
+    print(f"set up UED: DR algorithm...")
+    ued = DR(num_levels=num_train_levels)
     
     print(f"setting up {num_eval_levels} off-distribution evaluation levels...")
     shift_level_generator = cheese_in_the_corner.LevelGenerator(
@@ -236,6 +265,7 @@ def train(
             raise Exception(f"unknown net architecture: {net}")
     # initialise the network
     rng_model, rng_input, rng_level, rng = jax.random.split(rng, 4)
+    example_level = train_level_generator.sample(rng_level)
     example_level = train_level_generator.sample(rng_level)
     example_obs, _ = env.reset_to_level(rng_input, example_level)
     net_init_params = net.init(rng_model, example_obs)
