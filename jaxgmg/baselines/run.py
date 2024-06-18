@@ -347,6 +347,7 @@ def train(
 
         # periodic evaluation on fixed test levels (on and off distribution)
         if t % num_cycles_per_eval == 0:
+            # on-distribution
             rng_eval_on, rng_t = jax.random.split(rng_t)
             eval_on_trajectories, *_, eval_on_metrics = collect_trajectories(
                 rng=rng_eval_on,
@@ -357,6 +358,7 @@ def train(
                 discount_rate=ppo_gamma,
                 compute_metrics=log_cycle,
             )
+            # off-distribution
             rng_eval_off, rng_t = jax.random.split(rng_t)
             eval_off_trajectories, *_, eval_off_metrics = collect_trajectories(
                 rng=rng_eval_off,
@@ -687,34 +689,38 @@ def collect_trajectories(
     final_obs, final_env_state = final_carry
 
     if compute_metrics:
+        # compute returns
+        avg_actual_return = jax.vmap(
+            compute_average_return,
+            in_axes=(1,1,None),
+        )(
+            trajectories.reward,
+            trajectories.done,
+            discount_rate,
+        ).mean()
+        # compute optimal returns for comparison
+        avg_optimal_return = env.voptimal_value(
+            levels,
+            discount_rate,
+        ).mean()
+        
         metrics = {
-            # average reward per step
-            'avg_reward':
-                trajectories.reward.mean(),
-            # average return per episode
-            'avg_episode_return':
-                jax.vmap(
-                    compute_average_return,
-                    in_axes=(1,1,None),
-                )(
-                    trajectories.reward,
-                    trajectories.done,
-                    discount_rate,
-                ).mean(),
-            # return of optimal policy, average by level
-            'avg_optimal_return_by_level':
-                jax.vmap(
-                    env.optimal_value,
-                    in_axes=(0,None),
-                )(
-                    levels,
-                    discount_rate,
-                ).mean(),
             # approx. mean episode completion time (by episode and by level)
             'avg_episode_length_by_episode':
                 1 / (trajectories.done.mean() + 1e-10),
             'avg_episode_length_by_level':
                 (1 / (trajectories.done.mean(axis=0) + 1e-10)).mean(),
+            # average reward per step
+            'avg_reward':
+                trajectories.reward.mean(),
+            # average return per episode (by level)
+            'avg_actual_return':
+                avg_actual_return,
+            # return of optimal policy for comparison (average by level)
+            'avg_optimal_return':
+                avg_optimal_return,
+            'optimal_minus_actual_return':
+                avg_optimal_return - avg_actual_return,
         }
     else:
         metrics = {}
