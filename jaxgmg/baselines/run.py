@@ -65,12 +65,12 @@ def train(
     # environment config
     env: str = "corner",
     rgb: bool = False,                  # obs are boolean (default) or rgb
-    env_height: int = 9,
-    env_width: int = 9,
+    env_height: int = 13,
+    env_width: int = 13,
     env_layout: str = 'blocks',
     
     # config for cheese in the corner env
-    env_corner_size: int = 1,
+    env_corner_size: int = 7,
     
     # config for keys and chests env
     env_num_keys: int = 2,
@@ -82,7 +82,9 @@ def train(
     env_monster_optimality: float = 0.9,
     
     # config agent
-    net: str = "relu-ff",
+    #net: str = "relu-ff",
+    net: str = "impala-large",
+
 
     # # config UED algorithm
     ued: str = "dr",
@@ -90,21 +92,22 @@ def train(
     plr_staleness_coeff: float = 0.5,   # staleness mixture weight in [0,1]
     
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
+    #num_total_env_steps: int = 20_000_000,
+    num_total_env_steps: int = 100_000_000,
     num_env_steps_per_cycle: int = 256,
     num_parallel_envs: int = 32,
     num_train_levels: int = 2048,
     
     # PPO hyperparameters
-    ppo_lr: float = 1e-4,               # learning rate
-    ppo_gamma: float = 0.995,           # discount rate
+    ppo_lr: float = 5e-4,               # learning rate
+    ppo_gamma: float = 0.999,           # discount rate
     ppo_clip_eps: float = 0.2,
-    ppo_gae_lambda: float = 0.98,
-    ppo_entropy_coeff: float = 1e-3,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.01,
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 1,
+    num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
     
     # evaluation config
@@ -114,12 +117,12 @@ def train(
     
     # logging
     console_log: bool = True,           # whether to log metrics to stdout
-    wandb_log: bool = False,            # whether to log metrics to wandb
+    wandb_log: bool = True,            # whether to log metrics to wandb
     num_cycles_per_log: int = 16,
     
     # wandb config
     wandb_entity: str = None,
-    wandb_project: str = "test",
+    wandb_project: str = "Phase1 Karim",
     wandb_group: str = None,
     wandb_name: str = None,
     wandb_notes: str = None,
@@ -200,6 +203,13 @@ def train(
                 maze_generator=maze_generator,
                 corner_size=env_corner_size,
             )
+            level_generator_eval_off = cheese_in_the_corner.LevelGenerator(
+                height=env_height,
+                width=env_width,
+                maze_generator=maze_generator,
+                corner_size=env_height -2,
+            )
+        
         case "keys" | "keys-and-chests":
             env = keys_and_chests.Env(
                 rgb=rgb,
@@ -237,7 +247,8 @@ def train(
     
     print(f"setting up {num_eval_levels} evaluation levels...")
     rng_eval_levels, rng = jax.random.split(rng)
-    eval_levels = level_generator.vsample(
+    #EVAL_LEVELS = level_generator.vsample(rng_eval_levels, num_levels = num_eval_levels)
+    eval_levels = level_generator_eval_off.vsample(
         rng_eval_levels,
         num_levels=num_eval_levels,
     )
