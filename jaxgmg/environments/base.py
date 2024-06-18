@@ -47,7 +47,7 @@ class Env:
     * max_steps_in_episode: int (default 128)
             Declare an episode terminal after this many steps, regardless of
             whether the episode has been completed.
-    * penalise_time : bool (default True)
+    * penalize_time : bool (default True)
             If True, all rewards decrease linearly by up to 90% over the
             maximum episode duration.
     * automatically_reset : bool (default True)

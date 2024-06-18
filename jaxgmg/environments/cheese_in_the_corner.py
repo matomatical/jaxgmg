@@ -343,7 +343,6 @@ class LevelGenerator(base.LevelGenerator):
     
     def __post_init__(self):
         assert self.corner_size >= 1
-        assert self.corner_size <= self.width - 2
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
