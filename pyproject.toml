@@ -25,7 +25,7 @@ dependencies = [
     "flax",
     "distrax",
     "readchar",
-    "argh",
+    "typer",
     "tqdm",
     "wandb",
 ]
