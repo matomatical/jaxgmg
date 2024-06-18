@@ -479,20 +479,42 @@ def train(
                 wandb.log(step=t, data={'gifs/train': util.wandb_gif(frames)})
 
         
-        # periodic eval animation saving
+        # periodic eval animation saving (on distribution)
         if eval_gifs and t % num_cycles_per_eval_gif == 0:
             frames = animate_trajectories(
-                eval_trajectories,
+                eval_on_trajectories,
                 grid_width=gif_grid_width_eval,
                 force_rgb=rgb_gifs,
                 env=env,
             )
-            gif_path = fileman.get_path(f"gifs/eval/{t}.gif")
+            gif_path = fileman.get_path(f"gifs/eval-on/{t}.gif")
             util.save_gif(frames, gif_path)
             progress.write("saved gif to " + gif_path)
             
             if wandb_log:
-                wandb.log(step=t, data={'gifs/eval': util.wandb_gif(frames)})
+                wandb.log(
+                    step=t,
+                    data={'gifs/eval-on': util.wandb_gif(frames)},
+                )
+
+        
+        # periodic eval animation saving (off distribution)
+        if eval_gifs and t % num_cycles_per_eval_gif == 0:
+            frames = animate_trajectories(
+                eval_off_trajectories,
+                grid_width=gif_grid_width_eval,
+                force_rgb=rgb_gifs,
+                env=env,
+            )
+            gif_path = fileman.get_path(f"gifs/eval-off/{t}.gif")
+            util.save_gif(frames, gif_path)
+            progress.write("saved gif to " + gif_path)
+            
+            if wandb_log:
+                wandb.log(
+                    step=t,
+                    data={'gifs/eval-off': util.wandb_gif(frames)},
+                )
         
 
         # periodic memory profiling
