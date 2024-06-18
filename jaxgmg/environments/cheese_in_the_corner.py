@@ -261,7 +261,7 @@ class Env(base.Env):
         * level : Level
                 The level to compute the optimal value for. Depends on the
                 wall configuration, the initial agent location, and the
-                location of each key and chest.
+                location of the cheese.
         * discount_rate : float
                 The discount rate to apply in the formula for computing
                 return.
@@ -343,7 +343,6 @@ class LevelGenerator(base.LevelGenerator):
     
     def __post_init__(self):
         assert self.corner_size >= 1
-        assert self.corner_size <= self.width - 2
 
 
     @functools.partial(jax.jit, static_argnames=('self',))

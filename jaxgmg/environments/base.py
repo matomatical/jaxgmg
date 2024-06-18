@@ -47,7 +47,7 @@ class Env:
     * max_steps_in_episode: int (default 128)
             Declare an episode terminal after this many steps, regardless of
             whether the episode has been completed.
-    * penalise_time : bool (default True)
+    * penalize_time : bool (default True)
             If True, all rewards decrease linearly by up to 90% over the
             maximum episode duration.
     * automatically_reset : bool (default True)
@@ -247,6 +247,59 @@ class Env:
 
     def _get_obs_bool(self, state) -> chex.Array:
         raise NotImplementedError
+    
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def optimal_value(
+        self,
+        levels: Level,
+        discount_rate: float,
+    ) -> float:
+        """
+        Compute the optimal return from (the initial state of) a level for a
+        given discount rate. Respects time penalties to reward and max
+        episode length.
+
+        Parameters:
+
+        * levels : Level
+                The level to compute the optimal value for.
+        * discount_rate : float
+                The discount rate to apply in the formula for computing
+                return.
+        * The output also depends on the environment's reward function, which
+          depends on `self.penalize_time` and `self.max_steps_in_episode`.
+        """
+        raise NotImplementedError
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def voptimal_value(
+        self,
+        levels: Level,          # Level[n]
+        discount_rate: float,
+    ) -> chex.Array:            # float[n]
+        """
+        Compute the optimal return from a set of levels for a given discount
+        rate. Respects time penalties to reward and max episode length.
+
+        Parameters:
+
+        * levels : Level[n]
+                The levels to compute the optimal value for.
+        * discount_rate : float
+                The discount rate to apply in the formula for computing
+                return.
+        * The output also depends on the environment's reward function, which
+          depends on `self.penalize_time` and `self.max_steps_in_episode`.
+        """
+        vectorised_optimal_value = jax.vmap(
+            self.optimal_value,
+            in_axes=(0, None),
+            out_axes=0,
+        )
+        return vectorised_optimal_value(levels, discount_rate)
+
 
 
 @struct.dataclass

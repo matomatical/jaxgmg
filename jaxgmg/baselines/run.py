@@ -40,7 +40,6 @@ from jaxgmg.baselines.networks import (
     SigmoidalFF,
     ReLUFF,
 )
-from jaxgmg.baselines.ued_algorithms import DR, PLR
 
 
 # # # 
@@ -63,28 +62,14 @@ def train(
     seed: int = 42,
 
     # environment config
-    env: str = "corner",
     rgb: bool = False,                  # obs are boolean (default) or rgb
     env_height: int = 13,
     env_width: int = 13,
     env_layout: str = 'blocks',
-    
-    # config for cheese in the corner env
-    env_corner_size: int = 7,
-    
-    # config for keys and chests env
-    env_num_keys: int = 2,
-    env_num_chests: int = 6,
-
-    # config for monster world env
-    env_num_shields: int = 4,
-    env_num_monsters: int = 6,
-    env_monster_optimality: float = 0.9,
+    env_corner_size: int = 1,
     
     # config agent
-    #net: str = "relu-ff",
-    net: str = "impala-large",
-
+    net: str = "relu-ff",
 
     # # config UED algorithm
     ued: str = "dr",
@@ -203,13 +188,6 @@ def train(
                 maze_generator=maze_generator,
                 corner_size=env_corner_size,
             )
-            level_generator_eval_off = cheese_in_the_corner.LevelGenerator(
-                height=env_height,
-                width=env_width,
-                maze_generator=maze_generator,
-                corner_size=env_height -2,
-            )
-        
         case "keys" | "keys-and-chests":
             env = keys_and_chests.Env(
                 rgb=rgb,
@@ -239,7 +217,7 @@ def train(
 
     print(f"generating {num_train_levels} training levels...")
     rng_train_levels, rng = jax.random.split(rng)
-    train_levels = level_generator.vsample(
+    train_levels = train_level_generator.vsample(
         rng_train_levels,
         num_levels=num_train_levels,
     )
@@ -247,28 +225,27 @@ def train(
     
     print(f"setting up {num_eval_levels} evaluation levels...")
     rng_eval_levels, rng = jax.random.split(rng)
-    #EVAL_LEVELS = level_generator.vsample(rng_eval_levels, num_levels = num_eval_levels)
-    eval_levels = level_generator_eval_off.vsample(
+    eval_levels = level_generator.vsample(
         rng_eval_levels,
+        num_levels=num_eval_levels,
+    )
+    
+    print(f"setting up {num_eval_levels} off-distribution evaluation levels...")
+    shift_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_height,
+        width=env_width,
+        maze_generator=maze_generator,
+        corner_size=max(env_height, env_width), # larger than necessary
+    )
+    rng_eval_off_levels, rng = jax.random.split(rng)
+    eval_off_levels = shift_level_generator.vsample(
+        rng_eval_off_levels,
         num_levels=num_eval_levels,
     )
 
 
-    print(f"set up UED: {ued} algorithm...")
-    match ued.lower():
-        case "dr" | "domain-randomisation" | "domain-randomization":
-            ued = DR(
-                num_levels=num_train_levels,
-            )
-        case "plr" | "prioritised-level-replay" | "prioritized-level-replay":
-            raise NotImplementedError # requires testing
-            ued = PLR(
-                num_levels=num_train_levels,
-                temperature=plr_temperature,
-                staleness_coeff=plr_staleness_coeff,
-            )
-        case _:
-            raise Exception(f"unknown ued algorithm: {ued}")
+    print(f"set up UED: DR algorithm...")
+    ued = DR(num_levels=num_train_levels)
     ued_state = ued.init()
 
 
@@ -291,7 +268,7 @@ def train(
             raise Exception(f"unknown net architecture: {net}")
     # initialise the network
     rng_model, rng_input, rng_level, rng = jax.random.split(rng, 4)
-    example_level = level_generator.sample(rng_level)
+    example_level = train_level_generator.sample(rng_level)
     example_obs, _ = env.reset_to_level(rng_input, example_level)
     net_init_params = net.init(rng_model, example_obs)
 
@@ -401,20 +378,33 @@ def train(
         )
         
 
-        # periodic evaluation on fixed test levels
+        # periodic evaluation on fixed test levels (on and off distribution)
         if t % num_cycles_per_eval == 0:
-            rng_eval, rng_t = jax.random.split(rng_t)
-            eval_trajectories, *_, eval_env_metrics = collect_trajectories(
-                rng=rng_eval,
+            # on-distribution
+            rng_eval_on, rng_t = jax.random.split(rng_t)
+            eval_on_trajectories, *_, eval_on_metrics = collect_trajectories(
+                rng=rng_eval_on,
                 train_state=train_state,
                 env=env,
-                levels=eval_levels,
+                levels=eval_on_levels,
+                num_steps=num_env_steps_per_eval,
+                discount_rate=ppo_gamma,
+                compute_metrics=log_cycle,
+            )
+            # off-distribution
+            rng_eval_off, rng_t = jax.random.split(rng_t)
+            eval_off_trajectories, *_, eval_off_metrics = collect_trajectories(
+                rng=rng_eval_off,
+                train_state=train_state,
+                env=env,
+                levels=eval_off_levels,
                 num_steps=num_env_steps_per_eval,
                 discount_rate=ppo_gamma,
                 compute_metrics=log_cycle,
             )
         else:
-            eval_env_metrics = {}
+            eval_on_metrics = {}
+            eval_off_metrics = {}
         
 
         # periodic logging
@@ -441,8 +431,10 @@ def train(
                     util.dict2str(ued_metrics),
                     f"ppo updates {t_ppo_before}--{t_ppo_after} loss:",
                     util.dict2str(ppo_metrics),
-                    f"eval env rollouts (if evaluating this cycle):",
-                    util.dict2str(eval_env_metrics),
+                    f"eval env rollouts (on distribution):",
+                    util.dict2str(eval_on_metrics),
+                    f"eval env rollouts (off distribution):",
+                    util.dict2str(eval_off_metrics),
                     f"performance metrics:",
                     util.dict2str(perf_metrics),
                     "=" * 59,
@@ -457,7 +449,8 @@ def train(
                         | util.dict_prefix(env_metrics, "env/train/")
                         | util.dict_prefix(ued_metrics, "ued/")
                         | util.dict_prefix(ppo_metrics, "ppo/")
-                        | util.dict_prefix(eval_env_metrics, "env/eval/")
+                        | util.dict_prefix(eval_on_metrics, "env/eval/on/")
+                        | util.dict_prefix(eval_off_metrics, "env/eval/off/")
                         | util.dict_prefix(perf_metrics, "perf/")
                     ),
                 )
@@ -519,6 +512,53 @@ def train(
     print("training run complete.")
 
 
+# # # 
+# domain randomisation
+
+
+@struct.dataclass
+class DRState:
+    visited: Array # bool[num_levels]
+
+
+@struct.dataclass
+class DR:
+    num_levels: int
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def init(self) -> DRState:
+        return DRState(
+            visited=jnp.zeros(self.num_levels, dtype=bool),
+        )
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def distribution(self, state) -> Array:
+        return jnp.ones(self.num_levels) / self.num_levels
+
+
+    @functools.partial(jax.jit, static_argnames=('self', 'compute_metrics',))
+    def update(
+        self,
+        state: DRState,
+        chosen_level_ids: Array,   # index[num_levels]
+        gaes: Array,               # float[num_steps, num_levels]
+        compute_metrics: bool,
+    ) -> Tuple[
+        DRState,
+        Dict[str, Any],
+    ]:
+        state = state.replace(
+            visited=state.visited.at[chosen_level_ids].set(True),
+        )
+        if compute_metrics:
+            metrics = {
+                'visited_proportion': state.visited.mean(),
+            }
+        else:
+            metrics = {}
+        return state, metrics
 # # # 
 # "eval" entry point
 
@@ -682,34 +722,38 @@ def collect_trajectories(
     final_obs, final_env_state = final_carry
 
     if compute_metrics:
+        # compute returns
+        avg_actual_return = jax.vmap(
+            compute_average_return,
+            in_axes=(1,1,None),
+        )(
+            trajectories.reward,
+            trajectories.done,
+            discount_rate,
+        ).mean()
+        # compute optimal returns for comparison
+        avg_optimal_return = env.voptimal_value(
+            levels,
+            discount_rate,
+        ).mean()
+        
         metrics = {
-            # average reward per step
-            'avg_reward':
-                trajectories.reward.mean(),
-            # average return per episode
-            'avg_episode_return':
-                jax.vmap(
-                    compute_average_return,
-                    in_axes=(1,1,None),
-                )(
-                    trajectories.reward,
-                    trajectories.done,
-                    discount_rate,
-                ).mean(),
-            # return of optimal policy, average by level
-            'avg_optimal_return_by_level':
-                jax.vmap(
-                    env.optimal_value,
-                    in_axes=(0,None),
-                )(
-                    levels,
-                    discount_rate,
-                ).mean(),
             # approx. mean episode completion time (by episode and by level)
             'avg_episode_length_by_episode':
                 1 / (trajectories.done.mean() + 1e-10),
             'avg_episode_length_by_level':
                 (1 / (trajectories.done.mean(axis=0) + 1e-10)).mean(),
+            # average reward per step
+            'avg_reward':
+                trajectories.reward.mean(),
+            # average return per episode (by level)
+            'avg_actual_return':
+                avg_actual_return,
+            # return of optimal policy for comparison (average by level)
+            'avg_optimal_return':
+                avg_optimal_return,
+            'optimal_minus_actual_return':
+                avg_optimal_return - avg_actual_return,
         }
     else:
         metrics = {}
