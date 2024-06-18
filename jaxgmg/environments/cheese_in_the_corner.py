@@ -364,25 +364,34 @@ class LevelGenerator(base.LevelGenerator):
             jnp.indices((self.height, self.width)),
             'c h w -> (h w) c',
         )
-        no_wall = ~wall_map.flatten()
+        no_wall_map = ~wall_map
+        no_wall_mask = no_wall_map.flatten()
         
         # cheese spawn in top left corner region
-        in_corner = jnp.logical_and(
-            coords[:, 0] < self.corner_size + 1, # first `corner_size+1` rows
-            coords[:, 1] < self.corner_size + 1, # first `corner_size+1` cols
-            # (+1s account for boundary which is masked out by `no_wall` mask)
+        corner_mask = (
+            # first `corner_size` rows not including border
+              (coords[:, 0] >= 1)
+            & (coords[:, 0] <= self.corner_size)
+            # first `corner_size` cols not including border
+            & (coords[:, 1] >= 1)
+            & (coords[:, 1] <= self.corner_size)
         ).flatten()
-
+        # ... not on a wall (unless that's the only option)
+        cheese_mask = corner_mask & no_wall_mask
+        cheese_mask = cheese_mask | (~(cheese_mask.any()) & corner_mask)
         rng_spawn_cheese, rng = jax.random.split(rng)
-        cheese_pos = coords[jax.random.choice(
+        cheese_pos = jax.random.choice(
             key=rng_spawn_cheese,
-            a=coords.shape[0],
+            a=coords,
+            axis=0,
             shape=(),
-            p=no_wall & in_corner,
-        )]
+            p=cheese_mask,
+        )
+        # ... in case there *was* a wall there , remove it
+        wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
         
         # mouse spawn in some remaining valid position
-        no_cheese = jnp.ones_like(wall_map).at[
+        mouse_mask = no_wall_map.at[
             cheese_pos[0],
             cheese_pos[1],
         ].set(False).flatten()
@@ -392,7 +401,7 @@ class LevelGenerator(base.LevelGenerator):
             key=rng_spawn_mouse,
             a=coords.shape[0],
             shape=(),
-            p=no_wall & no_cheese,
+            p=mouse_mask,
         )]
 
         return Level(
