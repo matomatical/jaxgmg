@@ -15,10 +15,6 @@ import optax
 import tqdm
 import wandb
 
-from jaxgmg.environments import cheese_in_the_corner
-from jaxgmg.environments import keys_and_chests
-from jaxgmg.environments import monster_world
-from jaxgmg.procgen import maze_generation
 from jaxgmg.baselines import util
 from jaxgmg.baselines import networks
 
@@ -102,8 +98,7 @@ def run(
 
     
     print(f"set up UED: DR algorithm...")
-    num_train_levels = jax.tree.leaves(train_levels)[0].shape[0]
-    ued = DR(num_levels=num_train_levels)
+    ued = DR(levels=train_levels)
     ued_state = ued.init()
 
 
@@ -155,18 +150,11 @@ def run(
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
         perf_metrics = {}
 
-        # TODO: REFACTOR UED
         rng_levels, rng_t = jax.random.split(rng_t)
-        chosen_level_ids = jax.random.choice(
-            rng_levels,
-            num_train_levels,
-            (num_parallel_envs,),
-            replace=False,
-            p=ued.distribution(ued_state),
-        )
-        chosen_levels = jax.tree.map(
-            lambda x: x[chosen_level_ids],
-            train_levels,
+        ued_state, levels_t = ued.select_levels(
+            rng=rng_levels,
+            state=ued_state,
+            num_selected_levels=num_parallel_envs,
         )
     
         
@@ -178,7 +166,7 @@ def run(
             rng=rng_env,
             train_state=train_state,
             env=env,
-            levels=chosen_levels,
+            levels=levels_t,
             num_steps=num_env_steps_per_cycle,
             discount_rate=ppo_gamma,
             compute_metrics=log_cycle,
@@ -218,8 +206,6 @@ def run(
         # update ued state
         ued_state, ued_metrics = ued.update(
             state=ued_state,
-            chosen_level_ids=chosen_level_ids,
-            gaes=advantages,
             compute_metrics=log_cycle,
         )
         
@@ -304,7 +290,7 @@ def run(
                 wandb.log(step=t, data={'gifs/train': util.wandb_gif(frames)})
 
         
-        # periodic eval animation saving (on distribution)
+        # periodic eval animation saving
         if eval_gifs and t % num_cycles_per_gif == 0:
             for eval_name, eval_trajectories_ in eval_trajectories.items():
                 frames = animate_trajectories(
@@ -338,40 +324,62 @@ def run(
 
 @struct.dataclass
 class DRState:
-    visited: Array # bool[num_levels]
+    visited: Array          # bool[num_levels]
+    prev_level_ids: Array   # int[num_selected_levels]
 
 
 @struct.dataclass
 class DR:
-    num_levels: int
-    # TODO: REFACTOR TO HOLD THE LEVELS I THINK!!
+    levels: Level           # Level[num_levels]
 
 
-    @functools.partial(jax.jit, static_argnames=('self',))
+    # @functools.partial(jax.jit, static_argnames=('self',))
+    @jax.jit
     def init(self) -> DRState:
+        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
         return DRState(
-            visited=jnp.zeros(self.num_levels, dtype=bool),
+            visited=jnp.zeros(num_levels, dtype=bool),
+            prev_level_ids=None,
         )
 
     
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def distribution(self, state) -> Array:
-        return jnp.ones(self.num_levels) / self.num_levels
+    @functools.partial(jax.jit, static_argnames=('num_selected_levels',))
+    def select_levels(
+        self,
+        rng: PRNGKey,
+        state: DRState,
+        num_selected_levels: int
+    ) -> Tuple[
+        DRState,
+        Level,              # Level[num_selected_levels]
+    ]:
+        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
+        level_ids = jax.random.choice(
+            rng,
+            num_levels,
+            (num_selected_levels,),
+            replace=False,
+        )
+        levels = jax.tree.map(
+            lambda x: x[level_ids],
+            self.levels,
+        )
+        state = state.replace(
+            visited=state.visited.at[level_ids].set(True),
+            prev_level_ids=level_ids,
+        )
+        return state, levels
 
 
-    @functools.partial(jax.jit, static_argnames=('self', 'compute_metrics',))
+    @functools.partial(jax.jit, static_argnames=('compute_metrics',))
     def update(
         self,
         state: DRState,
-        chosen_level_ids: Array,   # index[num_levels]
-        gaes: Array,               # float[num_steps, num_levels]
+        # TODO: add arguments for some kind of result?
         compute_metrics: bool,
-    ) -> Tuple[
-        DRState,
-        Dict[str, Any],
-    ]:
+    ) -> Tuple[DRState, Metrics]:
         state = state.replace(
-            visited=state.visited.at[chosen_level_ids].set(True),
+            prev_level_ids=None,
         )
         if compute_metrics:
             metrics = {
@@ -380,31 +388,6 @@ class DR:
         else:
             metrics = {}
         return state, metrics
-# # # 
-# "eval" entry point
-
-
-def evaluate_checkpoint(
-    # configure the environment
-    # ...
-    # locate the checkpoint to evaluate
-    checkpoint_directory: str = None,   # path to checkpoints folder
-    checkpoint_to_eval: int = -1,       # default: final checkpoint
-    # evaluation hyperparameters
-    # ... num environments and so on
-):
-    pass
-    # set up environment
-    # ...
-
-    # load checkpoint
-    # ...
-
-    # do some evaluation
-    # ...
-
-    # output or save the results somewhere
-    # ...
 
 
 # # # 
