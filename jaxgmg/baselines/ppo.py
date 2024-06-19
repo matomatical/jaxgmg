@@ -1,16 +1,5 @@
 """
 Universal run script allowing configuring:
-
-* training environment
-  * maze size and generating algorithm
-  * proxy correlation
-  * observation (boolean vs. rgb)
-* agent architecture (feed forward actor critic)
-* UED algorithm (DR or PLR)
-* PPO hyperparameters
-* wandb logging, local checkpointing, and saving animations
-
-All from the command line or through exposed functions
 """
 
 import functools
@@ -25,21 +14,13 @@ import optax
 
 import tqdm
 import wandb
-import orbax.checkpoint as ocp
-
-from jaxgmg.baselines import util
 
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
 from jaxgmg.procgen import maze_generation
-
-from jaxgmg.baselines.networks import (
-    ImpalaFull,
-    ImpalaSmall,
-    SigmoidalFF,
-    ReLUFF,
-)
+from jaxgmg.baselines import util
+from jaxgmg.baselines import networks
 
 
 # # # 
@@ -53,97 +34,54 @@ Metrics = Dict[str, Any]
 
 
 # # # 
-# "train" entry point
+# training entry point
 
 
-@util.wandb_run # inits wandb and syncs the arguments with wandb.config
-def train(
-    # randomness
-    seed: int = 42,
-
-    # environment config
-    rgb: bool = False,                  # obs are boolean (default) or rgb
-    env_height: int = 9,
-    env_width: int = 9,
-    env_layout: str = 'blocks',
-    env_corner_size: int = 1,
-    
-    # config agent
-    net: str = "relu-ff",
-    
+def run(
+    rng: PRNGKey,
+    env: Env,
+    train_levels: Level,                # Level[n]
+    eval_levels_dict: Dict[str, Level], # {str: Level[n]}
+    # policy config
+    net: str,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 256,
-    num_parallel_envs: int = 32,
-    num_train_levels: int = 2048,
-    
+    num_total_env_steps: int,
+    num_env_steps_per_cycle: int,
+    num_parallel_envs: int,
     # PPO hyperparameters
-    ppo_lr: float = 1e-4,               # learning rate
-    ppo_gamma: float = 0.995,           # discount rate
-    ppo_clip_eps: float = 0.2,
-    ppo_gae_lambda: float = 0.98,
-    ppo_entropy_coeff: float = 1e-3,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 1,
-    num_epochs_per_cycle: int = 5,
-    
+    ppo_lr: float,                      # learning rate
+    ppo_gamma: float,                   # discount rate
+    ppo_clip_eps: float,
+    ppo_gae_lambda: float,
+    ppo_entropy_coeff: float,
+    ppo_critic_coeff: float,
+    ppo_max_grad_norm: float,
+    ppo_lr_annealing: bool,
+    num_minibatches_per_epoch: int,
+    num_epochs_per_cycle: int,
     # evaluation config
-    num_cycles_per_eval: int = 64,
-    num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 1024,
-    
-    # logging
-    console_log: bool = True,           # whether to log metrics to stdout
-    wandb_log: bool = False,            # whether to log metrics to wandb
-    num_cycles_per_log: int = 16,
-    
-    # wandb config
-    wandb_entity: str = None,
-    wandb_project: str = "test",
-    wandb_group: str = None,
-    wandb_name: str = None,
-    wandb_notes: str = None,
-    
-    # checkpointing
-    checkpointing: bool = False,
-    num_cycles_per_checkpoint: int = 256,
-    
-    # gif animations for training/eval rollouts
-    train_gifs: bool = False,
-    eval_gifs: bool = False,
-    num_cycles_per_train_gif: int = 256,
-    num_cycles_per_eval_gif: int = 256,
-    gif_grid_width_train: int = 8,
-    gif_grid_width_eval: int = 16,
-    rgb_gifs: bool = False,             # force gifs rgb even if obs are bool
-    
-    # memory profiling
-    profiling: bool = False,
-    num_cycles_per_profile: int = 256,
-    
-    # output save directory
-    save_files_to: str = "out/",
+    num_cycles_per_eval: int,
+    num_env_steps_per_eval: int,
+    # console logging
+    console_log: bool,                  # whether to log metrics to stdout
+    wandb_log: bool,                    # whether to log metrics to wandb
+    num_cycles_per_log: int,
+    train_gifs: bool,
+    eval_gifs: bool,
+    num_cycles_per_gif: int,
+    gif_grid_width: int,
+    rgb_gifs: bool,                     # force gifs rgb even if obs are bool
+    save_files_to: str,
 ):
-
-
-    # config management
-    config = dict(locals())
-    print("new run with config:")
-    print(util.dict2str(config))
 
 
     # initialising file manager
     print("initialising run file manager")
     fileman = util.RunFilesManager(root_path=save_files_to)
     print("  run folder:", fileman.path)
-    
 
-    # save the config to disk
-    config_save_path = fileman.get_path('config.json')
-    util.save_json(config, config_save_path)
-    print('saved config to', config_save_path)
+    
+    # TODO: Would be a good idea to save the config as a file again
     
 
     # deriving some additional config variables
@@ -163,79 +101,20 @@ def train(
         wandb.define_metric("ppo/std/*", step_metric="ppo/update")
 
     
-    # initialise prng
-    rng = jax.random.PRNGKey(seed)
-
-
-    print("setting up environment...")
-    env = cheese_in_the_corner.Env(
-        rgb=rgb,
-        penalize_time=False,
-    )
-
-    print(f"generating {num_train_levels} training levels...")
-    maze_generator = maze_generation.get_generator_class_from_name(
-        name=env_layout,
-    )()
-    train_level_generator = cheese_in_the_corner.LevelGenerator(
-        height=env_height,
-        width=env_width,
-        maze_generator=maze_generator,
-        corner_size=env_corner_size,
-    )
-    rng_train_levels, rng = jax.random.split(rng)
-    train_levels = train_level_generator.vsample(
-        rng_train_levels,
-        num_levels=num_train_levels,
-    )
-    
-    
-    print(f"setting up {num_eval_levels} on-distribution evaluation levels...")
-    rng_eval_on_levels, rng = jax.random.split(rng)
-    eval_on_levels = train_level_generator.vsample(
-        rng_eval_on_levels,
-        num_levels=num_eval_levels,
-    )
-    
-    print(f"setting up {num_eval_levels} off-distribution evaluation levels...")
-    shift_level_generator = cheese_in_the_corner.LevelGenerator(
-        height=env_height,
-        width=env_width,
-        maze_generator=maze_generator,
-        corner_size=max(env_height, env_width), # larger than necessary
-    )
-    rng_eval_off_levels, rng = jax.random.split(rng)
-    eval_off_levels = shift_level_generator.vsample(
-        rng_eval_off_levels,
-        num_levels=num_eval_levels,
-    )
-
-
     print(f"set up UED: DR algorithm...")
+    num_train_levels = jax.tree.leaves(train_levels)[0].shape[0]
     ued = DR(num_levels=num_train_levels)
     ued_state = ued.init()
 
 
     print(f"setting up agent with {net} architecture...")
     # select agent architecture
-    match net.lower():
-        case "relu-ff" | "relu":
-            net = ReLUFF(
-                num_actions=env.num_actions,
-            )
-        case "impala-small":
-            net = ImpalaSmall(
-                num_actions=env.num_actions,
-            )
-        case "impala" | "impala-large":
-            net = ImpalaFull(
-                num_actions=env.num_actions,
-            )
-        case _:
-            raise Exception(f"unknown net architecture: {net}")
+    net = networks.get_architecture_class_from_name(net)(
+        num_actions=env.num_actions,
+    )
     # initialise the network
     rng_model, rng_input, rng_level, rng = jax.random.split(rng, 4)
-    example_level = train_level_generator.sample(rng_level)
+    example_level = jax.tree.map(lambda x: x[0], train_levels)
     example_obs, _ = env.reset_to_level(rng_input, example_level)
     net_init_params = net.init(rng_model, example_obs)
 
@@ -276,7 +155,7 @@ def train(
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
         perf_metrics = {}
 
-
+        # TODO: REFACTOR UED
         rng_levels, rng_t = jax.random.split(rng_t)
         chosen_level_ids = jax.random.choice(
             rng_levels,
@@ -345,33 +224,28 @@ def train(
         )
         
 
-        # periodic evaluation on fixed test levels (on and off distribution)
+        # periodic evaluation on fixed test levels
+        eval_metrics = {}
+        eval_trajectories = {}
+        # TODO: I think I can replace this with a tree map if I switch to
+        # nested metrics dictionaries, also nested metrics dictionaries seems
+        # nicer anyway...!
         if t % num_cycles_per_eval == 0:
-            # on-distribution
-            rng_eval_on, rng_t = jax.random.split(rng_t)
-            eval_on_trajectories, *_, eval_on_metrics = collect_trajectories(
-                rng=rng_eval_on,
-                train_state=train_state,
-                env=env,
-                levels=eval_on_levels,
-                num_steps=num_env_steps_per_eval,
-                discount_rate=ppo_gamma,
-                compute_metrics=log_cycle,
-            )
-            # off-distribution
-            rng_eval_off, rng_t = jax.random.split(rng_t)
-            eval_off_trajectories, *_, eval_off_metrics = collect_trajectories(
-                rng=rng_eval_off,
-                train_state=train_state,
-                env=env,
-                levels=eval_off_levels,
-                num_steps=num_env_steps_per_eval,
-                discount_rate=ppo_gamma,
-                compute_metrics=log_cycle,
-            )
-        else:
-            eval_on_metrics = {}
-            eval_off_metrics = {}
+            for eval_name, eval_levels in eval_levels_dict.items():
+                rng_eval, rng_t = jax.random.split(rng_t)
+                eval_trajectories_, *_, eval_metrics_ = collect_trajectories(
+                    rng=rng_eval,
+                    train_state=train_state,
+                    env=env,
+                    levels=eval_levels,
+                    num_steps=num_env_steps_per_eval,
+                    discount_rate=ppo_gamma,
+                    compute_metrics=log_cycle,
+                )
+                eval_metrics.update(
+                    util.dict_prefix(eval_metrics_, eval_name+"/")
+                )
+                eval_trajectories[eval_name] = eval_trajectories_
         
 
         # periodic logging
@@ -390,20 +264,12 @@ def train(
             if console_log:
                 progress.write("\n".join([
                     "=" * 59,
-                    f"training loop cycle {t}:",
-                    util.dict2str(step_metrics),
-                    f"env step {t_env_before}--{t_env_after} rollout:",
-                    util.dict2str(env_metrics),
-                    f"ued state @{t_env_after}:",
-                    util.dict2str(ued_metrics),
-                    f"ppo updates {t_ppo_before}--{t_ppo_after} loss:",
-                    util.dict2str(ppo_metrics),
-                    f"eval env rollouts (on distribution):",
-                    util.dict2str(eval_on_metrics),
-                    f"eval env rollouts (off distribution):",
-                    util.dict2str(eval_off_metrics),
-                    f"performance metrics:",
-                    util.dict2str(perf_metrics),
+                    f"training iteration {t}:", util.dict2str(step_metrics),
+                    f"env rollouts:",           util.dict2str(env_metrics),
+                    f"ued state:",              util.dict2str(ued_metrics),
+                    f"ppo updates:",            util.dict2str(ppo_metrics),
+                    f"eval rollouts:",          util.dict2str(eval_metrics),
+                    f"performance:",            util.dict2str(perf_metrics),
                     "=" * 59,
                 ]))
 
@@ -412,29 +278,21 @@ def train(
                 wandb.log(
                     step=t,
                     data=(
-                        step_metrics
+                          step_metrics
                         | util.dict_prefix(env_metrics, "env/train/")
                         | util.dict_prefix(ued_metrics, "ued/")
                         | util.dict_prefix(ppo_metrics, "ppo/")
-                        | util.dict_prefix(eval_on_metrics, "env/eval/on/")
-                        | util.dict_prefix(eval_off_metrics, "env/eval/off/")
+                        | util.dict_prefix(eval_metrics, "env/eval/")
                         | util.dict_prefix(perf_metrics, "perf/")
                     ),
                 )
 
         
-        # periodic checkpointing
-        if checkpointing and t % num_cycles_per_checkpoint == 0:
-            checkpoint_path = fileman.get_path(f"checkpoints/{t}.ocp")
-            ocp.PyTreeCheckpointer().save(checkpoint_path, train_state)
-            progress.write(f"saved checkpoint to {checkpoint_path}")
-        
-
         # periodic training animation saving
-        if train_gifs and t % num_cycles_per_train_gif == 0:
+        if train_gifs and t % num_cycles_per_gif == 0:
             frames = animate_trajectories(
                 trajectories,
-                grid_width=gif_grid_width_train,
+                grid_width=gif_grid_width,
                 force_rgb=rgb_gifs,
                 env=env,
             )
@@ -447,58 +305,31 @@ def train(
 
         
         # periodic eval animation saving (on distribution)
-        if eval_gifs and t % num_cycles_per_eval_gif == 0:
-            frames = animate_trajectories(
-                eval_on_trajectories,
-                grid_width=gif_grid_width_eval,
-                force_rgb=rgb_gifs,
-                env=env,
-            )
-            gif_path = fileman.get_path(f"gifs/eval-on/{t}.gif")
-            util.save_gif(frames, gif_path)
-            progress.write("saved gif to " + gif_path)
-            
-            if wandb_log:
-                wandb.log(
-                    step=t,
-                    data={'gifs/eval-on': util.wandb_gif(frames)},
+        if eval_gifs and t % num_cycles_per_gif == 0:
+            for eval_name, eval_trajectories_ in eval_trajectories.items():
+                frames = animate_trajectories(
+                    eval_trajectories_,
+                    grid_width=gif_grid_width,
+                    force_rgb=rgb_gifs,
+                    env=env,
                 )
-
-        
-        # periodic eval animation saving (off distribution)
-        if eval_gifs and t % num_cycles_per_eval_gif == 0:
-            frames = animate_trajectories(
-                eval_off_trajectories,
-                grid_width=gif_grid_width_eval,
-                force_rgb=rgb_gifs,
-                env=env,
-            )
-            gif_path = fileman.get_path(f"gifs/eval-off/{t}.gif")
-            util.save_gif(frames, gif_path)
-            progress.write("saved gif to " + gif_path)
-            
-            if wandb_log:
-                wandb.log(
-                    step=t,
-                    data={'gifs/eval-off': util.wandb_gif(frames)},
-                )
+                gif_path = fileman.get_path(f"gifs/{eval_name}/{t}.gif")
+                util.save_gif(frames, gif_path)
+                progress.write("saved gif to " + gif_path)
+                
+                if wandb_log:
+                    wandb.log(
+                        step=t,
+                        data={'gifs/eval-on': util.wandb_gif(frames)},
+                    )
         
 
-        # periodic memory profiling
-        if profiling and t % num_cycles_per_profile == 0:
-            profile_path = fileman.get_path(f"profiles/mem-{t}.gif")
-            jax.profiler.save_device_memory_profile(profile_path)
-            progress.write("saved memory profile to " + profile_path)
-        
-        
         # ending cycle
         progress.update(num_total_env_steps_per_cycle)
 
 
     # ending run
     progress.close()
-    # (the decorator finishes the wandb run for us, so no need to do that)
-    print("training run complete.")
 
 
 # # # 
@@ -513,6 +344,7 @@ class DRState:
 @struct.dataclass
 class DR:
     num_levels: int
+    # TODO: REFACTOR TO HOLD THE LEVELS I THINK!!
 
 
     @functools.partial(jax.jit, static_argnames=('self',))

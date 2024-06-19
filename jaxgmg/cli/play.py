@@ -3,7 +3,6 @@ Interactive environment demonstrations.
 """
 
 import jax
-import jax.numpy as jnp
 import readchar
 import time
 import chex
