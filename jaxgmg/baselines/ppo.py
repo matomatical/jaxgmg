@@ -1,10 +1,15 @@
 """
-Universal run script allowing configuring:
+Proximal policy optimisation for a given network, environment, and set of
+training/eval levels.
 """
 
 import functools
+import datetime
+import json
+import os
 import time
 
+import numpy as np
 import jax
 import jax.numpy as jnp
 import einops
@@ -12,10 +17,10 @@ from flax.training.train_state import TrainState
 from flax import struct
 import optax
 
+from PIL import Image
 import tqdm
 import wandb
 
-from jaxgmg.baselines import util
 from jaxgmg.baselines import networks
 
 
@@ -78,6 +83,10 @@ def run(
 
     
     # TODO: Would be a good idea to save the config as a file again
+
+
+    # TODO: Would also be a good idea for this program to initialise and
+    # manage the WANDB run. But that means going back to config hell?
     
 
     # deriving some additional config variables
@@ -88,13 +97,17 @@ def run(
 
     # alternative axes
     if wandb_log:
-        wandb.define_metric("env/step")
-        wandb.define_metric("env/train/*", step_metric="env/step")
-        wandb.define_metric("env/eval/*", step_metric="env/step")
-        wandb.define_metric("ued/*", step_metric="env/step")
-        wandb.define_metric("ppo/update")
-        wandb.define_metric("ppo/*", step_metric="ppo/update")
-        wandb.define_metric("ppo/std/*", step_metric="ppo/update")
+        wandb.define_metric("step/env-step")
+        wandb.define_metric("env/train/*", step_metric="step/env-step")
+        for eval_name in eval_levels_dict.keys():
+            wandb.define_metric(
+                f"env/eval/{eval_name}/*",
+                step_metric="step/env-step",
+            )
+        wandb.define_metric("ued/*", step_metric="step/env-step")
+        wandb.define_metric("step/ppo-update")
+        wandb.define_metric("ppo/*", step_metric="step/ppo-update")
+        wandb.define_metric("ppo/std/*", step_metric="step/ppo-update")
 
     
     print(f"set up UED: DR algorithm...")
@@ -148,8 +161,31 @@ def run(
     for t in range(num_total_cycles):
         rng_t, rng = jax.random.split(rng)
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
-        perf_metrics = {}
+        if log_cycle:
+            metrics = {
+                'step': {},
+                'perf': {},
+                'env/train': {},
+                'env/eval': {},
+                'ued': {},
+                'ppo': {},
+            }
 
+
+        # step counting
+        if log_cycle:
+            t_env_before = t * num_total_env_steps_per_cycle
+            t_env_after = t_env_before + num_total_env_steps_per_cycle
+            t_ppo_before = t * num_updates_per_cycle
+            t_ppo_after = t_ppo_before + num_updates_per_cycle
+            metrics['step'].update({
+                'ppo-update': t_ppo_before,
+                'env-step': t_env_before,
+                'ppo-update-ater': t_ppo_after,
+                'env-step-after': t_env_after,
+            })
+
+        # choose levels for this round
         rng_levels, rng_t = jax.random.split(rng_t)
         ued_state, levels_t = ued.select_levels(
             rng=rng_levels,
@@ -173,7 +209,8 @@ def run(
         )
         if log_cycle:
             env_elapsed_time = time.perf_counter() - env_start_time
-            perf_metrics['env_steps_per_second'] = (
+            metrics['env/train'].update(env_metrics)
+            metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
 
@@ -198,7 +235,8 @@ def run(
         )
         if log_cycle:
             ppo_elapsed_time = time.perf_counter() - ppo_start_time
-            perf_metrics['ppo_updates_per_second'] = (
+            metrics['ppo'].update(ppo_metrics)
+            metrics['perf']['ppo_updates_per_second'] = (
                 num_updates_per_cycle / ppo_elapsed_time
             )
     
@@ -208,17 +246,18 @@ def run(
             state=ued_state,
             compute_metrics=log_cycle,
         )
+        if log_cycle:
+            metrics['ued'].update(ued_metrics)
         
 
         # periodic evaluation on fixed test levels
-        eval_metrics = {}
-        eval_trajectories = {}
-        # TODO: I think I can replace this with a tree map if I switch to
-        # nested metrics dictionaries, also nested metrics dictionaries seems
-        # nicer anyway...!
-        if t % num_cycles_per_eval == 0:
+        if log_cycle and t % num_cycles_per_eval == 0:
+            rng_eval, rng_t = jax.random.split(rng_t)
+            # this is a tree map but writing it that way would make it worse
+            eval_trajectories = {}
+            eval_metrics = {}
             for eval_name, eval_levels in eval_levels_dict.items():
-                rng_eval, rng_t = jax.random.split(rng_t)
+                rng_eval_, rng_eval = jax.random.split(rng_eval)
                 eval_trajectories_, *_, eval_metrics_ = collect_trajectories(
                     rng=rng_eval,
                     train_state=train_state,
@@ -228,50 +267,21 @@ def run(
                     discount_rate=ppo_gamma,
                     compute_metrics=log_cycle,
                 )
-                eval_metrics.update(
-                    util.dict_prefix(eval_metrics_, eval_name+"/")
-                )
                 eval_trajectories[eval_name] = eval_trajectories_
+                eval_metrics[eval_name] = eval_metrics_
+            metrics['env/eval'].update(eval_metrics)
         
 
         # periodic logging
         if log_cycle:
-            # convert cycle count to num steps/updates
-            t_env_before = t * num_total_env_steps_per_cycle
-            t_env_after = t_env_before + num_total_env_steps_per_cycle
-            t_ppo_before = t * num_updates_per_cycle
-            t_ppo_after = t_ppo_before + num_updates_per_cycle
-            step_metrics = {
-                'ppo/update': t_ppo_before,
-                'env/step': t_env_before,
-            }
-
-            # optionally log to console
             if console_log:
                 progress.write("\n".join([
                     "=" * 59,
-                    f"training iteration {t}:", util.dict2str(step_metrics),
-                    f"env rollouts:",           util.dict2str(env_metrics),
-                    f"ued state:",              util.dict2str(ued_metrics),
-                    f"ppo updates:",            util.dict2str(ppo_metrics),
-                    f"eval rollouts:",          util.dict2str(eval_metrics),
-                    f"performance:",            util.dict2str(perf_metrics),
+                    util.dict_to_str(metrics),
                     "=" * 59,
                 ]))
-
-            # optionally log to wandb
             if wandb_log:
-                wandb.log(
-                    step=t,
-                    data=(
-                          step_metrics
-                        | util.dict_prefix(env_metrics, "env/train/")
-                        | util.dict_prefix(ued_metrics, "ued/")
-                        | util.dict_prefix(ppo_metrics, "ppo/")
-                        | util.dict_prefix(eval_metrics, "env/eval/")
-                        | util.dict_prefix(perf_metrics, "perf/")
-                    ),
-                )
+                wandb.log(step=t, data=util.flatten_dict(metrics))
 
         
         # periodic training animation saving
@@ -287,7 +297,10 @@ def run(
             progress.write("saved gif to " + gif_path)
             
             if wandb_log:
-                wandb.log(step=t, data={'gifs/train': util.wandb_gif(frames)})
+                wandb.log(
+                    step=t,
+                    data={'gifs/train': util.wandb_gif(frames)},
+                )
 
         
         # periodic eval animation saving
@@ -299,14 +312,14 @@ def run(
                     force_rgb=rgb_gifs,
                     env=env,
                 )
-                gif_path = fileman.get_path(f"gifs/{eval_name}/{t}.gif")
+                gif_path = fileman.get_path(f"gifs/eval-{eval_name}/{t}.gif")
                 util.save_gif(frames, gif_path)
                 progress.write("saved gif to " + gif_path)
                 
                 if wandb_log:
                     wandb.log(
                         step=t,
-                        data={'gifs/eval-on': util.wandb_gif(frames)},
+                        data={'gifs/eval-'+eval_name: util.wandb_gif(frames)},
                     )
         
 
@@ -744,11 +757,11 @@ def ppo_update(
             'avg_loss_critic': losses_components[1].mean(),
             'avg_loss_entropy': losses_components[2].mean(),
             'avg_advantage': advantages.mean(),
-            'std/std_loss': losses.std(),
-            'std/std_loss_actor': losses_components[0].std(),
-            'std/std_loss_critic': losses_components[1].std(),
-            'std/std_loss_entropy': losses_components[2].std(),
-            'std/std_advantage': advantages.std(),
+            'std_loss': losses.std(),
+            'std_loss_actor': losses_components[0].std(),
+            'std_loss_critic': losses_components[1].std(),
+            'std_loss_entropy': losses_components[2].std(),
+            'std_advantage': advantages.std(),
         }
     else:
         metrics = {}
@@ -868,20 +881,129 @@ def animate_trajectories(
 
 
 # # # 
-# Program entry point
+# RUN FILES MANAGEMENT
 
-if __name__ == "__main__":
-    # 'typer' automatically turns functions into a CLI based on their
-    # parameters and type annotations
-    import typer
-    app = typer.Typer(
-        no_args_is_help=True,
-        add_completion=False,
-        pretty_exceptions_show_locals=False, # can turn on during debugging
-    )
-    # add the following functions to the CLI as subcommands
-    app.command()(train)
-    app.command()(evaluate_checkpoint)
-    # launch program: parse arguments from command line, pass to the function
-    app()
+
+class RunFilesManager:
+    def __init__(self, root_path="out/"):
+        now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.path = os.path.abspath(os.path.join(root_path, f'run_{now}'))
+        os.makedirs(self.path, exist_ok=False)
+
+
+    def get_path(self, suffix):
+        path = os.path.join(self.path, suffix)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        return path
+
+
+# # # 
+# TRANSFORMING DICTIONARIES
+
+
+def flatten_dict(nested_dict):
+    merged_dict = {}
+    for key, inner_dict in nested_dict.items():
+        if isinstance(inner_dict, dict):
+            for inner_key, value in flatten_dict(inner_dict).items():
+                merged_dict[key + '/' + inner_key] = value
+        else:
+            merged_dict[key] = inner_dict
+    return merged_dict
+
+
+def dict_to_str(dct):
+    def dict_to_lines(dct, depth):
+        for key, value in dct.items():
+            if isinstance(value, dict):
+                yield (depth, key, '')
+                yield from dict_to_lines(value, depth+1)
+            else:
+                yield (depth, key, value)
+    return '\n'.join([
+        '  '*depth + (key + ':').ljust(42-2*depth) + str(value)
+        for depth, key, value in dict_to_lines(dct, 1)
+    ])
+
+
+def save_json(dct, path):
+    with open(path, 'w') as outfile:
+        json.dump(dct, outfile, indent=True)
+
+
+# # # 
+# RENDERING AND SAVING IMAGES AND ANIMATIONS
+
+
+def save_gif(
+    frames,
+    path,
+    upscale=1,
+    fps=12,
+    repeat=True,
+):
+    """
+    Take a (time, height, width, rgb) matrix and save it as an animated gif.
     
+    Parameters:
+
+    * frames : float[t, h, w, rgb]
+                The animation. First axis is time, remaining axes represent
+                the image data. Each point should be a float between 0 and 1.
+    * path : str
+                Where to save the gif.
+    * upscale : int (>=1, default is 1)
+                Width/height of pixel representation of each matrix entry.
+    * fps : int
+                Approx. frames per second encoded into the gif.
+    * repeat : bool (default True)
+                Whether the gif loops indefinitely (True, default) or only
+                plays once (False).
+    """
+    T, H, W, C = frames.shape
+    assert C == 3, f"too many channels ({C}>3) to create gif"
+        
+    # preprocess image data
+    frames_u8 = (np.asarray(frames) * 255).astype(np.uint8)
+    frames_u8_upscaled = einops.repeat(
+        frames_u8,
+        't h w rgb -> t (h sh) (w sw) rgb',
+        sh=upscale,
+        sw=upscale,
+    )
+    # PIL images for each frame
+    imgs = [Image.fromarray(i) for i in frames_u8_upscaled]
+    # compile gif
+    imgs[0].save(
+        path,
+        save_all=True,
+        append_images=imgs[1:],
+        duration=1000 // fps,
+        loop=1-repeat,
+    )
+
+
+def wandb_gif(frames, fps=12):
+    """
+    Format a gif as a video for wandb.
+
+    Parameters:
+
+    * frames : float[t h w c]
+            RGB floats each channel in range [0,1].
+    * fps : int = 12
+            Frames per second for the wandb video.
+
+    Returns:
+
+    * video : wandb.Video (contains uint8[t c h w]).
+            RGB video including this data in the required format.
+
+    """
+    return wandb.Video(
+        np.asarray(
+            255 * einops.rearrange(frames, 't h w c -> t c h w'),
+            dtype=np.uint8,
+        ),
+        fps=fps,
+    )
