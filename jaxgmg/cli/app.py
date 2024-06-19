@@ -167,7 +167,7 @@ app.add_typer(util.make_typer_app(
     name='train',
     help=train.__doc__,
     subcommands=(
-        train.ppo_corner,
+        train.corner,
     ),
     **TYPER_CONFIG,
 ))

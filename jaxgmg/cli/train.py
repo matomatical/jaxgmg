@@ -16,7 +16,7 @@ from jaxgmg.cli import util
 
 
 @util.wandb_run # inits wandb and syncs the arguments with wandb.config
-def ppo_corner(
+def corner(
     # environment config
     env_size: int = 9,
     env_layout: str = 'blocks',
