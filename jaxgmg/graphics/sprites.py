@@ -3,7 +3,7 @@ import einops
 import jax.numpy as jnp
 from importlib.resources import files
 
-_SPRITESHEET_PATH = files('jaxgmg.graphics').joinpath('spritesheet.png')
+_SPRITESHEET_PATH = files('jaxgmg.graphics').joinpath('spritesheet8.png')
 _SPRITESHEET = jnp.array(
     einops.rearrange(
         imageio.v2.imread(_SPRITESHEET_PATH) / 255,

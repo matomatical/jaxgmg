@@ -31,9 +31,8 @@ from flax import struct
 
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
-
+from jaxgmg.graphics import sprites
 from jaxgmg.environments import base
-from jaxgmg.environments import spritesheet
 
 
 @struct.dataclass
@@ -255,14 +254,14 @@ class Env(base.Env):
         # put the corresponding sprite into each square
         spritemap = jnp.stack([
             # two objects
-            spritesheet.CHEESE_ON_DISH,
+            sprites.CHEESE_ON_DISH,
             # one object
-            spritesheet.WALL,
-            spritesheet.MOUSE,
-            spritesheet.SMALL_CHEESE,
-            spritesheet.DISH,
+            sprites.WALL,
+            sprites.MOUSE,
+            sprites.SMALL_CHEESE,
+            sprites.DISH,
             # no objects
-            spritesheet.PATH,
+            sprites.PATH,
         ])[chosen_sprites]
         image = einops.rearrange(
             spritemap,
