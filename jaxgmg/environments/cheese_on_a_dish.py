@@ -272,6 +272,74 @@ class Env(base.Env):
         return image
 
 
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def optimal_value(
+        self,
+        level: Level,
+        discount_rate: float,
+    ) -> float:
+        """
+        Compute the optimal return from a given level (initial state) for a
+        given discount rate. Respects time penalties to reward and max
+        episode length.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+        * discount_rate : float
+                The discount rate to apply in the formula for computing
+                return.
+        * The output also depends on the environment's reward function, which
+          depends on `self.penalize_time` and `self.max_steps_in_episode`.
+
+        Notes:
+
+        * With a steep discount rate or long episodes, this algorithm might
+          run into minor numerical issues where small contributions to the
+          return from late into the episode are lost.
+        * For VERY large mazes, solving the level will be pretty slow.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        * Support computing the return from arbitrary states. This would be
+          not very difficult, requires taking note of `got_cheese` flag
+          and current time, and computing distance from mouse's current
+          position rather than initial position.
+        """
+        # compute distance between mouse and cheese
+        dist = maze_solving.maze_distances(level.wall_map)
+        optimal_dist = dist[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+        ]
+
+        # reward when we get the cheese is 1
+        reward = 1
+        
+        # maybe we apply an optional time penalty
+        penalized_reward = jnp.where(
+            self.penalize_time,
+            (1.0 - 0.9 * optimal_dist / self.max_steps_in_episode) * reward,
+            reward,
+        )
+        
+        # mask out rewards beyond the end of the episode
+        episodes_still_valid = (optimal_dist < self.max_steps_in_episode)
+        valid_reward = penalized_reward * episodes_still_valid
+
+        # discount the reward
+        discounted_reward = (discount_rate ** optimal_dist) * valid_reward
+
+        return discounted_reward
+
+
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
     """

@@ -259,9 +259,7 @@ class Env(base.Env):
         Parameters:
 
         * level : Level
-                The level to compute the optimal value for. Depends on the
-                wall configuration, the initial agent location, and the
-                location of the cheese.
+                The level to compute the optimal value for.
         * discount_rate : float
                 The discount rate to apply in the formula for computing
                 return.
