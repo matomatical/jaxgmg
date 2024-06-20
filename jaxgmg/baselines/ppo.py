@@ -78,7 +78,7 @@ def run(
 
     # initialising file manager
     print("initialising run file manager")
-    fileman = util.RunFilesManager(root_path=save_files_to)
+    fileman = RunFilesManager(root_path=save_files_to)
     print("  run folder:", fileman.path)
 
     
@@ -277,11 +277,11 @@ def run(
             if console_log:
                 progress.write("\n".join([
                     "=" * 59,
-                    util.dict_to_str(metrics),
+                    dict_to_str(metrics),
                     "=" * 59,
                 ]))
             if wandb_log:
-                wandb.log(step=t, data=util.flatten_dict(metrics))
+                wandb.log(step=t, data=flatten_dict(metrics))
 
         
         # periodic training animation saving
@@ -293,13 +293,13 @@ def run(
                 env=env,
             )
             gif_path = fileman.get_path(f"gifs/train/{t}.gif")
-            util.save_gif(frames, gif_path)
+            save_gif(frames, gif_path)
             progress.write("saved gif to " + gif_path)
             
             if wandb_log:
                 wandb.log(
                     step=t,
-                    data={'gifs/train': util.wandb_gif(frames)},
+                    data={'gifs/train': wandb_gif(frames)},
                 )
 
         
@@ -313,13 +313,13 @@ def run(
                     env=env,
                 )
                 gif_path = fileman.get_path(f"gifs/eval-{eval_name}/{t}.gif")
-                util.save_gif(frames, gif_path)
+                save_gif(frames, gif_path)
                 progress.write("saved gif to " + gif_path)
                 
                 if wandb_log:
                     wandb.log(
                         step=t,
-                        data={'gifs/eval-'+eval_name: util.wandb_gif(frames)},
+                        data={'gifs/eval-'+eval_name: wandb_gif(frames)},
                     )
         
 
@@ -371,7 +371,7 @@ class DR:
             rng,
             num_levels,
             (num_selected_levels,),
-            replace=False,
+            replace=(num_selected_levels >= num_levels),
         )
         levels = jax.tree.map(
             lambda x: x[level_ids],
