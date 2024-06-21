@@ -384,7 +384,7 @@ class LevelSolver:
         
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def vsolve(
+    def vmap_solve(
         self,
         levels: Level, # Level[n]
     ) -> LevelSolution: # LevelSolution[n]
@@ -392,5 +392,17 @@ class LevelSolver:
             self.solve,
         )
         return vectorised_solve(levels)
+    
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def vmap_level_value(
+        self,
+        solns: LevelSolution,   # LevelSolution[n]
+        levels: Level,          # Level[n]
+    ) -> float:                 # float[n]
+        vectorised_level_value = jax.vmap(
+            self.level_value,
+        )
+        return vectorised_level_value(solns, levels)
 
 

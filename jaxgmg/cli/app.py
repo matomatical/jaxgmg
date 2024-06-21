@@ -168,10 +168,10 @@ app.add_typer(util.make_typer_app(
     help=train.__doc__,
     subcommands=(
         train.corner,
-        train.dish,
+        # train.dish,
         # train.follow,
         # train.keys,
-        train.lava,
+        # train.lava,
         # train.monsters,
     ),
     **TYPER_CONFIG,
