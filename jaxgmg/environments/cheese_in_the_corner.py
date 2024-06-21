@@ -461,11 +461,12 @@ class LevelParser:
 @struct.dataclass
 class LevelSolution(base.LevelSolution):
     level: Level
-    directional_distance_map_to_cheese: chex.Array
+    directional_distance_to_cheese: chex.Array
 
 
 @struct.dataclass
 class LevelSolver(base.LevelSolver):
+
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def solve(self, level: Level) -> LevelSolution:
@@ -544,7 +545,7 @@ class LevelSolver(base.LevelSolver):
         )
         # mask out rewards beyond the end of the episode
         episode_still_valid = (
-            state.time + optimal_dist < self.max_steps_in_episode
+            state.steps + optimal_dist < self.env.max_steps_in_episode
         )
         valid_reward = penalized_reward * episode_still_valid
 

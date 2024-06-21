@@ -192,12 +192,7 @@ class Env:
 
         # (potentially) automatically reset the environment
         rng_reset, rng = jax.random.split(rng)
-        reset_state = self._reset(
-            rng_reset,
-            new_state.level,
-        ).replace(
-            level=new_state.level,
-        )
+        reset_state = self._reset(new_state.level)
         new_state = jax.lax.cond( # because pytrees...
             self.automatically_reset & done_or_timeout,
             lambda: reset_state,
@@ -364,7 +359,7 @@ class LevelSolver:
     discount_rate: float
 
 
-    @functoools.partial(jax.jit, static_argnames=('self',))
+    @functools.partial(jax.jit, static_argnames=('self',))
     def solve(self, level: Level) -> LevelSolution:
         raise NotImplementedError
 
