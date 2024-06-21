@@ -469,7 +469,7 @@ def envstep_corner(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = cheese_in_the_corner.Env(
-        observation_lod=level_of_detail,
+        obs_level_of_detail=level_of_detail,
     )
     generator = cheese_in_the_corner.LevelGenerator(
         height=height,
@@ -507,7 +507,7 @@ def envstep_dish(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = cheese_on_a_dish.Env(
-        observation_lod=level_of_detail,
+        obs_level_of_detail=level_of_detail,
     )
     generator = cheese_on_a_dish.LevelGenerator(
         height=height,
@@ -546,7 +546,7 @@ def envstep_follow(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = follow_me.Env(
-        observation_lod=level_of_detail,
+        obs_level_of_detail=level_of_detail,
     )
     generator = follow_me.LevelGenerator(
         height=height,
@@ -588,7 +588,7 @@ def envstep_keys(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = keys_and_chests.Env(
-        observation_lod=level_of_detail,
+        obs_level_of_detail=level_of_detail,
     )
     generator = keys_and_chests.LevelGenerator(
         height=height,
@@ -629,7 +629,7 @@ def envstep_lava(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = lava_land.Env(
-        observation_lod=level_of_detail,
+        obs_level_of_detail=level_of_detail,
     )
     generator = lava_land.LevelGenerator(
         height=height,
@@ -672,7 +672,7 @@ def envstep_monsters(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = monster_world.Env(
-        observation_lod=level_of_detail,
+        obs_level_of_detail=level_of_detail,
     )
     generator = monster_world.LevelGenerator(
         height=height,

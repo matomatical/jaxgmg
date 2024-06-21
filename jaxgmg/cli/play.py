@@ -114,7 +114,7 @@ def corner(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_in_the_corner.Env(observation_lod=level_of_detail)
+    env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
@@ -150,7 +150,7 @@ def dish(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_on_a_dish.Env(observation_lod=level_of_detail)
+    env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
     level_generator = cheese_on_a_dish.LevelGenerator(
         height=height,
         width=width,
@@ -187,7 +187,7 @@ def follow(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = follow_me.Env(observation_lod=level_of_detail)
+    env = follow_me.Env(obs_level_of_detail=level_of_detail)
     level_generator = follow_me.LevelGenerator(
         height=height,
         width=width,
@@ -227,7 +227,7 @@ def keys(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = keys_and_chests.Env(observation_lod=level_of_detail)
+    env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
@@ -266,7 +266,7 @@ def lava(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = lava_land.Env(observation_lod=level_of_detail)
+    env = lava_land.Env(obs_level_of_detail=level_of_detail)
     level_generator = lava_land.LevelGenerator(
         height=height,
         width=width,
@@ -305,7 +305,7 @@ def monsters(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = monster_world.Env(observation_lod=level_of_detail)
+    env = monster_world.Env(obs_level_of_detail=level_of_detail)
     level_generator = monster_world.LevelGenerator(
         height=height,
         width=width,
