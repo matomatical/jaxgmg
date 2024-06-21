@@ -129,7 +129,6 @@ class Env(base.Env):
     
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         return EnvState(

@@ -152,7 +152,6 @@ class Env(base.Env):
     @functools.partial(jax.jit, static_argnames=('self',))
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         """

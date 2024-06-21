@@ -76,13 +76,13 @@ class Env:
 
     Methods:
 
-    * env.reset_to_level(rng, level) -> (obs, start_state)
+    * env.reset_to_level(level) -> (obs, start_state)
     * env.step(rng, state, action) -> (obs, new_state, reward, done, info)
     * env.get_obs(state) -> obs
 
     Instructions for sublassing: Implement the following methods:
 
-    * _reset(rng, level) -> start_state
+    * _reset(level) -> start_state
     * _step(rng, state, action) -> (new_state, reward, done, info)
     * _get_obs_bool(state) -> obs_bool
     * _get_obs_rgb(state) -> obs_rgb
@@ -106,7 +106,6 @@ class Env:
     
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         raise NotImplementedError
@@ -144,13 +143,12 @@ class Env:
     @functools.partial(jax.jit, static_argnames=('self',))
     def reset_to_level(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> Tuple[
         chex.Array,
         EnvState,
     ]:
-        start_state = self._reset(rng, level)
+        start_state = self._reset(level)
         obs = self.get_obs(start_state)
         return (obs, start_state)
     
@@ -242,22 +240,17 @@ class Env:
     @functools.partial(jax.jit, static_argnames=('self',))
     def vreset_to_level(
         self,
-        rng: chex.PRNGKey,
-        levels: Level,      # * n
+        levels: Level,      # Level[n]
     ) -> Tuple[
-        chex.Array,         # * n
-        EnvState,           # * n
+        chex.Array,         # Observation[n]
+        EnvState,           # Level[n]
     ]:
         vmapped_reset_to_level = jax.vmap(
             self.reset_to_level,
-            in_axes=(0, 0),
+            in_axes=(0,),
             out_axes=(0, 0),
         )
-        num_levels = jax.tree.leaves(levels)[0].shape[0]
-        return vmapped_reset_to_level(
-            jax.random.split(rng, num_levels),
-            levels,
-        )
+        return vmapped_reset_to_level(levels)
 
 
     @functools.partial(jax.jit, static_argnames=('self',))

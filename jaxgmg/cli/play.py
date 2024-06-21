@@ -38,7 +38,7 @@ def play_forever(
         print("generating level...")
         rng_level, rng = jax.random.split(rng)
         level = level_generator.sample(rng_level)
-        obs, state = env.reset_to_level(rng, level)
+        obs, state = env.reset_to_level(level)
 
         print("playing level...")
         print("initial state")

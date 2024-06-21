@@ -49,8 +49,7 @@ def corner(
     print("generating levels...")
     rng_level, rng = jax.random.split(rng)
     levels = level_generator.vsample(rng_level, num_levels)
-    rng_reset, rng = jax.random.split(rng)
-    obs, state = env.vreset_to_level(rng_reset, levels)
+    obs, state = env.vreset_to_level(levels)
 
     print("visualising first level (indicative)...")
     img = (
@@ -128,8 +127,7 @@ def keys(
     print("generating levels...")
     rng_level, rng = jax.random.split(rng)
     levels = level_generator.vsample(rng_level, num_levels)
-    rng_reset, rng = jax.random.split(rng)
-    obs, state = env.vreset_to_level(rng_reset, levels)
+    obs, state = env.vreset_to_level(levels)
     
     print("visualising first level (indicative)...")
     img = (

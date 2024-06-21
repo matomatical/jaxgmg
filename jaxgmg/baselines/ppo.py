@@ -121,9 +121,9 @@ def run(
         num_actions=env.num_actions,
     )
     # initialise the network
-    rng_model, rng_input, rng_level, rng = jax.random.split(rng, 4)
+    rng_model, rng = jax.random.split(rng, 2)
     example_level = jax.tree.map(lambda x: x[0], train_levels)
-    example_obs, _ = env.reset_to_level(rng_input, example_level)
+    example_obs, _ = env.reset_to_level(example_level)
     net_init_params = net.init(rng_model, example_obs)
 
 
@@ -489,11 +489,7 @@ def collect_trajectories(
             If `compute_metrics` is False, the dictionary is empty.
     """
     # reset environments to these levels
-    rng_reset, rng = jax.random.split(rng)
-    env_obs, env_state = env.vreset_to_level(
-        rng=rng_reset,
-        levels=levels,
-    )
+    env_obs, env_state = env.vreset_to_level(levels=levels)
     initial_carry = (env_obs, env_state)
 
     def _env_step(carry, rng):
