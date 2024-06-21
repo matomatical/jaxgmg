@@ -6,7 +6,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from jaxgmg.graphics.sprites import LevelOfDetail, spritesheet
+from jaxgmg.graphics import LevelOfDetail, load_spritesheet
 
 
 @struct.dataclass
@@ -231,7 +231,7 @@ class Env:
         if lod == LevelOfDetail.BOOLEAN:
             return self._get_obs_bool(state)
         else:
-            return self._get_obs_rgb(state, spritesheet(lod))
+            return self._get_obs_rgb(state, load_spritesheet(lod))
 
 
     # pre-vectorised methods
