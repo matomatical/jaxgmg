@@ -55,7 +55,7 @@ class Env:
     * automatically_reset : bool (default True)
             If True, the step method automatically resets the state as the
             level is completed.
-    * observation_lod: LevelOfDetail (OK to use raw int 0, 1, 3, 4, or 8)
+    * obs_level_of_detail: LevelOfDetail (OK to use raw int 0, 1, 3, 4, or 8)
             The level of detail for observations:
             * If LevelOfDetail.BOOLEAN or int 0, observations come as a
               height by width by num_channels Boolean array with
@@ -91,7 +91,7 @@ class Env:
     max_steps_in_episode: int = 128
     penalize_time: bool = True
     automatically_reset: bool = True
-    observation_lod: LevelOfDetail = LevelOfDetail.BOOLEAN
+    obs_level_of_detail: LevelOfDetail = LevelOfDetail.BOOLEAN
 
 
     @property
@@ -253,7 +253,7 @@ class Env:
     ):
         # override LevelOfDetail
         if force_lod is None:
-            lod = self.observation_lod
+            lod = self.obs_level_of_detail
         else:
             lod = force_lod
         # dispatch to the appropriate renderer
