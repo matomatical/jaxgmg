@@ -33,7 +33,7 @@ def corner(
     print("initialising...")
     rng = jax.random.PRNGKey(seed=seed)
     env = cheese_in_the_corner.Env(
-        rgb=False,
+        observation_lod=0,
         penalize_time=penalize_time,
         max_steps_in_episode=max_steps_in_episode,
     )
@@ -120,7 +120,7 @@ def keys(
         num_chests_max=num_chests_max,
     )
     env = keys_and_chests.Env(
-        rgb=False,
+        observation_lod=0,
         penalize_time=penalize_time,
         max_steps_in_episode=max_steps_in_episode,
     )

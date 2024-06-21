@@ -71,7 +71,7 @@ def run(
     eval_gifs: bool,
     num_cycles_per_gif: int,
     gif_grid_width: int,
-    rgb_gifs: bool,                     # force gifs rgb even if obs are bool
+    gif_level_of_detail: int,           # 1, 3, 4, or 8; sprite pixel width
     save_files_to: str,
 ):
 
@@ -289,7 +289,7 @@ def run(
             frames = animate_trajectories(
                 trajectories,
                 grid_width=gif_grid_width,
-                force_rgb=rgb_gifs,
+                force_lod=gif_level_of_detail,
                 env=env,
             )
             gif_path = fileman.get_path(f"gifs/train/{t}.gif")
@@ -309,7 +309,7 @@ def run(
                 frames = animate_trajectories(
                     eval_trajectories_,
                     grid_width=gif_grid_width,
-                    force_rgb=rgb_gifs,
+                    force_lod=gif_level_of_detail,
                     env=env,
                 )
                 gif_path = fileman.get_path(f"gifs/eval-{eval_name}/{t}.gif")
@@ -827,11 +827,11 @@ def ppo_loss(
 # Helper functions
 
 
-@functools.partial(jax.jit, static_argnames=('grid_width','force_rgb','env'))
+@functools.partial(jax.jit, static_argnames=('grid_width','force_lod','env'))
 def animate_trajectories(
     trajectories: Transition,
     grid_width: int,
-    force_rgb: bool = False,
+    force_lod: int = 1,
     env: Env = None,
 ) -> Array:
     """
@@ -842,10 +842,10 @@ def animate_trajectories(
     """
     obs = trajectories.obs
 
-    if force_rgb:
+    if force_lod != env.observation_lod:
         vrender = jax.vmap(env.get_obs, in_axes=(0, None,)) # parallel envs
         vvrender = jax.vmap(vrender, in_axes=(0, None,))    # time
-        obs = vvrender(trajectories.env_state, force_rgb)
+        obs = vvrender(trajectories.env_state, force_lod)
 
     # flash the screen half black for the last frame of each episode
     done_mask = einops.rearrange(trajectories.done, 't p -> t p 1 1 1')

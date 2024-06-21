@@ -21,7 +21,7 @@ def corner(
     env_size: int = 9,
     env_layout: str = 'blocks',
     env_corner_size: int = 1,
-    env_rgb: bool = False,
+    env_level_of_detail: int = 0,       # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "relu",
     # PPO hyperparameters
@@ -57,7 +57,7 @@ def corner(
     eval_gifs: bool = False,
     num_cycles_per_gif: int = 256,
     gif_grid_width: int = 16,
-    rgb_gifs: bool = False,             # force gifs rgb even if obs are bool
+    gif_level_of_detail: int = 1,       # 1, 3, 4 or 8
     # output save directory
     save_files_to: str = "logs/",
     # other
@@ -70,7 +70,7 @@ def corner(
 
     print("setting up environment...")
     env = cheese_in_the_corner.Env(
-        rgb=env_rgb,
+        observation_lod=env_level_of_detail,
         penalize_time=False,
     )
 
@@ -145,7 +145,7 @@ def corner(
         eval_gifs=eval_gifs,
         num_cycles_per_gif=num_cycles_per_gif,
         gif_grid_width=gif_grid_width,
-        rgb_gifs=rgb_gifs,
+        gif_level_of_detail=gif_level_of_detail,
         save_files_to=save_files_to,
     )
     # (the decorator finishes the wandb run for us, so no need to do that)
@@ -158,7 +158,7 @@ def dish(
     env_size: int = 9,
     env_layout: str = 'blocks',
     env_max_cheese_radius: int = 0,
-    env_rgb: bool = False,
+    env_level_of_detail: int = 0,       # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "relu",
     # PPO hyperparameters
@@ -194,7 +194,7 @@ def dish(
     eval_gifs: bool = False,
     num_cycles_per_gif: int = 256,
     gif_grid_width: int = 16,
-    rgb_gifs: bool = False,             # force gifs rgb even if obs are bool
+    gif_level_of_detail: int = 1,       # 1, 3, 4 or 8
     # output save directory
     save_files_to: str = "logs/",
     # other
@@ -207,7 +207,7 @@ def dish(
 
     print("setting up environment...")
     env = cheese_on_a_dish.Env(
-        rgb=env_rgb,
+        observation_lod=env_level_of_detail,
         penalize_time=False,
     )
 
@@ -282,7 +282,7 @@ def dish(
         eval_gifs=eval_gifs,
         num_cycles_per_gif=num_cycles_per_gif,
         gif_grid_width=gif_grid_width,
-        rgb_gifs=rgb_gifs,
+        gif_level_of_detail=gif_level_of_detail,
         save_files_to=save_files_to,
     )
     # (the decorator finishes the wandb run for us, so no need to do that)
@@ -296,7 +296,7 @@ def lava(
     env_layout: str = 'blocks',
     env_lava_threshold: float = -1.0,
     env_lava_threshold_after_shift: float = -0.25,
-    env_rgb: bool = False,
+    env_level_of_detail: int = 0,       # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "relu",
     # PPO hyperparameters
@@ -332,7 +332,7 @@ def lava(
     eval_gifs: bool = False,
     num_cycles_per_gif: int = 256,
     gif_grid_width: int = 16,
-    rgb_gifs: bool = False,             # force gifs rgb even if obs are bool
+    gif_level_of_detail: int = 1,       # 1, 3, 4 or 8
     # output save directory
     save_files_to: str = "logs/",
     # other
@@ -345,7 +345,7 @@ def lava(
 
     print("setting up environment...")
     env = lava_land.Env(
-        rgb=env_rgb,
+        observation_lod=env_level_of_detail,
         penalize_time=False,
     )
 
@@ -420,7 +420,7 @@ def lava(
         eval_gifs=eval_gifs,
         num_cycles_per_gif=num_cycles_per_gif,
         gif_grid_width=gif_grid_width,
-        rgb_gifs=rgb_gifs,
+        gif_level_of_detail=gif_level_of_detail,
         save_files_to=save_files_to,
     )
     # (the decorator finishes the wandb run for us, so no need to do that)

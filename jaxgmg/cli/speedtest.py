@@ -226,6 +226,8 @@ def mazegen_tree(
     """
     Speedtest for tree maze generator.
     """
+    if level_of_detail not in {0,1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -252,6 +254,8 @@ def mazegen_edges(
     """
     Speedtest for edge maze generator.
     """
+    if level_of_detail not in {0,1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -278,6 +282,8 @@ def mazegen_blocks(
     """
     Speedtest for tree maze generator.
     """
+    if level_of_detail not in {0,1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -306,6 +312,8 @@ def mazegen_noise(
     """
     Speedtest for noise maze generator.
     """
+    if level_of_detail not in {0,1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -448,7 +456,7 @@ def envstep_corner(
     width: int = 9,
     layout: str = 'edges',
     corner_size: int = 3,
-    rgb: bool = True,
+    level_of_detail: int = 0,
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -461,7 +469,7 @@ def envstep_corner(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = cheese_in_the_corner.Env(
-        rgb=rgb,
+        observation_lod=level_of_detail,
     )
     generator = cheese_in_the_corner.LevelGenerator(
         height=height,
@@ -486,7 +494,7 @@ def envstep_dish(
     width: int = 9,
     layout: str = 'edges',
     max_cheese_radius: int = 3,
-    rgb: bool = True,
+    level_of_detail: int = 0,
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -499,7 +507,7 @@ def envstep_dish(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = cheese_on_a_dish.Env(
-        rgb=rgb,
+        observation_lod=level_of_detail,
     )
     generator = cheese_on_a_dish.LevelGenerator(
         height=height,
@@ -525,7 +533,7 @@ def envstep_follow(
     layout: str = 'edges',
     num_beacons: int = 3,
     trustworthy_leader: bool = True,
-    rgb: bool = True,
+    level_of_detail: int = 0,
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -538,7 +546,7 @@ def envstep_follow(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = follow_me.Env(
-        rgb=rgb,
+        observation_lod=level_of_detail,
     )
     generator = follow_me.LevelGenerator(
         height=height,
@@ -567,7 +575,7 @@ def envstep_keys(
     num_keys_max: int = 6,
     num_chests_min: int = 6,
     num_chests_max: int = 6,
-    rgb: bool = True,
+    level_of_detail: int = 0,
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -580,7 +588,7 @@ def envstep_keys(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = keys_and_chests.Env(
-        rgb=rgb,
+        observation_lod=level_of_detail,
     )
     generator = keys_and_chests.LevelGenerator(
         height=height,
@@ -608,7 +616,7 @@ def envstep_lava(
     width: int = 9,
     layout: str = 'edges',
     lava_threshold: float = -0.25,
-    rgb: bool = True,
+    level_of_detail: int = 0,
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -621,7 +629,7 @@ def envstep_lava(
 
     rng = jax.random.PRNGKey(seed=seed)
     env = lava_land.Env(
-        rgb=rgb,
+        observation_lod=level_of_detail,
     )
     generator = lava_land.LevelGenerator(
         height=height,
@@ -649,7 +657,7 @@ def envstep_monsters(
     num_shields: int = 5,
     num_monsters: int = 5,
     monster_optimality: float = 3,
-    rgb: bool = True,
+    level_of_detail: int = 0,
     seed: int = 42,
     batch_size: int = 32,
     num_iters: int = 128,
@@ -658,11 +666,13 @@ def envstep_monsters(
     """
     Speedtest for Monster World environment.
     """
+    if level_of_detail not in {0,1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
     env = monster_world.Env(
-        rgb=rgb,
+        observation_lod=level_of_detail,
     )
     generator = monster_world.LevelGenerator(
         height=height,
