@@ -70,7 +70,7 @@ def corner(
 
     print("setting up environment...")
     env = cheese_in_the_corner.Env(
-        observation_lod=env_level_of_detail,
+        obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
     )
 
@@ -207,7 +207,7 @@ def dish(
 
     print("setting up environment...")
     env = cheese_on_a_dish.Env(
-        observation_lod=env_level_of_detail,
+        obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
     )
 
@@ -345,7 +345,7 @@ def lava(
 
     print("setting up environment...")
     env = lava_land.Env(
-        observation_lod=env_level_of_detail,
+        obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
     )
 
