@@ -1,10 +1,12 @@
 import functools
-from typing import Tuple
+from typing import Tuple, Optional, Dict
 from flax import struct
 import chex
 
 import jax
 import jax.numpy as jnp
+
+from jaxgmg.graphics.sprites import LevelOfDetail, spritesheet
 
 
 @struct.dataclass
@@ -53,9 +55,19 @@ class Env:
     * automatically_reset : bool (default True)
             If True, the step method automatically resets the state as the
             level is completed.
-    * rgb : bool (default False)
-            If True, observations are float rgb format, else they are
-            environment-specific boolean channel format.
+    * observation_lod: LevelOfDetail (OK to use raw int 0, 1, 3, 4, or 8)
+            The level of detail for observations:
+            * If LevelOfDetail.BOOLEAN or int 0, observations come as a
+              height by width by num_channels Boolean array with
+              environment-specific channels.
+            * If LevelOfDetail.RGB_1PX or int 1, observations come as a
+              height by width by 3 float RGB array with each sprite
+              represented by a single pixel.
+            * If LevelOfDetail.RGB_3PX or int 3, observations come as a
+              3height by 3width by 3 float RGB array with each sprite
+              represented by a 3x3 square of pixels.
+            * Similarly for LevelOfDetail.RGB_4PX or int 4.
+            * Similarly for LevelOfDetail.RGB_8PX or int 8.
     
     Properties:
 
@@ -79,7 +91,7 @@ class Env:
     max_steps_in_episode: int = 128
     penalize_time: bool = True
     automatically_reset: bool = True
-    rgb: bool = False
+    observation_lod: LevelOfDetail = LevelOfDetail.BOOLEAN
 
 
     @property
@@ -233,19 +245,33 @@ class Env:
         )
 
 
-    @functools.partial(jax.jit, static_argnames=('self', 'force_rgb'))
-    def get_obs(self, state, force_rgb: bool = False):
-        if self.rgb or force_rgb:
-            return self._get_obs_rgb(state)
+    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
+    def get_obs(
+        self,
+        state: EnvState,
+        force_lod: Optional[LevelOfDetail] = None,
+    ):
+        # override LevelOfDetail
+        if force_lod is None:
+            lod = self.observation_lod
         else:
+            lod = force_lod
+        # dispatch to the appropriate renderer
+        if lod == LevelOfDetail.BOOLEAN:
             return self._get_obs_bool(state)
+        else:
+            return self._get_obs_rgb(state, spritesheet(lod))
 
 
-    def _get_obs_rgb(self, state) -> chex.Array:
+    def _get_obs_bool(self, state: EnvState) -> chex.Array:
         raise NotImplementedError
     
 
-    def _get_obs_bool(self, state) -> chex.Array:
+    def _get_obs_rgb(
+        self,
+        state: EnvState,
+        spritesheet: Dict[str, chex.Array],
+    ) -> chex.Array:
         raise NotImplementedError
 
 
