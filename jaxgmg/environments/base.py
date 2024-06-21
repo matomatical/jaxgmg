@@ -389,30 +389,13 @@ class LevelSolver:
         
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def levels_values(
+    def vsolve(
         self,
-        levels: Level,          # Level[n]
-        discount_rate: float,
-    ) -> chex.Array:            # float[n]
-        """
-        Compute the return from a set of levels for a given discount rate.
-        Respects time penalties to reward and max episode length.
-
-        Parameters:
-
-        * levels : Level[n]
-                The levels to compute the optimal value for.
-        * discount_rate : float
-                The discount rate to apply in the formula for computing
-                return.
-        * The output also depends on the environment's reward function, which
-          depends on `self.penalize_time` and `self.max_steps_in_episode`.
-        """
-        vectorised_optimal_value = jax.vmap(
-            self.optimal_value,
-            in_axes=(0, None),
-            out_axes=0,
+        levels: Level, # Level[n]
+    ) -> LevelSolution: # LevelSolution[n]
+        vectorised_solve = jax.vmap(
+            self.solve,
         )
-        return vectorised_optimal_value(levels, discount_rate)
+        return vectorised_solve(levels)
 
 
