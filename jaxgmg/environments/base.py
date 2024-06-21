@@ -6,7 +6,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from jaxgmg.graphics.sprites import LevelOfDetail, spritesheet
+from jaxgmg.graphics import LevelOfDetail, load_spritesheet
 
 
 @struct.dataclass
@@ -76,18 +76,20 @@ class Env:
 
     Methods:
 
-    * env.reset_to_level(rng, level) -> (obs, start_state)
+    * env.reset_to_level(level) -> (obs, start_state)
     * env.step(rng, state, action) -> (obs, new_state, reward, done, info)
     * env.get_obs(state) -> obs
 
     Instructions for sublassing: Implement the following methods:
 
-    * _reset(rng, level) -> start_state
+    * _reset(level) -> start_state
     * _step(rng, state, action) -> (new_state, reward, done, info)
     * _get_obs_bool(state) -> obs_bool
     * _get_obs_rgb(state) -> obs_rgb
     """
 
+
+    # fields
     max_steps_in_episode: int = 128
     penalize_time: bool = True
     automatically_reset: bool = True
@@ -98,49 +100,58 @@ class Env:
     def num_actions(self) -> int:
         raise NotImplementedError
 
-    
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def reset_to_level(
-        self,
-        rng: chex.PRNGKey,
-        level: Level,
-    ) -> Tuple[
-        chex.Array,
-        EnvState,
-    ]:
-        start_state = self._reset(rng, level)
-        obs = self.get_obs(start_state)
-        return (obs, start_state)
-    
 
+    # methods supplied by base class
+
+    
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         raise NotImplementedError
 
 
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def vreset_to_level(
+    def _step(
         self,
         rng: chex.PRNGKey,
-        levels: Level,      # * n
+        state: EnvState,
+        action: int,
     ) -> Tuple[
-        chex.Array,         # * n
-        EnvState,           # * n
+        EnvState,
+        float,
+        bool,
+        dict,
     ]:
-        vmapped_reset_to_level = jax.vmap(
-            self.reset_to_level,
-            in_axes=(0, 0),
-            out_axes=(0, 0),
-        )
-        num_levels = jax.tree.leaves(levels)[0].shape[0]
-        return vmapped_reset_to_level(
-            jax.random.split(rng, num_levels),
-            levels,
-        )
+        raise NotImplementedError
 
+    
+    def _get_obs_bool(self, state: EnvState) -> chex.Array:
+        raise NotImplementedError
+    
+
+    def _get_obs_rgb(
+        self,
+        state: EnvState,
+        spritesheet: Dict[str, chex.Array],
+    ) -> chex.Array:
+        raise NotImplementedError
+    
+
+    # public API
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def reset_to_level(
+        self,
+        level: Level,
+    ) -> Tuple[
+        chex.Array,
+        EnvState,
+    ]:
+        start_state = self._reset(level)
+        obs = self.get_obs(start_state)
+        return (obs, start_state)
+    
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def step(
@@ -181,12 +192,7 @@ class Env:
 
         # (potentially) automatically reset the environment
         rng_reset, rng = jax.random.split(rng)
-        reset_state = self._reset(
-            rng_reset,
-            new_state.level,
-        ).replace(
-            level=new_state.level,
-        )
+        reset_state = self._reset(new_state.level)
         new_state = jax.lax.cond( # because pytrees...
             self.automatically_reset & done_or_timeout,
             lambda: reset_state,
@@ -205,20 +211,43 @@ class Env:
         )
 
 
-    def _step(
+    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
+    def get_obs(
         self,
-        rng: chex.PRNGKey,
         state: EnvState,
-        action: int,
-    ) -> Tuple[
-        EnvState,
-        float,
-        bool,
-        dict,
-    ]:
-        raise NotImplementedError
+        force_lod: Optional[LevelOfDetail] = None,
+    ):
+        # override LevelOfDetail
+        if force_lod is None:
+            lod = self.obs_level_of_detail
+        else:
+            lod = force_lod
+        # dispatch to the appropriate renderer
+        if lod == LevelOfDetail.BOOLEAN:
+            return self._get_obs_bool(state)
+        else:
+            return self._get_obs_rgb(state, load_spritesheet(lod))
 
-    
+
+    # pre-vectorised methods
+        
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def vreset_to_level(
+        self,
+        levels: Level,      # Level[n]
+    ) -> Tuple[
+        chex.Array,         # Observation[n]
+        EnvState,           # Level[n]
+    ]:
+        vmapped_reset_to_level = jax.vmap(
+            self.reset_to_level,
+            in_axes=(0,),
+            out_axes=(0, 0),
+        )
+        return vmapped_reset_to_level(levels)
+
+
     @functools.partial(jax.jit, static_argnames=('self',))
     def vstep(
         self,
@@ -245,89 +274,6 @@ class Env:
         )
 
 
-    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
-    def get_obs(
-        self,
-        state: EnvState,
-        force_lod: Optional[LevelOfDetail] = None,
-    ):
-        # override LevelOfDetail
-        if force_lod is None:
-            lod = self.obs_level_of_detail
-        else:
-            lod = force_lod
-        # dispatch to the appropriate renderer
-        if lod == LevelOfDetail.BOOLEAN:
-            return self._get_obs_bool(state)
-        else:
-            return self._get_obs_rgb(state, spritesheet(lod))
-
-
-    def _get_obs_bool(self, state: EnvState) -> chex.Array:
-        raise NotImplementedError
-    
-
-    def _get_obs_rgb(
-        self,
-        state: EnvState,
-        spritesheet: Dict[str, chex.Array],
-    ) -> chex.Array:
-        raise NotImplementedError
-    
-    
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def optimal_value(
-        self,
-        levels: Level,
-        discount_rate: float,
-    ) -> float:
-        """
-        Compute the optimal return from (the initial state of) a level for a
-        given discount rate. Respects time penalties to reward and max
-        episode length.
-
-        Parameters:
-
-        * levels : Level
-                The level to compute the optimal value for.
-        * discount_rate : float
-                The discount rate to apply in the formula for computing
-                return.
-        * The output also depends on the environment's reward function, which
-          depends on `self.penalize_time` and `self.max_steps_in_episode`.
-        """
-        raise NotImplementedError
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def voptimal_value(
-        self,
-        levels: Level,          # Level[n]
-        discount_rate: float,
-    ) -> chex.Array:            # float[n]
-        """
-        Compute the optimal return from a set of levels for a given discount
-        rate. Respects time penalties to reward and max episode length.
-
-        Parameters:
-
-        * levels : Level[n]
-                The levels to compute the optimal value for.
-        * discount_rate : float
-                The discount rate to apply in the formula for computing
-                return.
-        * The output also depends on the environment's reward function, which
-          depends on `self.penalize_time` and `self.max_steps_in_episode`.
-        """
-        vectorised_optimal_value = jax.vmap(
-            self.optimal_value,
-            in_axes=(0, None),
-            out_axes=0,
-        )
-        return vectorised_optimal_value(levels, discount_rate)
-
-
-
 @struct.dataclass
 class LevelGenerator:
     """
@@ -349,6 +295,9 @@ class LevelGenerator:
         """
         raise NotImplementedError
 
+
+    # pre-vectorised
+        
 
     @functools.partial(jax.jit, static_argnames=('self', 'num_levels'))
     def vsample(
@@ -395,5 +344,65 @@ class MixtureLevelGenerator:
         )
 
         return chosen_level
+
+
+@struct.dataclass
+class LevelSolution:
+    """
+    Represent a solution to some level. All fields come from subclass.
+    """
+
+
+@struct.dataclass
+class LevelSolver:
+    env: Env
+    discount_rate: float
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def solve(self, level: Level) -> LevelSolution:
+        raise NotImplementedError
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
+        raise NotImplementedError
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
+        raise NotImplementedError
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def level_value(self, soln: LevelSolution, level: Level) -> float:
+        state = self.env._reset(level)
+        return self.state_value(soln, state)
+
+
+    # pre-vectorised methods
+        
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def vmap_solve(
+        self,
+        levels: Level, # Level[n]
+    ) -> LevelSolution: # LevelSolution[n]
+        vectorised_solve = jax.vmap(
+            self.solve,
+        )
+        return vectorised_solve(levels)
+    
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def vmap_level_value(
+        self,
+        solns: LevelSolution,   # LevelSolution[n]
+        levels: Level,          # Level[n]
+    ) -> float:                 # float[n]
+        vectorised_level_value = jax.vmap(
+            self.level_value,
+        )
+        return vectorised_level_value(solns, levels)
 
 

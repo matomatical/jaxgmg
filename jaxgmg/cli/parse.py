@@ -37,7 +37,7 @@ def corner(
 
     print("rendering...")
     env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
@@ -66,7 +66,7 @@ def dish(
 
     print("rendering...")
     env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
@@ -99,7 +99,7 @@ def follow(
 
     print("rendering...")
     env = follow_me.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
@@ -131,7 +131,7 @@ def keys(
 
     print("rendering...")
     env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
@@ -157,7 +157,7 @@ def lava(
 
     print("rendering...")
     env = lava_land.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
@@ -191,7 +191,7 @@ def monsters(
 
     print("rendering...")
     env = monster_world.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 

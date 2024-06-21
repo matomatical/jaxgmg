@@ -8,6 +8,7 @@ Structs:
   spawn position.
 * The `EnvState` struct represents a specific dynamic state of the
   environment.
+* The `LevelSolution` struct represents a solution to a given maze layout.
 
 Classes:
 
@@ -17,6 +18,9 @@ Classes:
   level.
 * `LevelParser` class, provides a `parse` and `parse_batch` method for
   designing Level structs based on ASCII depictions.
+* `LevelSolver` class, provides a `solve` method for levels and further
+  methods to query the solution for the optimal value of the level and the
+  value or optimal action from any state within that level.
 """
 
 from typing import Tuple, Dict
@@ -120,7 +124,6 @@ class Env(base.Env):
     
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         return EnvState(
@@ -247,74 +250,6 @@ class Env(base.Env):
 
         return image
     
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def optimal_value(
-        self,
-        level: Level,
-        discount_rate: float,
-    ) -> float:
-        """
-        Compute the optimal return from a given level (initial state) for a
-        given discount rate. Respects time penalties to reward and max
-        episode length.
-
-        Parameters:
-
-        * level : Level
-                The level to compute the optimal value for.
-        * discount_rate : float
-                The discount rate to apply in the formula for computing
-                return.
-        * The output also depends on the environment's reward function, which
-          depends on `self.penalize_time` and `self.max_steps_in_episode`.
-
-        Notes:
-
-        * With a steep discount rate or long episodes, this algorithm might
-          run into minor numerical issues where small contributions to the
-          return from late into the episode are lost.
-        * For VERY large mazes, solving the level will be pretty slow.
-
-        TODO:
-
-        * Solving the mazes currently uses all pairs shortest paths
-          algorithm, which is not efficient enough to work for very large
-          mazes. If we wanted to solve very large mazes, we could by changing
-          to a single source shortest path algorithm.
-        * Support computing the return from arbitrary states. This would be
-          not very difficult, requires taking note of `got_cheese` flag
-          and current time, and computing distance from mouse's current
-          position rather than initial position.
-        """
-        # compute distance between mouse and cheese
-        dist = maze_solving.maze_distances(level.wall_map)
-        optimal_dist = dist[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ]
-
-        # reward when we get the cheese is 1
-        reward = 1
-        
-        # maybe we apply an optional time penalty
-        penalized_reward = jnp.where(
-            self.penalize_time,
-            (1.0 - 0.9 * optimal_dist / self.max_steps_in_episode) * reward,
-            reward,
-        )
-        
-        # mask out rewards beyond the end of the episode
-        episodes_still_valid = (optimal_dist < self.max_steps_in_episode)
-        valid_reward = penalized_reward * episodes_still_valid
-
-        # discount the reward
-        discounted_reward = (discount_rate ** optimal_dist) * valid_reward
-
-        return discounted_reward
-
 
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
@@ -521,3 +456,150 @@ class LevelParser:
             cheese_pos=jnp.stack([l.cheese_pos for l in levels]),
             initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
         )
+
+
+@struct.dataclass
+class LevelSolution(base.LevelSolution):
+    level: Level
+    directional_distance_to_cheese: chex.Array
+
+
+@struct.dataclass
+class LevelSolver(base.LevelSolver):
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def solve(self, level: Level) -> LevelSolution:
+        """
+        Compute the distance from each possible mouse position to the cheese
+        position a given level. From this information one can easy compute
+        the optimal action or value from any state of this level.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+
+        Returns:
+
+        * soln : LevelSolution
+                The necessary precomputed (directional) distances for later
+                computing optimal values and actions from states.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        """
+        # compute distance between mouse and cheese
+        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
+        dir_dist_to_cheese = dir_dist[
+            :,
+            :,
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+            :,
+        ]
+
+        return LevelSolution(
+            level=level,
+            directional_distance_to_cheese=dir_dist_to_cheese,
+        )
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the value for.
+            
+        Notes:
+
+        * With a steep discount rate or long episodes, this algorithm might
+          run into minor numerical issues where small contributions to the
+          return from late into the episode are lost.
+        """
+        # steps to get to the cheese: look up in distance cache
+        optimal_dist = soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+            4, # stay here
+        ]
+
+        # reward when we get to the cheese is 1 iff the cheese is still there
+        reward = (1.0 - state.got_cheese)
+        # maybe we apply a time penalty
+        penalty = (1.0 - 0.9 * optimal_dist / self.env.max_steps_in_episode)
+        penalized_reward = jnp.where(
+            self.env.penalize_time,
+            penalty * reward,
+            reward,
+        )
+        # mask out rewards beyond the end of the episode
+        episode_still_valid = (
+            state.steps + optimal_dist < self.env.max_steps_in_episode
+        )
+        valid_reward = penalized_reward * episode_still_valid
+
+        # discount the reward
+        discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+
+        return discounted_reward
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
+        """
+        Optimal action value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the optimal action for.
+            
+        Return:
+
+        * action : int                      # TODO: use the Env.Action enum?
+                An optimal action from the given state.
+                
+        Notes:
+
+        * If there are multiple equally optimal actions, this method will
+          return the first according to the order up (0), left (1), down (2),
+          or right (3).
+        * As a special case of this, if the cheese is unreachable, the
+          returned action will be up (0).
+        * If the cheese is on the current square, the returned action is
+          arbitrary, and in fact it might even be suboptimal, since if there
+          is a wall the optimal action is to move into that wall.
+        * If the cheese has already been gotten then there is no more reward
+          available, but this method will still direct the mouse towards the
+          cheese position.
+        * If the cheese is too far away to reach by the end of the episode,
+          this method will still direct the mouse towards the cheese.
+
+        TODO: 
+
+        * Make all environments have a 'stay action' will simplify these
+          solutions a fair bit. The mouse could stay when on the cheese, or
+          when the cheese is unreachable, or when the cheese is already
+          gotten.
+        """
+        action = jnp.argmin(soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+            :4,
+        ])
+        return action
+
+

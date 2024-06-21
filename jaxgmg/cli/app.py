@@ -129,7 +129,7 @@ app.add_typer(util.make_typer_app(
         solve.corner,
         # solve.dish, # not yet implemented
         # solve.follow, # not yet implemented
-        solve.keys,
+        # solve.keys, # not yet implemented
         # solve.lava, # not yet implemented
         # solve.monsters, # not yet implemented
     ),
@@ -168,10 +168,10 @@ app.add_typer(util.make_typer_app(
     help=train.__doc__,
     subcommands=(
         train.corner,
-        train.dish,
+        # train.dish,
         # train.follow,
         # train.keys,
-        train.lava,
+        # train.lava,
         # train.monsters,
     ),
     **TYPER_CONFIG,

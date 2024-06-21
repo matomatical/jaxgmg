@@ -155,7 +155,6 @@ def speedtest_env(
     # accelerated rollout (with rendering included)
     @jax.jit
     def trial(rng, levels):
-        rng_reset, rng_rollout = jax.random.split(rng)
         def random_rollout_step(carry, rng_rollout_step):
             prev_obss, states = carry
             # select a random action (may depend on prev_obss)
@@ -172,11 +171,11 @@ def speedtest_env(
                 actions=actions,
             )
             return (obss, states), obss
-        init_obss, init_states = env.vreset_to_level(rng_reset, levels)
+        init_obss, init_states = env.vreset_to_level(levels)
         final_carry, obsss = jax.lax.scan(
             random_rollout_step,
             (init_obss, init_states),
-            jax.random.split(rng_rollout, num_iters),
+            jax.random.split(rng, num_iters),
         )
         return obsss
     

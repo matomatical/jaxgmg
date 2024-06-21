@@ -90,7 +90,7 @@ def maze_directional_distances(grid):
             * 1: the distance upon moving left (that is, decrementing column)
             * 2: the distance upon moving down (that is, incrementing row)
             * 3: the distance upon moving right (that is, incrementing column)
-            * 5: the distance upon not moving from the source square.
+            * 4: the distance upon not moving from the source square.
             
             In the case of an unreachable destination, or upon moving into a
             wall, the value is infinite. Otherwise, the value is the number

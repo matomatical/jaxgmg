@@ -41,8 +41,10 @@ Metrics = Dict[str, Any]
 def run(
     rng: PRNGKey,
     env: Env,
-    train_levels: Level,                # Level[n]
-    eval_levels_dict: Dict[str, Level], # {str: Level[n]}
+    train_levels: Level,                            # Level[n]
+    eval_levels_dict: Dict[str, Level],             # {str: Level[n]}
+    train_benchmark_returns: Array,                 # float[n]
+    eval_benchmark_returns_dict: Dict[str, Array],  # {str: float[n]}
     # policy config
     net: str,
     # training dimensions
@@ -93,6 +95,7 @@ def run(
     num_total_env_steps_per_cycle = num_env_steps_per_cycle * num_parallel_envs
     num_total_cycles = num_total_env_steps // num_total_env_steps_per_cycle
     num_updates_per_cycle = num_epochs_per_cycle * num_minibatches_per_epoch
+    num_train_levels = jax.tree.leaves(train_levels)[0].shape[0]
     
 
     # alternative axes
@@ -110,20 +113,15 @@ def run(
         wandb.define_metric("ppo/std/*", step_metric="step/ppo-update")
 
     
-    print(f"set up UED: DR algorithm...")
-    ued = DR(levels=train_levels)
-    ued_state = ued.init()
-
-
     print(f"setting up agent with {net} architecture...")
     # select agent architecture
     net = networks.get_architecture_class_from_name(net)(
         num_actions=env.num_actions,
     )
     # initialise the network
-    rng_model, rng_input, rng_level, rng = jax.random.split(rng, 4)
+    rng_model, rng = jax.random.split(rng, 2)
     example_level = jax.tree.map(lambda x: x[0], train_levels)
-    example_obs, _ = env.reset_to_level(rng_input, example_level)
+    example_obs, _ = env.reset_to_level(example_level)
     net_init_params = net.init(rng_model, example_obs)
 
 
@@ -187,11 +185,13 @@ def run(
 
         # choose levels for this round
         rng_levels, rng_t = jax.random.split(rng_t)
-        ued_state, levels_t = ued.select_levels(
-            rng=rng_levels,
-            state=ued_state,
-            num_selected_levels=num_parallel_envs,
+        level_ids_t = jax.random.choice(
+            rng_levels,
+            num_train_levels,
+            (num_parallel_envs,),
+            replace=(num_parallel_envs >= num_train_levels),
         )
+        levels_t = jax.tree.map(lambda x: x[level_ids_t], train_levels)
     
         
         # collect experience
@@ -206,6 +206,7 @@ def run(
             num_steps=num_env_steps_per_cycle,
             discount_rate=ppo_gamma,
             compute_metrics=log_cycle,
+            benchmark_returns=train_benchmark_returns[level_ids_t],
         )
         if log_cycle:
             env_elapsed_time = time.perf_counter() - env_start_time
@@ -239,15 +240,6 @@ def run(
             metrics['perf']['ppo_updates_per_second'] = (
                 num_updates_per_cycle / ppo_elapsed_time
             )
-    
-
-        # update ued state
-        ued_state, ued_metrics = ued.update(
-            state=ued_state,
-            compute_metrics=log_cycle,
-        )
-        if log_cycle:
-            metrics['ued'].update(ued_metrics)
         
 
         # periodic evaluation on fixed test levels
@@ -266,6 +258,7 @@ def run(
                     num_steps=num_env_steps_per_eval,
                     discount_rate=ppo_gamma,
                     compute_metrics=log_cycle,
+                    benchmark_returns=eval_benchmark_returns_dict[eval_name],
                 )
                 eval_trajectories[eval_name] = eval_trajectories_
                 eval_metrics[eval_name] = eval_metrics_
@@ -332,78 +325,6 @@ def run(
 
 
 # # # 
-# domain randomisation
-
-
-@struct.dataclass
-class DRState:
-    visited: Array          # bool[num_levels]
-    prev_level_ids: Array   # int[num_selected_levels]
-
-
-@struct.dataclass
-class DR:
-    levels: Level           # Level[num_levels]
-
-
-    # @functools.partial(jax.jit, static_argnames=('self',))
-    @jax.jit
-    def init(self) -> DRState:
-        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
-        return DRState(
-            visited=jnp.zeros(num_levels, dtype=bool),
-            prev_level_ids=None,
-        )
-
-    
-    @functools.partial(jax.jit, static_argnames=('num_selected_levels',))
-    def select_levels(
-        self,
-        rng: PRNGKey,
-        state: DRState,
-        num_selected_levels: int
-    ) -> Tuple[
-        DRState,
-        Level,              # Level[num_selected_levels]
-    ]:
-        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
-        level_ids = jax.random.choice(
-            rng,
-            num_levels,
-            (num_selected_levels,),
-            replace=(num_selected_levels >= num_levels),
-        )
-        levels = jax.tree.map(
-            lambda x: x[level_ids],
-            self.levels,
-        )
-        state = state.replace(
-            visited=state.visited.at[level_ids].set(True),
-            prev_level_ids=level_ids,
-        )
-        return state, levels
-
-
-    @functools.partial(jax.jit, static_argnames=('compute_metrics',))
-    def update(
-        self,
-        state: DRState,
-        # TODO: add arguments for some kind of result?
-        compute_metrics: bool,
-    ) -> Tuple[DRState, Metrics]:
-        state = state.replace(
-            prev_level_ids=None,
-        )
-        if compute_metrics:
-            metrics = {
-                'visited_proportion': state.visited.mean(),
-            }
-        else:
-            metrics = {}
-        return state, metrics
-
-
-# # # 
 # Experience collection / rollouts
 
 
@@ -436,11 +357,12 @@ class Transition:
 def collect_trajectories(
     rng: PRNGKey,
     train_state: TrainState,
-    env,
-    levels,
+    env: Env,
+    levels: Level,              # Level[num_levels]
     num_steps: int,
     discount_rate: float,
     compute_metrics: bool,
+    benchmark_returns: Array,   # float[num_levels]
 ) -> Tuple[
     Transition,
     Observation,
@@ -460,10 +382,10 @@ def collect_trajectories(
             (`.params`) and application function (`.apply_fn`).
             The policy apply function should take params and an observation
             and return an action distribution and value prediction.
-    * env : gmg_environments.base.Env
+    * env : jaxgmg.environments.base.Env
             Provides functions `reset` and `step` (actually, vectorised
             versions `vreset` and `vstep`).
-    * levels : gmg_environments.base.Level[num_levels]
+    * levels : jaxgmg.environments.base.Level[num_levels]
             Vector of Level structs. This many environments will be run in
             parallel.
     * num_steps : int
@@ -472,6 +394,9 @@ def collect_trajectories(
             Used in computing the return metric.
     * compute_metrics : bool (default True)
             Whether to compute metrics.
+    * benchmark_returns : float[num_levels]
+            For each level, what is the benchmark (e.g. optimal) return to be
+            aiming for? Only used if `compute_metrics` is True.
 
     Returns:
 
@@ -480,7 +405,7 @@ def collect_trajectories(
     * final_obs : Observation[num_levels]
             The observation arising after the final transition in each
             trajectory.
-    * final_env_state : gmg_environments.base.EnvState[num_levels]
+    * final_env_state : jaxgmg.environments.base.EnvState[num_levels]
             The env state arising after the final transition in each
             trajectory.
     * metrics : {str: Any}
@@ -489,11 +414,7 @@ def collect_trajectories(
             If `compute_metrics` is False, the dictionary is empty.
     """
     # reset environments to these levels
-    rng_reset, rng = jax.random.split(rng)
-    env_obs, env_state = env.vreset_to_level(
-        rng=rng_reset,
-        levels=levels,
-    )
+    env_obs, env_state = env.vreset_to_level(levels=levels)
     initial_carry = (env_obs, env_state)
 
     def _env_step(carry, rng):
@@ -548,11 +469,7 @@ def collect_trajectories(
             trajectories.done,
             discount_rate,
         ).mean()
-        # compute optimal returns for comparison
-        avg_optimal_return = env.voptimal_value(
-            levels,
-            discount_rate,
-        ).mean()
+        avg_benchmark_return = benchmark_returns.mean()
         
         metrics = {
             # approx. mean episode completion time (by episode and by level)
@@ -563,14 +480,13 @@ def collect_trajectories(
             # average reward per step
             'avg_reward':
                 trajectories.reward.mean(),
-            # average return per episode (by level)
-            'avg_actual_return':
+            # average return per episode (by level, vs. benchmark)
+            'avg_return_by_level':
                 avg_actual_return,
-            # return of optimal policy for comparison (average by level)
-            'avg_optimal_return':
-                avg_optimal_return,
-            'optimal_minus_actual_return':
-                avg_optimal_return - avg_actual_return,
+            'avg_benchmark_return_by_level':
+                avg_benchmark_return,
+            'benchmark_minus_actual_return':
+                avg_benchmark_return - avg_actual_return,
         }
     else:
         metrics = {}
