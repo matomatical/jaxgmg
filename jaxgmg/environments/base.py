@@ -370,18 +370,19 @@ class LevelSolver:
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def state_value(self, soln: LevelSolverState, state: EnvState) -> float:
+    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
         raise NotImplementedError
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def state_action(self, state: EnvState) -> int:
+    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
         raise NotImplementedError
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
-    def level_value(self, level: Level) -> float:
-        return 
+    def level_value(self, soln: LevelSolution, level: Level) -> float:
+        state = self.env._reset(level)
+        return self.state_value(soln, state)
 
 
     # pre-vectorised methods
