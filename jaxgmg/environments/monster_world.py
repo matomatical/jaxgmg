@@ -19,7 +19,7 @@ Classes:
   designing Level structs based on ASCII depictions.
 """
 
-from typing import Tuple
+from typing import Tuple, Dict
 import enum
 import functools
 
@@ -31,7 +31,6 @@ from flax import struct
 
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
-from jaxgmg.graphics import sprites
 from jaxgmg.environments import base
 
 
@@ -412,9 +411,14 @@ class Env(base.Env):
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(self, state: EnvState) -> chex.Array:
+    def _get_obs_rgb(
+        self,
+        state: EnvState,
+        spritesheet: Dict[str, chex.Array],
+    ) -> chex.Array:
         """
-        Return an RGB observation, which is also a human-interpretable image.
+        Return an RGB observation based on a grid of tiles from the given
+        spritesheet.
         """
         # get the boolean grid representation of the state
         obs = self._get_obs_bool(state)
@@ -442,18 +446,18 @@ class Env(base.Env):
         # put the corresponding sprite into each square
         spritemap = jnp.stack([
             # multiple objects
-            sprites.SHIELD_ON_WALL,
-            sprites.MONSTER_ON_APPLE,
-            sprites.MONSTER_ON_SHIELD,
-            sprites.MOUSE_ON_MONSTER,
+            spritesheet['SHIELD_ON_WALL'],
+            spritesheet['MONSTER_ON_APPLE'],
+            spritesheet['MONSTER_ON_SHIELD'],
+            spritesheet['MOUSE_ON_MONSTER'],
             # one object
-            sprites.WALL,
-            sprites.MOUSE,
-            sprites.APPLE,
-            sprites.MONSTER,
-            sprites.SHIELD,
+            spritesheet['WALL'],
+            spritesheet['MOUSE'],
+            spritesheet['APPLE'],
+            spritesheet['MONSTER'],
+            spritesheet['SHIELD'],
             # no objects
-            sprites.PATH,
+            spritesheet['PATH'],
         ])[chosen_sprites]
         image = einops.rearrange(
             spritemap,

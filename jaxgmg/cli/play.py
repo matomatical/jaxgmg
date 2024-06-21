@@ -101,6 +101,7 @@ def corner(
     width: int                  = 9,
     layout: str                 = 'tree',
     corner_size: int            = 3,
+    level_of_detail: int        = 8,
     seed: int                   = 42,
     debug: bool                 = False,
     record: bool                = False,
@@ -108,10 +109,12 @@ def corner(
     """
     Interactive Cheese in the Corner environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_in_the_corner.Env(rgb=True)
+    env = cheese_in_the_corner.Env(observation_lod=level_of_detail)
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
@@ -134,6 +137,7 @@ def dish(
     width: int                  = 9,
     layout: str                 = 'tree',
     max_cheese_radius: int      = 3,
+    level_of_detail: int        = 8,
     seed: int                   = 42,
     debug: bool                 = False,
     record: bool                = False,
@@ -141,10 +145,12 @@ def dish(
     """
     Interactive Cheese on a Dish environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_on_a_dish.Env(rgb=True)
+    env = cheese_on_a_dish.Env(observation_lod=level_of_detail)
     level_generator = cheese_on_a_dish.LevelGenerator(
         height=height,
         width=width,
@@ -168,6 +174,7 @@ def follow(
     layout: str                 = 'edges',
     num_beacons: int            = 3,
     trustworthy_leader: bool    = True,
+    level_of_detail: int        = 8,
     seed: int                   = 42,
     debug: bool                 = False,
     record: bool                = False,
@@ -175,10 +182,12 @@ def follow(
     """
     Interactive Follow Me environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = follow_me.Env(rgb=True)
+    env = follow_me.Env(observation_lod=level_of_detail)
     level_generator = follow_me.LevelGenerator(
         height=height,
         width=width,
@@ -205,6 +214,7 @@ def keys(
     num_keys_max: int           = 6,
     num_chests_min: int         = 6,
     num_chests_max: int         = 6,
+    level_of_detail: int        = 8,
     seed: int                   = 42,
     debug: bool                 = False,
     record: bool                = False,
@@ -212,10 +222,12 @@ def keys(
     """
     Interactive Keys and Chests environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = keys_and_chests.Env(rgb=True)
+    env = keys_and_chests.Env(observation_lod=level_of_detail)
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
@@ -241,6 +253,7 @@ def lava(
     width: int                  = 9,
     layout: str                 = 'edges',
     lava_threshold: float       = -0.25,
+    level_of_detail: int        = 8,
     seed: int                   = 42,
     debug: bool                 = False,
     record: bool                = False,
@@ -248,10 +261,12 @@ def lava(
     """
     Interactive Lava Land environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = lava_land.Env(rgb=True)
+    env = lava_land.Env(observation_lod=level_of_detail)
     level_generator = lava_land.LevelGenerator(
         height=height,
         width=width,
@@ -277,6 +292,7 @@ def monsters(
     num_shields: int            = 5,
     num_monsters: int           = 5,
     monster_optimality: float   = 3,
+    level_of_detail: int        = 8,
     seed: int                   = 42,
     debug: bool                 = False,
     record: bool                = False,
@@ -284,10 +300,12 @@ def monsters(
     """
     Interactive Monster World environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = monster_world.Env(rgb=True)
+    env = monster_world.Env(observation_lod=level_of_detail)
     level_generator = monster_world.LevelGenerator(
         height=height,
         width=width,
