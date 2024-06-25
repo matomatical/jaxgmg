@@ -19,7 +19,7 @@ Classes:
   designing Level structs based on ASCII depictions.
 """
 
-from typing import Tuple
+from typing import Tuple, Dict
 import enum
 import functools
 
@@ -31,9 +31,7 @@ from flax import struct
 
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
-
 from jaxgmg.environments import base
-from jaxgmg.environments import spritesheet
 
 
 @struct.dataclass
@@ -131,7 +129,6 @@ class Env(base.Env):
     
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         return EnvState(
@@ -229,9 +226,14 @@ class Env(base.Env):
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(self, state: EnvState) -> chex.Array:
+    def _get_obs_rgb(
+        self,
+        state: EnvState,
+        spritesheet: Dict[str, chex.Array],
+    ) -> chex.Array:
         """
-        Return an RGB observation, which is also a human-interpretable image.
+        Return an RGB observation based on a grid of tiles from the given
+        spritesheet.
         """
         # get the boolean grid representation of the state
         obs = self._get_obs_bool(state)
@@ -255,14 +257,14 @@ class Env(base.Env):
         # put the corresponding sprite into each square
         spritemap = jnp.stack([
             # two objects
-            spritesheet.CHEESE_ON_DISH,
+            spritesheet['CHEESE_ON_DISH'],
             # one object
-            spritesheet.WALL,
-            spritesheet.MOUSE,
-            spritesheet.SMALL_CHEESE,
-            spritesheet.DISH,
+            spritesheet['WALL'],
+            spritesheet['MOUSE'],
+            spritesheet['SMALL_CHEESE'],
+            spritesheet['DISH'],
             # no objects
-            spritesheet.PATH,
+            spritesheet['PATH'],
         ])[chosen_sprites]
         image = einops.rearrange(
             spritemap,
@@ -270,6 +272,74 @@ class Env(base.Env):
         )
 
         return image
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def optimal_value(
+        self,
+        level: Level,
+        discount_rate: float,
+    ) -> float:
+        """
+        Compute the optimal return from a given level (initial state) for a
+        given discount rate. Respects time penalties to reward and max
+        episode length.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+        * discount_rate : float
+                The discount rate to apply in the formula for computing
+                return.
+        * The output also depends on the environment's reward function, which
+          depends on `self.penalize_time` and `self.max_steps_in_episode`.
+
+        Notes:
+
+        * With a steep discount rate or long episodes, this algorithm might
+          run into minor numerical issues where small contributions to the
+          return from late into the episode are lost.
+        * For VERY large mazes, solving the level will be pretty slow.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        * Support computing the return from arbitrary states. This would be
+          not very difficult, requires taking note of `got_cheese` flag
+          and current time, and computing distance from mouse's current
+          position rather than initial position.
+        """
+        # compute distance between mouse and cheese
+        dist = maze_solving.maze_distances(level.wall_map)
+        optimal_dist = dist[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+        ]
+
+        # reward when we get the cheese is 1
+        reward = 1
+        
+        # maybe we apply an optional time penalty
+        penalized_reward = jnp.where(
+            self.penalize_time,
+            (1.0 - 0.9 * optimal_dist / self.max_steps_in_episode) * reward,
+            reward,
+        )
+        
+        # mask out rewards beyond the end of the episode
+        episodes_still_valid = (optimal_dist < self.max_steps_in_episode)
+        valid_reward = penalized_reward * episodes_still_valid
+
+        # discount the reward
+        discounted_reward = (discount_rate ** optimal_dist) * valid_reward
+
+        return discounted_reward
 
 
 @struct.dataclass

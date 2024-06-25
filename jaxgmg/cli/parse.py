@@ -15,7 +15,9 @@ from jaxgmg.environments import follow_me
 from jaxgmg.cli import util
 
 
-def corner():
+def corner(
+    level_of_detail: int = 8,
+):
     """
     Test the level parser from the Cheese in the Corner environment.
     """
@@ -34,12 +36,14 @@ def corner():
     print("level:", level)
 
     print("rendering...")
-    env = cheese_in_the_corner.Env(rgb=True)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
-def dish():
+def dish(
+    level_of_detail: int = 8,
+):
     """
     Test the level parser from the Cheese on a Dish environment.
     """
@@ -61,12 +65,14 @@ def dish():
     print("level:", level)
 
     print("rendering...")
-    env = cheese_on_a_dish.Env(rgb=True)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
-def follow():
+def follow(
+    level_of_detail: int = 8,
+):
     """
     Test the level parser from the Follow Me environment.
     """
@@ -92,12 +98,14 @@ def follow():
     print("level:", level)
 
     print("rendering...")
-    env = follow_me.Env(rgb=True)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    env = follow_me.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
-def keys():
+def keys(
+    level_of_detail: int = 8,
+):
     """
     Test the level parser from the Keys and Chests environment.
     """
@@ -122,12 +130,14 @@ def keys():
     print("level:", level)
 
     print("rendering...")
-    env = keys_and_chests.Env(rgb=True)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
-def lava():
+def lava(
+    level_of_detail: int = 8,
+):
     """
     Test the level parser from the Lava Land environment.
     """
@@ -146,12 +156,14 @@ def lava():
     print("level:", level)
 
     print("rendering...")
-    env = lava_land.Env(rgb=True)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    env = lava_land.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 
-def monsters():
+def monsters(
+    level_of_detail: int = 8,
+):
     """
     Test the level parser from the Monster World environment.
     """
@@ -178,8 +190,8 @@ def monsters():
     print("level:", level)
 
     print("rendering...")
-    env = monster_world.Env(rgb=True)
-    obs, state = env.reset_to_level(jax.random.PRNGKey(42), level)
+    env = monster_world.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
 

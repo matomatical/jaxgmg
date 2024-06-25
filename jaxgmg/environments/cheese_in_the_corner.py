@@ -8,6 +8,7 @@ Structs:
   spawn position.
 * The `EnvState` struct represents a specific dynamic state of the
   environment.
+* The `LevelSolution` struct represents a solution to a given maze layout.
 
 Classes:
 
@@ -17,9 +18,14 @@ Classes:
   level.
 * `LevelParser` class, provides a `parse` and `parse_batch` method for
   designing Level structs based on ASCII depictions.
+* `LevelSolver` class, provides a `solve` method for levels and further
+  methods to query the solution for the optimal value of the level and the
+  value or optimal action from any state within that level.
+* `LevelSplayer` class, provides static `splay_*` methods for transforming
+  a level into sets of similar levels.
 """
 
-from typing import Tuple
+from typing import Tuple, Dict
 import enum
 import functools
 
@@ -31,9 +37,7 @@ from flax import struct
 
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
-
 from jaxgmg.environments import base
-from jaxgmg.environments import spritesheet
 
 
 @struct.dataclass
@@ -122,7 +126,6 @@ class Env(base.Env):
     
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         return EnvState(
@@ -208,9 +211,14 @@ class Env(base.Env):
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(self, state: EnvState) -> chex.Array:
+    def _get_obs_rgb(
+        self,
+        state: EnvState,
+        spritesheet: Dict[str, chex.Array],
+    ) -> chex.Array:
         """
-        Return an RGB observation, which is also a human-interpretable image.
+        Return an RGB observation based on a grid of tiles from the given
+        spritesheet.
         """
         # get the boolean grid representation of the state
         obs = self._get_obs_bool(state)
@@ -231,11 +239,11 @@ class Env(base.Env):
         # put the corresponding sprite into each square
         spritemap = jnp.stack([
             # one object
-            spritesheet.WALL,
-            spritesheet.MOUSE,
-            spritesheet.CHEESE,
+            spritesheet['WALL'],
+            spritesheet['MOUSE'],
+            spritesheet['CHEESE'],
             # no objects
-            spritesheet.PATH,
+            spritesheet['PATH'],
         ])[chosen_sprites]
         image = einops.rearrange(
             spritemap,
@@ -244,76 +252,6 @@ class Env(base.Env):
 
         return image
     
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def optimal_value(
-        self,
-        level: Level,
-        discount_rate: float,
-    ) -> float:
-        """
-        Compute the optimal return from a given level (initial state) for a
-        given discount rate. Respects time penalties to reward and max
-        episode length.
-
-        Parameters:
-
-        * level : Level
-                The level to compute the optimal value for. Depends on the
-                wall configuration, the initial agent location, and the
-                location of the cheese.
-        * discount_rate : float
-                The discount rate to apply in the formula for computing
-                return.
-        * The output also depends on the environment's reward function, which
-          depends on `self.penalize_time` and `self.max_steps_in_episode`.
-
-        Notes:
-
-        * With a steep discount rate or long episodes, this algorithm might
-          run into minor numerical issues where small contributions to the
-          return from late into the episode are lost.
-        * For VERY large mazes, solving the level will be pretty slow.
-
-        TODO:
-
-        * Solving the mazes currently uses all pairs shortest paths
-          algorithm, which is not efficient enough to work for very large
-          mazes. If we wanted to solve very large mazes, we could by changing
-          to a single source shortest path algorithm.
-        * Support computing the return from arbitrary states. This would be
-          not very difficult, requires taking note of `got_cheese` flag
-          and current time, and computing distance from mouse's current
-          position rather than initial position.
-        """
-        # compute distance between mouse and cheese
-        dist = maze_solving.maze_distances(level.wall_map)
-        optimal_dist = dist[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ]
-
-        # reward when we get the cheese is 1
-        reward = 1
-        
-        # maybe we apply an optional time penalty
-        penalized_reward = jnp.where(
-            self.penalize_time,
-            (1.0 - 0.9 * optimal_dist / self.max_steps_in_episode) * reward,
-            reward,
-        )
-        
-        # mask out rewards beyond the end of the episode
-        episodes_still_valid = (optimal_dist < self.max_steps_in_episode)
-        valid_reward = penalized_reward * episodes_still_valid
-
-        # discount the reward
-        discounted_reward = (discount_rate ** optimal_dist) * valid_reward
-
-        return discounted_reward
-
 
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
@@ -520,3 +458,335 @@ class LevelParser:
             cheese_pos=jnp.stack([l.cheese_pos for l in levels]),
             initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
         )
+
+
+@struct.dataclass
+class LevelSolution(base.LevelSolution):
+    level: Level
+    directional_distance_to_cheese: chex.Array
+
+
+@struct.dataclass
+class LevelSolver(base.LevelSolver):
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def solve(self, level: Level) -> LevelSolution:
+        """
+        Compute the distance from each possible mouse position to the cheese
+        position a given level. From this information one can easy compute
+        the optimal action or value from any state of this level.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+
+        Returns:
+
+        * soln : LevelSolution
+                The necessary precomputed (directional) distances for later
+                computing optimal values and actions from states.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        """
+        # compute distance between mouse and cheese
+        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
+        dir_dist_to_cheese = dir_dist[
+            :,
+            :,
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+            :,
+        ]
+
+        return LevelSolution(
+            level=level,
+            directional_distance_to_cheese=dir_dist_to_cheese,
+        )
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the value for.
+
+        Return:
+
+        * value : float
+                The optimal value of this state.
+        """
+        # steps to get to the cheese: look up in distance cache
+        optimal_dist = soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+            4, # stay here
+        ]
+
+        # reward when we get to the cheese is 1 iff the cheese is still there
+        reward = (1.0 - state.got_cheese)
+        # maybe we apply a time penalty
+        time_of_reward = state.steps + optimal_dist
+        penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+        penalized_reward = jnp.where(
+            self.env.penalize_time,
+            penalty * reward,
+            reward,
+        )
+        # mask out rewards beyond the end of the episode
+        episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+        valid_reward = penalized_reward * episode_still_valid
+
+        # discount the reward
+        discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+
+        return discounted_reward
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action_values(
+        self,
+        soln: LevelSolution,
+        state: EnvState,
+    ) -> chex.Array: # float[4]
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the value for.
+            
+        Notes:
+
+        * With a steep discount rate or long episodes, this algorithm might
+          run into minor numerical issues where small contributions to the
+          return from late into the episode are lost.
+        """
+        # steps to get to the cheese for adjacent squares: look up in cache
+        dir_dists = soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+        ] # -> float[5] (up left down right stay)
+        # steps after taking each action, taking collisions into account:
+        # replace inf values with stay-still values
+        action_dists = jnp.where(
+            jnp.isinf(dir_dists[:4]),
+            dir_dists[4],
+            dir_dists[:4],
+        )
+
+        # reward when we get to the cheese is 1 iff the cheese is still there
+        reward = (1.0 - state.got_cheese)
+        # maybe we apply a time penalty
+        times_of_reward = state.steps + action_dists
+        penalties = (
+            1.0 - 0.9 * times_of_reward / self.env.max_steps_in_episode
+        )
+        penalized_rewards = jnp.where(
+            self.env.penalize_time,
+            penalties * reward,
+            reward,
+        )
+        # mask out rewards beyond the end of the episode
+        episode_still_valids = times_of_reward < self.env.max_steps_in_episode
+        valid_rewards = penalized_rewards * episode_still_valids
+
+        # discount the reward
+        discounted_rewards = (
+            (self.discount_rate ** action_dists) * valid_rewards
+        )
+
+        return discounted_rewards
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
+        """
+        Optimal action from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the optimal action for.
+            
+        Return:
+
+        * action : int                      # TODO: use the Env.Action enum?
+                An optimal action from the given state.
+                
+        Notes:
+
+        * If there are multiple equally optimal actions, this method will
+          return the first according to the order up (0), left (1), down (2),
+          or right (3).
+        * As a special case of this, if the cheese is unreachable, the
+          returned action will be up (0).
+        * If the cheese is on the current square, the returned action is
+          arbitrary, and in fact it might even be suboptimal, since if there
+          is a wall the optimal action is to move into that wall.
+        * If the cheese has already been gotten then there is no more reward
+          available, but this method will still direct the mouse towards the
+          cheese position.
+        * If the cheese is too far away to reach by the end of the episode,
+          this method will still direct the mouse towards the cheese.
+
+        TODO: 
+
+        * Make all environments have a 'stay action' will simplify these
+          solutions a fair bit. The mouse could stay when on the cheese, or
+          when the cheese is unreachable, or when the cheese is already
+          gotten.
+        """
+        action = jnp.argmin(soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+            :4,
+        ])
+        return action
+
+
+@struct.dataclass
+class LevelSplayer:
+    """
+    Note that these methods are not jittable.
+
+    TODO: This is definitely a rough draft and seems like the API is not
+    quite right. Also still needs to be documented.
+    """
+
+
+    @staticmethod
+    def splay_mouse(level: Level) -> base.SplayedLevelSet:
+        free_map = ~level.wall_map
+        free_map = free_map.at[
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+        ].set(False)
+
+        # assemble level batch
+        num_levels = free_map.sum()
+        levels = Level(
+            wall_map=einops.repeat(
+                level.wall_map,
+                'h w -> n h w',
+                n=num_levels,
+            ),
+            cheese_pos=einops.repeat(
+                level.cheese_pos,
+                'c -> n c',
+                n=num_levels,
+            ),
+            initial_mouse_pos=jnp.stack(jnp.where(free_map), axis=1),
+        )
+        
+        # remember how to put the levels back together into a grid
+        levels_pos = jnp.where(free_map)
+        grid_shape = free_map.shape
+        
+        return base.SplayedLevelSet(
+            levels=levels,
+            num_levels=num_levels,
+            levels_pos=levels_pos,
+            grid_shape=grid_shape,
+        )
+
+
+    @staticmethod
+    def splay_cheese(level: Level) -> base.SplayedLevelSet:
+        free_map = ~level.wall_map
+        free_map = free_map.at[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+        ].set(False)
+
+        # assemble level batch
+        num_levels = free_map.sum()
+        levels = Level(
+            wall_map=einops.repeat(
+                level.wall_map,
+                'h w -> n h w',
+                n=num_levels,
+            ),
+            cheese_pos=jnp.stack(jnp.where(free_map), axis=1),
+            initial_mouse_pos=einops.repeat(
+                level.initial_mouse_pos,
+                'c -> n c',
+                n=num_levels,
+            ),
+        )
+        
+        # remember how to put the levels back together into a grid
+        levels_pos = jnp.where(free_map)
+        grid_shape = free_map.shape
+        
+        return base.SplayedLevelSet(
+            levels=levels,
+            num_levels=num_levels,
+            levels_pos=levels_pos,
+            grid_shape=grid_shape,
+        )
+
+
+    @staticmethod
+    def splay_cheese_and_mouse(level: Level) -> base.SplayedLevelSet:
+        free_map = ~level.wall_map
+        # macromaze
+        free_metamap = free_map[None,None,:,:] & free_map[:,:,None,None]
+        # remove mouse/cheese clashes
+        free_pos = jnp.where(free_map)
+        clash_pos = free_pos + free_pos # concatenate tuples
+        free_metamap = free_metamap.at[clash_pos].set(False)
+        # rearrange into appropriate order(s)
+        free_metamap_hhww = einops.rearrange(
+            free_metamap,
+            'H W h w -> H h W w',
+        )
+
+        # assemble level batch
+        num_spaces = free_map.sum()
+        num_levels = (num_spaces - 1) * num_spaces
+        # cheese/mouse spawn locations
+        cheese1, mouse1, cheese2, mouse2 = jnp.where(free_metamap_hhww)
+        levels = Level(
+            wall_map=einops.repeat(
+                level.wall_map,
+                'h w -> n h w',
+                n=num_levels,
+            ),
+            cheese_pos=jnp.stack((cheese1, cheese2), axis=1),
+            initial_mouse_pos=jnp.stack((mouse1, mouse2), axis=1),
+        )
+
+        # remember how to put the levels back together into a grid
+        free_metamap_grid = einops.rearrange(
+            free_metamap_hhww[1:-1,:,1:-1,:],
+            'H h W w -> (H h) (W w)',
+        )
+        levels_pos = jnp.where(free_metamap_grid)
+        grid_shape = free_metamap_grid.shape
+        
+        return base.SplayedLevelSet(
+            levels=levels,
+            num_levels=num_levels,
+            levels_pos=levels_pos,
+            grid_shape=grid_shape,
+        )
+
+

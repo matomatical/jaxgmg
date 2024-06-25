@@ -4,6 +4,18 @@ import flax.linen as nn
 import distrax
 
 
+def get_architecture_class_from_name(name):
+    match name.lower():
+        case "relu":
+            return ReLUFF
+        case "impala-small":
+            return ImpalaSmall
+        case "impala":
+            return ImpalaFull
+        case _:
+            raise ValueError(f"Unknown net architecture: {name!r}")
+
+
 class ImpalaSmall(nn.Module):
     num_actions: int
 
