@@ -20,6 +20,7 @@ import typer
 
 from jaxgmg.cli import util
 
+from jaxgmg.cli import heatmaps
 from jaxgmg.cli import noisegen
 from jaxgmg.cli import mazegen
 from jaxgmg.cli import mazesoln
@@ -27,6 +28,7 @@ from jaxgmg.cli import parse
 from jaxgmg.cli import play
 from jaxgmg.cli import solve
 from jaxgmg.cli import speedtest
+from jaxgmg.cli import splay
 
 
 # # #
@@ -47,6 +49,18 @@ app = typer.Typer(**TYPER_CONFIG)
 
 # # # 
 # Assemble various entrypoints into a Typer app
+
+
+# heatmaps
+app.add_typer(util.make_typer_app(
+    name='heatmaps',
+    help=heatmaps.__doc__,
+    subcommands=(
+        heatmaps.corner,
+    ),
+    **TYPER_CONFIG,
+))
+
 
 # noise generation
 app.add_typer(util.make_typer_app(
@@ -89,6 +103,22 @@ app.add_typer(util.make_typer_app(
 ))
 
 
+# parsers
+app.add_typer(util.make_typer_app(
+    name='parse',
+    help=parse.__doc__,
+    subcommands=(
+        parse.corner,
+        parse.dish,
+        parse.follow,
+        parse.keys,
+        parse.lava,
+        parse.monsters,
+    ),
+    **TYPER_CONFIG,
+))
+
+
 # play environments
 app.add_typer(util.make_typer_app(
     name='play',
@@ -105,17 +135,18 @@ app.add_typer(util.make_typer_app(
 ))
 
 
-# testing parsers
+# training
+from jaxgmg.cli import train
 app.add_typer(util.make_typer_app(
-    name='parse',
-    help=parse.__doc__,
+    name='train',
+    help=train.__doc__,
     subcommands=(
-        parse.corner,
-        parse.dish,
-        parse.follow,
-        parse.keys,
-        parse.lava,
-        parse.monsters,
+        train.corner,
+        # train.dish,
+        # train.follow,
+        # train.keys,
+        # train.lava,
+        # train.monsters,
     ),
     **TYPER_CONFIG,
 ))
@@ -161,18 +192,14 @@ app.add_typer(util.make_typer_app(
 ))
 
 
-# training
-from jaxgmg.cli import train
+# splayer demos
 app.add_typer(util.make_typer_app(
-    name='train',
-    help=train.__doc__,
+    name='splay',
+    help=splay.__doc__,
     subcommands=(
-        train.corner,
-        # train.dish,
-        # train.follow,
-        # train.keys,
-        # train.lava,
-        # train.monsters,
+        splay.corner,
     ),
     **TYPER_CONFIG,
 ))
+
+
