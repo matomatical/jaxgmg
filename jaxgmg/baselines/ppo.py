@@ -30,6 +30,7 @@ from jaxgmg.baselines import networks
 from typing import Tuple, Dict, Any
 from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level
+from jaxgmg.environments.base import SplayedLevelSet
 Observation = Array
 Metrics = Dict[str, Any]
 
@@ -45,6 +46,7 @@ def run(
     eval_levels_dict: Dict[str, Level],             # {str: Level[n]}
     train_benchmark_returns: Array,                 # float[n]
     eval_benchmark_returns_dict: Dict[str, Array],  # {str: float[n]}
+    splayset_dict: Dict[str, SplayedLevelSet],
     # policy config
     net: str,
     # training dimensions
@@ -65,7 +67,7 @@ def run(
     # evaluation config
     num_cycles_per_eval: int,
     num_env_steps_per_eval: int,
-    # console logging
+    # logging config
     console_log: bool,                  # whether to log metrics to stdout
     wandb_log: bool,                    # whether to log metrics to wandb
     num_cycles_per_log: int,
@@ -74,6 +76,7 @@ def run(
     num_cycles_per_gif: int,
     gif_grid_width: int,
     gif_level_of_detail: int,           # 1, 3, 4, or 8; sprite pixel width
+    num_cycles_per_splay: int,
     save_files_to: str,
 ):
 
@@ -107,7 +110,6 @@ def run(
                 f"env/eval/{eval_name}/*",
                 step_metric="step/env-step",
             )
-        wandb.define_metric("ued/*", step_metric="step/env-step")
         wandb.define_metric("step/ppo-update")
         wandb.define_metric("ppo/*", step_metric="step/ppo-update")
         wandb.define_metric("ppo/std/*", step_metric="step/ppo-update")
@@ -165,7 +167,6 @@ def run(
                 'perf': {},
                 'env/train': {},
                 'env/eval': {},
-                'ued': {},
                 'ppo': {},
             }
 
@@ -315,6 +316,39 @@ def run(
                         data={'gifs/eval-'+eval_name: wandb_gif(frames)},
                     )
         
+
+        # periodic heatmaps from fixed splayed level sets
+        if log_cycle and t % num_cycles_per_splay == 0:
+            rng_splay, rng_t = jax.random.split(rng_t)
+            images = {}
+            for splay_name, splayset in splayset_dict.items():
+                rng_splay_, rng_splay = jax.random.split(rng_splay)
+                images[splay_name] = analyse_splayset(
+                    rng=rng_splay_,
+                    train_state=train_state,
+                    env=env,
+                    splayset=splayset,
+                    shape=splayset.grid_shape, # static
+                    num_steps=num_env_steps_per_eval,
+                    discount_rate=ppo_gamma,
+                )
+            images = flatten_dict(images)
+            for img_name, img in images.items():
+                img_path = fileman.get_path(f"imgs/splay-{img_name}/{t}.png")
+                save_img(img, img_path)
+            progress.write(
+                "saved some splay heatmaps to "
+                + fileman.get_path('imgs/splay-*')
+            )
+            if wandb_log:
+                wandb.log(
+                    step=t,
+                    data={
+                        f'splays/{k}': wandb_img(v)
+                        for k, v in images.items()
+                    },
+                )
+
 
         # ending cycle
         progress.update(num_total_env_steps_per_cycle)
@@ -551,6 +585,93 @@ def compute_average_return(
     average_return = total_first_step_returns / num_episodes
     
     return average_return
+
+
+@functools.partial(jax.jit, static_argnames=('env', 'shape', 'num_steps'))
+def analyse_splayset(
+    rng: PRNGKey,
+    train_state: TrainState,
+    env: Env,
+    splayset: SplayedLevelSet,
+    shape: int,
+    num_steps: int,
+    discount_rate: float,
+) -> Metrics:
+    obs, _ = env.vreset_to_level(splayset.levels)
+    action_distr, values = train_state.apply_fn(train_state.params, obs)
+
+    # model value -> heatmap
+    value_heatmap = generate_heatmap(
+        data=values,
+        shape=shape,
+        pos=splayset.levels_pos,
+    )
+    
+    # model policy -> diamond map
+    action_probs = action_distr.probs
+    action_diamond_plot = generate_diamond_plot(
+        data=action_probs,
+        shape=shape,
+        pos=splayset.levels_pos,
+    )
+    
+    # model policy rollout returns -> heatmap
+    trajectories, *_ = collect_trajectories(
+        rng=rng,
+        train_state=train_state,
+        env=env,
+        levels=splayset.levels,
+        num_steps=num_steps,
+        discount_rate=discount_rate,
+        compute_metrics=False,
+        benchmark_returns=None,
+    )
+    returns = jax.vmap(compute_average_return, in_axes=(1,1,None))(
+        trajectories.reward,
+        trajectories.done,
+        discount_rate,
+    ).mean()
+    rollout_heatmap = generate_heatmap(
+        data=returns,
+        shape=shape,
+        pos=splayset.levels_pos,
+    )
+
+    return {
+        'value': value_heatmap,
+        'action-probs': action_diamond_plot,
+        'policy-rollout-return': rollout_heatmap,
+    }
+    
+    
+@functools.partial(jax.jit, static_argnames=('shape',))
+def generate_heatmap(data, shape, pos):
+    # TODO: colormap
+    return einops.repeat(
+        jnp.zeros(shape).at[pos].set(data),
+        'h w -> h w rgb',
+        rgb=3,
+    )
+
+
+@functools.partial(jax.jit, static_argnames=('shape',))
+def generate_diamond_plot(data, shape, pos):
+    # TODO: colormap
+    data = 0.1 + 0.9 * data
+    return einops.repeat(
+        jnp.full((5, 5, *shape), 0.1)
+            .at[:, :, pos[0], pos[1]].set(0.0)
+            .at[1, 2, pos[0], pos[1]].set(data[:,0])
+            .at[2, 1, pos[0], pos[1]].set(data[:,1])
+            .at[3, 2, pos[0], pos[1]].set(data[:,2])
+            .at[2, 3, pos[0], pos[1]].set(data[:,3]),
+        'col row h w -> (h col) (w row) rgb',
+        rgb=3,
+    )
+
+
+# # # 
+# RUN FILES MANAGEMENT
 
 
 # # # 
@@ -796,10 +917,6 @@ def animate_trajectories(
     return grid
 
 
-# # # 
-# RUN FILES MANAGEMENT
-
-
 class RunFilesManager:
     def __init__(self, root_path="out/"):
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -851,6 +968,39 @@ def save_json(dct, path):
 # RENDERING AND SAVING IMAGES AND ANIMATIONS
 
 
+def save_img(
+    image,
+    path,
+    upscale=1,
+):
+    """
+    Take a (height, width, rgb) matrix and save it as a png.
+    
+    Parameters:
+
+    * image : float[h, w, rgb]
+                The image. Each point should be a float between 0 and 1.
+    * path : str
+                Where to save the image.
+    * upscale : int (>=1, default is 1)
+                Width/height of pixel representation of each matrix entry.
+    """
+    H, W, C = image.shape
+    assert C == 3, f"too many channels ({C}>3) to create image"
+        
+    # preprocess image data
+    image_u8 = (np.asarray(image) * 255).astype(np.uint8)
+    image_u8_upscaled = einops.repeat(
+        image_u8,
+        'h w rgb -> (h sh) (w sw) rgb',
+        sh=upscale,
+        sw=upscale,
+    )
+    # PIL image and save
+    image_pil = Image.fromarray(image_u8_upscaled)
+    image_pil.save(path)
+
+
 def save_gif(
     frames,
     path,
@@ -896,6 +1046,29 @@ def save_gif(
         append_images=imgs[1:],
         duration=1000 // fps,
         loop=1-repeat,
+    )
+
+
+def wandb_img(image):
+    """
+    Format a gif as a video for wandb.
+
+    Parameters:
+
+    * image : float[h, w, rgb]
+            RGB floats each channel in range [0,1].
+
+    Returns:
+
+    * image : wandb.Image (contains uint8[h, w, c]).
+            RGB Image including this data in the required format.
+
+    """
+    return wandb.Image(
+        np.asarray(
+            255 * image,
+            dtype=np.uint8,
+        ),
     )
 
 

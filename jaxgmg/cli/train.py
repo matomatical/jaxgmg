@@ -44,11 +44,12 @@ def corner(
     num_cycles_per_eval: int = 64,
     num_eval_levels: int = 256,
     num_env_steps_per_eval: int = 1024,
-    # console logging
+    double_splayed_eval: bool = True,
+    # logging
     console_log: bool = True,           # whether to log metrics to stdout
     num_cycles_per_log: int = 64,
+    # wandb logging (forwarded to wandb by the wrapper)
     wandb_log: bool = False,            # whether to log metrics to wandb
-    # wandb location (forwarded to wandb by the wrapper)
     wandb_project: str = "test",
     wandb_group: str = None,
     wandb_name: str = None,
@@ -58,6 +59,8 @@ def corner(
     num_cycles_per_gif: int = 256,
     gif_grid_width: int = 16,
     gif_level_of_detail: int = 1,       # 1, 3, 4 or 8
+    # splay rate (these are kinda slow)
+    num_cycles_per_splay: int = 1024,
     # output save directory
     save_files_to: str = "logs/",
     # other
@@ -128,6 +131,22 @@ def corner(
         eval_off_levels,
     )
 
+    print("generating splayed eval batches...")
+    if double_splayed_eval:
+        splayer = cheese_in_the_corner.LevelSplayer.splay_cheese_and_mouse
+    else:
+        splayer = cheese_in_the_corner.LevelSplayer.splay_mouse
+    train_splayset = splayer(jax.tree.map(lambda x: x[0], train_levels))
+    eval_on_splayset = splayer(jax.tree.map(lambda x: x[0], eval_on_levels))
+    eval_off_splayset = splayer(jax.tree.map(lambda x: x[0], eval_off_levels))
+    print(
+        "  num levels:",
+        train_splayset.num_levels,
+        eval_on_splayset.num_levels,
+        eval_off_splayset.num_levels,
+    )
+
+
     ppo.run(
         rng=rng_train,
         # environment and level distributions
@@ -141,6 +160,11 @@ def corner(
         eval_benchmark_returns_dict={
             'on-distribution': eval_on_benchmark_returns,
             'off-distribution': eval_off_benchmark_returns,
+        },
+        splayset_dict={
+            'train-level-0': train_splayset,
+            'eval-on-level-0': eval_on_splayset,
+            'eval-off-level-0': eval_off_splayset,
         },
         # architecture
         net=net,
@@ -169,6 +193,7 @@ def corner(
         num_cycles_per_gif=num_cycles_per_gif,
         gif_grid_width=gif_grid_width,
         gif_level_of_detail=gif_level_of_detail,
+        num_cycles_per_splay=num_cycles_per_splay,
         save_files_to=save_files_to,
     )
     # (the decorator finishes the wandb run for us, so no need to do that)

@@ -375,6 +375,15 @@ class LevelSolver:
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action_values(
+        self,
+        soln: LevelSolution,
+        state: EnvState,
+    ) -> chex.Array: # float[4]
+        raise NotImplementedError
+
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
     def level_value(self, soln: LevelSolution, level: Level) -> float:
         state = self.env._reset(level)
         return self.state_value(soln, state)
@@ -404,5 +413,13 @@ class LevelSolver:
             self.level_value,
         )
         return vectorised_level_value(solns, levels)
+
+
+@struct.dataclass
+class SplayedLevelSet:
+    levels: Level
+    num_levels: int
+    levels_pos: Tuple[chex.Array, chex.Array]
+    grid_shape: Tuple[int, int]
 
 
