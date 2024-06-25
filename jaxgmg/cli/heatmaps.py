@@ -58,14 +58,16 @@ def heatmap_demo(level_set, states, level_solver, inverse_temperature):
     print("calculating action values for each state...")
     action_values = jax.vmap(level_solver.state_action_values)(solns, states)
     action_values_vis = (
-        jnp.full((4, 4, *level_set.grid_shape, 3), 0.5)
-            .at[(0, 1, *level_set.levels_pos)]
+        jnp.full((5, 5, *level_set.grid_shape, 3), 0.3)
+            .at[:, :, level_set.levels_pos[0], level_set.levels_pos[1]]
+                .set(0.5)
+            .at[1, 2, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_values[:,0]))
-            .at[(1, 0, *level_set.levels_pos)]
+            .at[2, 1, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_values[:,1]))
-            .at[(2, 1, *level_set.levels_pos)]
+            .at[3, 2, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_values[:,2]))
-            .at[(1, 2, *level_set.levels_pos)]
+            .at[2, 3, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_values[:,3]))
     )
     print(util.img2str(
@@ -88,14 +90,16 @@ def heatmap_demo(level_set, states, level_solver, inverse_temperature):
         axis=1,
     )
     action_dist_vis = (
-        jnp.full((4, 4, *level_set.grid_shape, 3), 0.5)
-            .at[(0, 1, *level_set.levels_pos)]
+        jnp.full((5, 5, *level_set.grid_shape, 3), 0.3)
+            .at[:, :, level_set.levels_pos[0], level_set.levels_pos[1]]
+                .set(0.5)
+            .at[1, 2, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_distribution[:,0]))
-            .at[(1, 0, *level_set.levels_pos)]
+            .at[2, 1, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_distribution[:,1]))
-            .at[(2, 1, *level_set.levels_pos)]
+            .at[3, 2, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_distribution[:,2]))
-            .at[(1, 2, *level_set.levels_pos)]
+            .at[2, 3, level_set.levels_pos[0], level_set.levels_pos[1]]
                 .set(util.viridis(action_distribution[:,3]))
     )
     print(util.img2str(
