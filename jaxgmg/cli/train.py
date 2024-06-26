@@ -45,7 +45,7 @@ def corner(
     num_cycles_per_eval: int = 64,
     num_eval_levels: int = 256,
     num_env_steps_per_eval: int = 1024,
-    double_splayed_eval: bool = True,
+    level_splayer: str = 'mouse',       # or 'cheese' or 'cheese-and-mouse'
     # logging
     console_log: bool = True,           # whether to log metrics to stdout
     num_cycles_per_log: int = 64,
@@ -61,7 +61,7 @@ def corner(
     gif_grid_width: int = 16,
     gif_level_of_detail: int = 1,       # 1, 3, 4 or 8
     # splay rate (these are kinda slow)
-    num_cycles_per_splay: int = 1024,
+    num_cycles_per_splay: int = 256,
     # output save directory
     save_files_to: str = "logs/",
     # other
@@ -133,13 +133,19 @@ def corner(
     )
 
     print("generating splayed eval batches...")
-    if double_splayed_eval:
-        splayer = cheese_in_the_corner.LevelSplayer.splay_cheese_and_mouse
-    else:
-        splayer = cheese_in_the_corner.LevelSplayer.splay_mouse
-    train_splayset = splayer(jax.tree.map(lambda x: x[0], train_levels))
-    eval_on_splayset = splayer(jax.tree.map(lambda x: x[0], eval_on_levels))
-    eval_off_splayset = splayer(jax.tree.map(lambda x: x[0], eval_off_levels))
+    LevelSplayer = cheese_in_the_corner.LevelSplayer
+    match level_splayer:
+        case 'mouse':
+            splay = LevelSplayer.splay_mouse
+        case 'cheese':
+            splay = LevelSplayer.splay_cheese
+        case 'cheese-and-mouse':
+            splay = LevelSplayer.splay_cheese_and_mouse 
+        case _:
+            raise ValueError(f'unknown level splayer {level_splayer!r}')
+    train_splayset = splay(jax.tree.map(lambda x: x[0], train_levels))
+    eval_on_splayset = splay(jax.tree.map(lambda x: x[0], eval_on_levels))
+    eval_off_splayset = splay(jax.tree.map(lambda x: x[0], eval_off_levels))
     print(
         "  num levels:",
         train_splayset.num_levels,
