@@ -12,7 +12,8 @@ from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import lava_land
 # from jaxgmg.environments import follow_me
 from jaxgmg.baselines import ppo
-from jaxgmg.cli import util
+
+from jaxgmg import util
 
 
 @util.wandb_run # inits wandb and syncs the arguments with wandb.config

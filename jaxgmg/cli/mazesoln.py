@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import einops
 from jaxgmg.procgen import maze_generation
 from jaxgmg.procgen import maze_solving
-from jaxgmg.cli import util
+from jaxgmg import util
 
 
 def distances(

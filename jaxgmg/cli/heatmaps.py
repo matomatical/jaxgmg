@@ -14,7 +14,7 @@ from jaxgmg.environments import cheese_in_the_corner
 # from jaxgmg.environments import lava_land
 # from jaxgmg.environments import follow_me
 
-from jaxgmg.cli import util
+from jaxgmg import util
 
 
 def heatmap_demo(level_set, states, level_solver, inverse_temperature):

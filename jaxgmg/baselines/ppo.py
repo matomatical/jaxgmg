@@ -4,12 +4,8 @@ training/eval levels.
 """
 
 import functools
-import datetime
-import json
-import os
 import time
 
-import numpy as np
 import jax
 import jax.numpy as jnp
 import einops
@@ -17,10 +13,10 @@ from flax.training.train_state import TrainState
 from flax import struct
 import optax
 
-from PIL import Image
 import tqdm
 import wandb
 
+from jaxgmg import util
 from jaxgmg.baselines import networks
 
 
@@ -83,7 +79,7 @@ def run(
 
     # initialising file manager
     print("initialising run file manager")
-    fileman = RunFilesManager(root_path=save_files_to)
+    fileman = util.RunFilesManager(root_path=save_files_to)
     print("  run folder:", fileman.path)
 
     
@@ -271,11 +267,11 @@ def run(
             if console_log:
                 progress.write("\n".join([
                     "=" * 59,
-                    dict_to_str(metrics),
+                    util.dict2str(metrics),
                     "=" * 59,
                 ]))
             if wandb_log:
-                wandb.log(step=t, data=flatten_dict(metrics))
+                wandb.log(step=t, data=util.flatten_dict(metrics))
 
         
         # periodic training animation saving
@@ -287,13 +283,13 @@ def run(
                 env=env,
             )
             gif_path = fileman.get_path(f"gifs/train/{t}.gif")
-            save_gif(frames, gif_path)
+            util.save_gif(frames, gif_path)
             progress.write("saved gif to " + gif_path)
             
             if wandb_log:
                 wandb.log(
                     step=t,
-                    data={'gifs/train': wandb_gif(frames)},
+                    data={'gifs/train': util.wandb_gif(frames)},
                 )
 
         
@@ -307,13 +303,13 @@ def run(
                     env=env,
                 )
                 gif_path = fileman.get_path(f"gifs/eval-{eval_name}/{t}.gif")
-                save_gif(frames, gif_path)
+                util.save_gif(frames, gif_path)
                 progress.write("saved gif to " + gif_path)
                 
                 if wandb_log:
                     wandb.log(
                         step=t,
-                        data={'gifs/eval-'+eval_name: wandb_gif(frames)},
+                        data={'gifs/eval-'+eval_name: util.wandb_gif(frames)},
                     )
         
 
@@ -332,10 +328,10 @@ def run(
                     num_steps=num_env_steps_per_eval,
                     discount_rate=ppo_gamma,
                 )
-            images = flatten_dict(images)
+            images = util.flatten_dict(images)
             for img_name, img in images.items():
                 img_path = fileman.get_path(f"imgs/splay-{img_name}/{t}.png")
-                save_img(img, img_path)
+                util.save_image(img, img_path)
             progress.write(
                 "saved some splay heatmaps to "
                 + fileman.get_path('imgs/splay-*')
@@ -344,7 +340,7 @@ def run(
                 wandb.log(
                     step=t,
                     data={
-                        f'splays/{k}': wandb_img(v)
+                        f'splays/{k}': util.wandb_img(v)
                         for k, v in images.items()
                     },
                 )
@@ -879,7 +875,7 @@ def animate_trajectories(
     """
     obs = trajectories.obs
 
-    if force_lod != env.observation_lod:
+    if force_lod != env.obs_level_of_detail:
         vrender = jax.vmap(env.get_obs, in_axes=(0, None,)) # parallel envs
         vvrender = jax.vmap(vrender, in_axes=(0, None,))    # time
         obs = vvrender(trajectories.env_state, force_lod)
@@ -917,182 +913,3 @@ def animate_trajectories(
     return grid
 
 
-class RunFilesManager:
-    def __init__(self, root_path="out/"):
-        now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        self.path = os.path.abspath(os.path.join(root_path, f'run_{now}'))
-        os.makedirs(self.path, exist_ok=False)
-
-
-    def get_path(self, suffix):
-        path = os.path.join(self.path, suffix)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        return path
-
-
-# # # 
-# TRANSFORMING DICTIONARIES
-
-
-def flatten_dict(nested_dict):
-    merged_dict = {}
-    for key, inner_dict in nested_dict.items():
-        if isinstance(inner_dict, dict):
-            for inner_key, value in flatten_dict(inner_dict).items():
-                merged_dict[key + '/' + inner_key] = value
-        else:
-            merged_dict[key] = inner_dict
-    return merged_dict
-
-
-def dict_to_str(dct):
-    def dict_to_lines(dct, depth):
-        for key, value in dct.items():
-            if isinstance(value, dict):
-                yield (depth, key, '')
-                yield from dict_to_lines(value, depth+1)
-            else:
-                yield (depth, key, value)
-    return '\n'.join([
-        '  '*depth + (key + ':').ljust(42-2*depth) + str(value)
-        for depth, key, value in dict_to_lines(dct, 1)
-    ])
-
-
-def save_json(dct, path):
-    with open(path, 'w') as outfile:
-        json.dump(dct, outfile, indent=True)
-
-
-# # # 
-# RENDERING AND SAVING IMAGES AND ANIMATIONS
-
-
-def save_img(
-    image,
-    path,
-    upscale=1,
-):
-    """
-    Take a (height, width, rgb) matrix and save it as a png.
-    
-    Parameters:
-
-    * image : float[h, w, rgb]
-                The image. Each point should be a float between 0 and 1.
-    * path : str
-                Where to save the image.
-    * upscale : int (>=1, default is 1)
-                Width/height of pixel representation of each matrix entry.
-    """
-    H, W, C = image.shape
-    assert C == 3, f"too many channels ({C}>3) to create image"
-        
-    # preprocess image data
-    image_u8 = (np.asarray(image) * 255).astype(np.uint8)
-    image_u8_upscaled = einops.repeat(
-        image_u8,
-        'h w rgb -> (h sh) (w sw) rgb',
-        sh=upscale,
-        sw=upscale,
-    )
-    # PIL image and save
-    image_pil = Image.fromarray(image_u8_upscaled)
-    image_pil.save(path)
-
-
-def save_gif(
-    frames,
-    path,
-    upscale=1,
-    fps=12,
-    repeat=True,
-):
-    """
-    Take a (time, height, width, rgb) matrix and save it as an animated gif.
-    
-    Parameters:
-
-    * frames : float[t, h, w, rgb]
-                The animation. First axis is time, remaining axes represent
-                the image data. Each point should be a float between 0 and 1.
-    * path : str
-                Where to save the gif.
-    * upscale : int (>=1, default is 1)
-                Width/height of pixel representation of each matrix entry.
-    * fps : int
-                Approx. frames per second encoded into the gif.
-    * repeat : bool (default True)
-                Whether the gif loops indefinitely (True, default) or only
-                plays once (False).
-    """
-    T, H, W, C = frames.shape
-    assert C == 3, f"too many channels ({C}>3) to create gif"
-        
-    # preprocess image data
-    frames_u8 = (np.asarray(frames) * 255).astype(np.uint8)
-    frames_u8_upscaled = einops.repeat(
-        frames_u8,
-        't h w rgb -> t (h sh) (w sw) rgb',
-        sh=upscale,
-        sw=upscale,
-    )
-    # PIL images for each frame
-    imgs = [Image.fromarray(i) for i in frames_u8_upscaled]
-    # compile gif
-    imgs[0].save(
-        path,
-        save_all=True,
-        append_images=imgs[1:],
-        duration=1000 // fps,
-        loop=1-repeat,
-    )
-
-
-def wandb_img(image):
-    """
-    Format a gif as a video for wandb.
-
-    Parameters:
-
-    * image : float[h, w, rgb]
-            RGB floats each channel in range [0,1].
-
-    Returns:
-
-    * image : wandb.Image (contains uint8[h, w, c]).
-            RGB Image including this data in the required format.
-
-    """
-    return wandb.Image(
-        np.asarray(
-            255 * image,
-            dtype=np.uint8,
-        ),
-    )
-
-
-def wandb_gif(frames, fps=12):
-    """
-    Format a gif as a video for wandb.
-
-    Parameters:
-
-    * frames : float[t h w c]
-            RGB floats each channel in range [0,1].
-    * fps : int = 12
-            Frames per second for the wandb video.
-
-    Returns:
-
-    * video : wandb.Video (contains uint8[t c h w]).
-            RGB video including this data in the required format.
-
-    """
-    return wandb.Video(
-        np.asarray(
-            255 * einops.rearrange(frames, 't h w c -> t c h w'),
-            dtype=np.uint8,
-        ),
-        fps=fps,
-    )
