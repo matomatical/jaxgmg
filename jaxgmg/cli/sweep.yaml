@@ -1,0 +1,16 @@
+name: scalingexperiments 
+program: jaxgmg/cli/train.py  # Your training script
+project: Phase1LastUpdate25thJune
+
+method: grid  # Grid search, other options include 'random' and 'bayes'
+parameters:
+  env_corner_size:
+    values: [1,3,7,15]  # Replace with desired values
+  env_size:
+    values: [13,17]  # Replace with desired values
+
+command:
+  - ${env}
+  - jaxgmg
+  - train
+  - corner
