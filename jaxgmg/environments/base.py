@@ -184,11 +184,13 @@ class Env:
         )
 
         # optional time penalty to reward
-        reward = jax.lax.select(
-            self.penalize_time,
-            reward * (1.0 - .9 * state.steps / self.max_steps_in_episode),
-            reward,
-        )
+        if self.penalize_time:
+            penalty = (1.0 - .9 * state.steps / self.max_steps_in_episode)
+            reward = reward * penalty
+            if 'proxy_rewards' in info:
+                info['proxy_rewards'] = {
+                    k: r * penalty for k, r in info['proxy_rewards'].items()
+                }
 
         # (potentially) automatically reset the environment
         rng_reset, rng = jax.random.split(rng)

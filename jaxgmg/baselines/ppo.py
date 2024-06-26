@@ -491,10 +491,11 @@ def collect_trajectories(
 
     if compute_metrics:
         # compute returns
-        avg_actual_return = jax.vmap(
+        vmap_avg_return = jax.vmap(
             compute_average_return,
             in_axes=(1,1,None),
-        )(
+        )
+        avg_actual_return = vmap_avg_return(
             trajectories.reward,
             trajectories.done,
             discount_rate,
@@ -518,6 +519,18 @@ def collect_trajectories(
             'benchmark_minus_actual_return':
                 avg_benchmark_return - avg_actual_return,
         }
+        if "proxy_rewards" in trajectories.info:
+            for proxy, r_proxy in trajectories.info["proxy_rewards"].items():
+                metrics.update({
+                    'avg_reward_proxy_'+proxy:
+                        r_proxy.mean(),
+                    'avg_return_proxy_'+proxy+'_by_level':
+                        vmap_avg_return(
+                            r_proxy,
+                            trajectories.done,
+                            discount_rate,
+                        ).mean(),
+                })
     else:
         metrics = {}
 
