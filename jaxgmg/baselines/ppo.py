@@ -642,27 +642,20 @@ def analyse_splayset(
     
 @functools.partial(jax.jit, static_argnames=('shape',))
 def generate_heatmap(data, shape, pos):
-    # TODO: colormap
-    return einops.repeat(
-        jnp.zeros(shape).at[pos].set(data),
-        'h w -> h w rgb',
-        rgb=3,
-    )
+    return util.viridis(jnp.zeros(shape).at[pos].set(data))
 
 
 @functools.partial(jax.jit, static_argnames=('shape',))
 def generate_diamond_plot(data, shape, pos):
-    # TODO: colormap
-    data = 0.1 + 0.9 * data
-    return einops.repeat(
-        jnp.full((5, 5, *shape), 0.1)
-            .at[:, :, pos[0], pos[1]].set(0.0)
-            .at[1, 2, pos[0], pos[1]].set(data[:,0])
-            .at[2, 1, pos[0], pos[1]].set(data[:,1])
-            .at[3, 2, pos[0], pos[1]].set(data[:,2])
-            .at[2, 3, pos[0], pos[1]].set(data[:,3]),
-        'col row h w -> (h col) (w row) rgb',
-        rgb=3,
+    color_data = util.viridis(data)
+    return einops.rearrange(
+        jnp.full((5, 5, *shape, 3), 0.4)
+            .at[:, :, pos[0], pos[1], :].set(0.5)
+            .at[1, 2, pos[0], pos[1], :].set(color_data[:,0,:])
+            .at[2, 1, pos[0], pos[1], :].set(color_data[:,1,:])
+            .at[3, 2, pos[0], pos[1], :].set(color_data[:,2,:])
+            .at[2, 3, pos[0], pos[1], :].set(color_data[:,3,:]),
+        'col row h w rgb -> (h col) (w row) rgb',
     )
 
 
