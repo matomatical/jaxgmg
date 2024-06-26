@@ -21,7 +21,7 @@ from jaxgmg.environments import follow_me
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import lava_land
 from jaxgmg.environments import monster_world
-from jaxgmg.cli import util
+from jaxgmg import util
 
 
 # # # 

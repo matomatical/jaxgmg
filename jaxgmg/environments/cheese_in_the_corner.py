@@ -67,9 +67,12 @@ class EnvState(base.EnvState):
             `level.initial_mouse_pos`.
     * got_cheese : bool
             Whether the mouse has already gotten the cheese.
+    * got_corner : bool
+            Whether the mouse has already visited the corner.
     """
     mouse_pos: chex.Array
     got_cheese: bool
+    got_corner: bool
 
 
 class Env(base.Env):
@@ -131,6 +134,7 @@ class Env(base.Env):
         return EnvState(
             mouse_pos=level.initial_mouse_pos,
             got_cheese=False,
+            got_corner=False,
             level=level,
             steps=0,
             done=False,
@@ -168,16 +172,28 @@ class Env(base.Env):
         # check if mouse got to cheese
         got_cheese = (state.mouse_pos == state.level.cheese_pos).all()
         state = state.replace(got_cheese=state.got_cheese | got_cheese)
+        
+        # check if mouse got to corner
+        got_corner = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
+        got_corner_first_time = got_corner & ~state.got_corner
+        state = state.replace(got_corner=state.got_corner | got_corner)
 
         # reward and done
         reward = got_cheese.astype(float)
         done = state.got_cheese
 
+        # proxy reward
+        proxy_reward = got_corner_first_time.astype(float)
+
         return (
             state,
             reward,
             done,
-            {},
+            {
+                'proxy_rewards': {
+                    'corner': proxy_reward,
+                },
+            },
         )
 
     
@@ -322,7 +338,6 @@ class LevelGenerator(base.LevelGenerator):
             key=rng_spawn_cheese,
             a=coords,
             axis=0,
-            shape=(),
             p=cheese_mask,
         )
         # ... in case there *was* a wall there , remove it
@@ -335,12 +350,12 @@ class LevelGenerator(base.LevelGenerator):
         ].set(False).flatten()
 
         rng_spawn_mouse, rng = jax.random.split(rng)
-        initial_mouse_pos = coords[jax.random.choice(
+        initial_mouse_pos = jax.random.choice(
             key=rng_spawn_mouse,
-            a=coords.shape[0],
-            shape=(),
+            a=coords,
+            axis=0,
             p=mouse_mask,
-        )]
+        )
 
         return Level(
             wall_map=wall_map,
