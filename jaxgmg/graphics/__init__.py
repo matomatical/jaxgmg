@@ -31,7 +31,11 @@ _MIPMAP = {
 }
 
 
-def spritesheet(lod: LevelOfDetail):
+def load_spritesheet(lod: LevelOfDetail):
+    if lod not in {0, 1, 3, 4, 8}:
+        raise ValueError(f"Invalid level of detail {lod}.")
+    if lod == 0:
+        raise ValueError("No spritesheet for detail level 0 (BOOLEAN)")
     _spritesheet = _MIPMAP[lod]
     return {
         'BLANK':                   _spritesheet[0,0],

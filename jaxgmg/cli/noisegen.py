@@ -4,7 +4,7 @@ Demonstration of noise generation methods.
 
 import jax
 from jaxgmg.procgen import noise_generation
-from jaxgmg.cli import util
+from jaxgmg import util
 
 
 def perlin(
