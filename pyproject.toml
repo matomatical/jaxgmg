@@ -29,6 +29,7 @@ dependencies = [
     "typer",
     "tqdm",
     "wandb",
+    "orbax-checkpoint",
 ]
 
 [project.scripts]

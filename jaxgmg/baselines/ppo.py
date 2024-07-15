@@ -12,6 +12,7 @@ import einops
 from flax.training.train_state import TrainState
 from flax import struct
 import optax
+import orbax.checkpoint as ocp
 
 import tqdm
 import wandb
@@ -63,6 +64,11 @@ def run(
     # evaluation config
     num_cycles_per_eval: int,
     num_env_steps_per_eval: int,
+    # checkpointing config
+    checkpointing: bool,
+    keep_all_checkpoints: bool,
+    max_num_checkpoints: int,
+    num_cycles_per_checkpoint: int,
     # logging config
     console_log: bool,                  # whether to log metrics to stdout
     wandb_log: bool,                    # whether to log metrics to wandb
@@ -74,6 +80,7 @@ def run(
     gif_level_of_detail: int,           # 1, 3, 4, or 8; sprite pixel width
     num_cycles_per_splay: int,
     save_files_to: str,
+
 ):
 
 
@@ -121,6 +128,17 @@ def run(
     example_level = jax.tree.map(lambda x: x[0], train_levels)
     example_obs, _ = env.reset_to_level(example_level)
     net_init_params = net.init(rng_model, example_obs)
+            
+
+    # initialise the checkpointer
+    checkpoint_path = fileman.get_path("checkpoints")
+    checkpoint_manager = ocp.CheckpointManager(
+        directory=checkpoint_path,
+        options=ocp.CheckpointManagerOptions(
+            max_to_keep=None if keep_all_checkpoints else max_num_checkpoints,
+            save_interval_steps=num_cycles_per_checkpoint,
+        ),
+    )
 
 
     # set up optimiser
@@ -142,6 +160,9 @@ def run(
             optax.adam(learning_rate=lr),
         ),
     )
+
+
+    # 
 
 
     # on-policy training loop
@@ -272,6 +293,21 @@ def run(
                 ]))
             if wandb_log:
                 wandb.log(step=t, data=util.flatten_dict(metrics))
+        
+
+        # periodic checkpointing
+        if checkpointing and t % num_cycles_per_checkpoint == 0:
+            checkpoint_manager.save(
+                t,
+                args=ocp.args.PyTreeSave(train_state),
+            )
+            progress.write(f"saving checkpoint to {checkpoint_path}/{t}...")
+        #     # this would be the code to restore
+        #     train_state_type = jax.tree.map(ocp.utils.to_shape_dtype_struct, train_state)
+        #     train_state = checkpoint_manager.restore(
+        #         t,
+        #         args=ocp.args.PyTreeRestore(train_state_dtype),
+        #     )
 
         
         # periodic training animation saving
@@ -352,6 +388,9 @@ def run(
 
     # ending run
     progress.close()
+    print("finishing checkpoints...")
+    checkpoint_manager.wait_until_finished()
+    checkpoint_manager.close()
 
 
 # # # 
