@@ -44,7 +44,7 @@ def corner(
     # evaluation dimensions
     num_cycles_per_eval: int = 64,
     num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 1024,
+    num_env_steps_per_eval: int = 512,
     level_splayer: str = 'mouse',       # or 'cheese' or 'cheese-and-mouse'
     # logging
     console_log: bool = True,           # whether to log metrics to stdout
@@ -55,20 +55,20 @@ def corner(
     wandb_group: str = None,
     wandb_name: str = None,
     # gif animations for training/eval rollouts
-    train_gifs: bool = False,
-    eval_gifs: bool = False,
-    num_cycles_per_gif: int = 256,
+    train_gifs: bool = True,
+    eval_gifs: bool = True,
+    num_cycles_per_gif: int = 1024, # roughly 9M
     gif_grid_width: int = 16,
     gif_level_of_detail: int = 1,       # 1, 3, 4 or 8
     # splay rate (these are kinda slow)
-    num_cycles_per_splay: int = 256,
+    num_cycles_per_splay: int = 1024,
     # output save directory
     save_files_to: str = "logs/",
     # checkpointing
-    checkpointing: bool = False,            # default: keep no checkpoints
-    keep_all_checkpoints: bool = True,      # if not: keep all checkpoints?
+    checkpointing: bool = True,             # default: keep checkpoints?    y
+    keep_all_checkpoints: bool = False,     # if not: keep all checkpoints? n
     max_num_checkpoints: int = 1,           # if not: keep only this many
-    num_cycles_per_checkpoint: int = 64,
+    num_cycles_per_checkpoint: int = 512,
     # other
     seed: int = 42,
 ):
