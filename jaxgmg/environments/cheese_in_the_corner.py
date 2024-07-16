@@ -178,12 +178,14 @@ class Env(base.Env):
         got_corner_first_time = got_corner & ~state.got_corner
         state = state.replace(got_corner=state.got_corner | got_corner)
 
-        # reward and done
+        # reward
         reward = got_cheese.astype(float)
-        done = state.got_cheese
 
         # proxy reward
         proxy_reward = got_corner_first_time.astype(float)
+        
+        # end of episode
+        done = state.got_cheese & state.got_corner
 
         return (
             state,

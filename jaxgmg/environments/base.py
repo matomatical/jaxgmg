@@ -90,7 +90,7 @@ class Env:
 
 
     # fields
-    max_steps_in_episode: int = 128
+    max_steps_in_episode: int = 64
     penalize_time: bool = True
     automatically_reset: bool = True
     obs_level_of_detail: LevelOfDetail = LevelOfDetail.BOOLEAN
