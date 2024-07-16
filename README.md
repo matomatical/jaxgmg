@@ -18,7 +18,7 @@ Installation
 Install the latest main version from GitHub:
 
 ```
-pip install git+ssh://git@github.com/matomatical/jaxgmg.git
+pip install git+https://github.com/matomatical/jaxgmg.git
 ```
 
 Install from a local clone:
@@ -28,8 +28,6 @@ git clone git@github.com:matomatical/jaxgmg.git
 cd jaxgmg
 pip install -e .
 ```
-
-TODO: list on PyPI
 
 
 Explore the library
@@ -51,24 +49,6 @@ functionality. For example:
 
 Note: Most of the demos display colour images to the terminal using ANSI
 control codes, which may not work in some environments (e.g. on Windows?).
-
-Run an RL experiment
---------------------
-
-WORK IN PROGRESS / SUBJECT TO CHANGE
-
-Currently, the baselines only run on `baselines` branch. If you installed the
-library while on a different branch, you will need to `pip install -e .`
-again because there are more dependencies.
-
-Then to see the API for running an experiment, run:
-
-```
-jaxgmg train --help
-```
-
-Include the flag --wandb-log to log results to wandb, etc.
-
 
 JAX-accelerated environments
 ----------------------------
@@ -342,7 +322,20 @@ TODO: Document.
 RL baselines
 ------------
 
-TODO: implement baselines.
+The repository includes a PPO implementation that runs in a subset of
+environments (so far, only "Cheese in the Corner", with support for more
+environments a work in progress).
+
+Most environment and training hyperparameters can be set from the command
+line. To see the API for running an experiment, run:
+
+```
+jaxgmg train corner --help
+```
+
+Include the flag `--wandb-log` to log results to wandb, etc.
+
+TODO: Include some results here
 
 
 Roadmap: Towards jaxgmg 1.0
@@ -362,20 +355,16 @@ Environments (JAX accelerated):
 * [x] Cheese on a dish
 * [x] Lava land
 * [x] Follow the leader (simplified 'cultural transmission')
-* [ ] Forest recovery
 
 Environment features:
 
 * [x] Boolean rendering
 * [x] 8x8 RGB rendering
-* [ ] Rendering in other resolutions
-* [ ] Partially observable versions
-* [ ] Gymnax API wrappers and registration
+* [x] Rendering in other resolutions (1x1. 3x3, 4x4)
 
 RL baselines:
 
-* [ ] Train PPO agents in the above environments (symbolic)
-* [ ] Train PPO agents in the above environments (small pixels)
+* [x] Train PPO agents in Cheese in the Corner (symbolic environment)
 * [ ] Qualitative and quantitative demonstration of goal misgeneralisation
 
 Packaging:
@@ -384,9 +373,9 @@ Packaging:
 * [x] Format project as an installable Python package
 * [x] CLI easily demonstrating core features
 * [x] Animation/images of core environments, procedural generation methods
-* [x] Speedtests of generation methods, environments, (TODO: baselines)
-* [ ] Document speedtests and RL experiments in a report
-* [ ] Release jaxgmg v1 on arXiv and PyPI...!
+* [x] Speedtests of generation methods, environments
+* [ ] Speedtests of baselines
+* [ ] Document speedtests and RL experiments in a report (arXiv)
 
 
 Stretch roadmap: Towards jaxgmg 2.0
@@ -404,6 +393,7 @@ More procedural generation methods (see notes
 
 More environments:
 
+* [ ] Forest recovery
 * [ ] Coin at the end (simplified 'coinrun'-style platformer)
 * [ ] Survivor ('crafter'-style mining/farming grid world)
 * [ ] Dungeon (a simple roguelike)
@@ -414,10 +404,12 @@ More environment features:
 
 * [ ] Procgen-style variable-size mazes
 * [ ] Procgen-style sprite and background diversity
+* [ ] Partially observable versions
+* [ ] Gymnax API wrappers and registration
 
 
 More RL baselines:
 
-* [ ] Train PPO agents in the stretch environments (symbolic and pixels)
+* [ ] Train PPO agents in other environments (symbolic and pixels)
 * [ ] Train DQN agents in all environments (symbolic and pixels)
 
