@@ -25,19 +25,19 @@ def get_generator_class_from_name(name):
     * MazeGenerator : subclass of MazeGenerator
             The class of the maze generator.
     """
-
-    if name.lower() == "tree":
-        return TreeMazeGenerator
-    elif name.lower() == "edges":
-        return EdgeMazeGenerator
-    elif name.lower() == "blocks":
-        return BlockMazeGenerator
-    elif name.lower() == "noise":
-        return NoiseMazeGenerator
-    elif name.lower() == "open":
-        return OpenMazeGenerator
-    else:
-        raise ValueError(f"Unknown maze generator {name!r}")
+    match name.lower():
+        case "tree":
+            return TreeMazeGenerator
+        case "edges":
+            return EdgeMazeGenerator
+        case "blocks":
+            return BlockMazeGenerator
+        case "noise":
+            return NoiseMazeGenerator
+        case "open":
+            return OpenMazeGenerator
+        case _:
+            raise ValueError(f"Unknown maze generator {name!r}")
 
 
 @struct.dataclass

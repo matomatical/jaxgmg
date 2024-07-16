@@ -3,7 +3,6 @@ Interactive environment demonstrations.
 """
 
 import jax
-import jax.numpy as jnp
 import readchar
 import time
 import chex
@@ -16,7 +15,7 @@ from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import lava_land
 from jaxgmg.environments import follow_me
-from jaxgmg.cli import util
+from jaxgmg import util
 
 
 # # # 
@@ -39,7 +38,7 @@ def play_forever(
         print("generating level...")
         rng_level, rng = jax.random.split(rng)
         level = level_generator.sample(rng_level)
-        obs, state = env.reset_to_level(rng, level)
+        obs, state = env.reset_to_level(level)
 
         print("playing level...")
         print("initial state")

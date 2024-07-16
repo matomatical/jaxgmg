@@ -30,6 +30,7 @@ import einops
 from flax import struct
 
 from jaxgmg.procgen import maze_generation as mg
+from jaxgmg.procgen import maze_solving
 from jaxgmg.procgen import noise_generation
 from jaxgmg.environments import base
 
@@ -126,7 +127,6 @@ class Env(base.Env):
     
     def _reset(
         self,
-        rng: chex.PRNGKey,
         level: Level,
     ) -> EnvState:
         return EnvState(
@@ -269,6 +269,85 @@ class Env(base.Env):
         return image
     
 
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def optimal_value(
+        self,
+        level: Level,
+        discount_rate: float,
+    ) -> float:
+        """
+        Compute the optimal return from a given level (initial state) for a
+        given discount rate. Respects time penalties to reward and max
+        episode length.
+
+        For Lava Land, the optimal policy is to take the shortest path to the
+        cheese that also avoids lava tiles. If there is no such path, the
+        best one can do is simply avoid lava and get a score of zero (it is
+        never worth crossing lava to get to the cheese, this will always lead
+        to negative net reward).
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+        * discount_rate : float
+                The discount rate to apply in the formula for computing
+                return.
+        * The output also depends on the environment's reward function, which
+          depends on `self.penalize_time` and `self.max_steps_in_episode`.
+
+        Notes:
+
+        * In the rare case of a level in which the mouse spawns surrounded
+          by immediately adjacent lava tiles in all four directions, the
+          optimal value is actually negative (because there is no 'stay'
+          action) but this function will return 0 for simplicity.
+        * With a steep discount rate or long episodes, this algorithm might
+          run into minor numerical issues where small contributions to the
+          return from late into the episode are lost.
+        * For VERY large mazes, solving the level will be pretty slow.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        * Supporting a generalisation 
+        * Support computing the return from arbitrary states. This would be
+          not very difficult, requires taking note of `got_cheese` flag
+          and current time, and computing distance from mouse's current
+          position rather than initial position.
+        """
+        # compute distance between mouse and cheese
+        dist = maze_solving.maze_distances(level.wall_map | level.lava_map)
+        optimal_dist = dist[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+        ]
+
+        # reward when we get the cheese is 1
+        reward = 1
+        
+        # maybe we apply an optional time penalty
+        penalized_reward = jnp.where(
+            self.penalize_time,
+            (1.0 - 0.9 * optimal_dist / self.max_steps_in_episode) * reward,
+            reward,
+        )
+        
+        # mask out rewards beyond the end of the episode
+        episodes_still_valid = (optimal_dist < self.max_steps_in_episode)
+        valid_reward = penalized_reward * episodes_still_valid
+
+        # discount the reward
+        discounted_reward = (discount_rate ** optimal_dist) * valid_reward
+
+        return discounted_reward
+
+
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
     """
@@ -286,7 +365,7 @@ class LevelGenerator(base.LevelGenerator):
             Provides the maze generation method to use (see module
             `maze_generation` for details).
             The default is a tree maze generator using Kruskal's algorithm.
-    * lava_threshold : float (-1.0 to +1.0, default -1.0):
+    * lava_threshold : float (-1.0 to +1.0, default -0.25):
             unoccupied tiles will spawn lava where perlin noise falls below
             this threshold (-1.0 means never, +1.0 means always)
     """

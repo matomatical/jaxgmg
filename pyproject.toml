@@ -19,13 +19,17 @@ requires-python = ">=3.10"
 dependencies = [
     "jax",
     "imageio",
+    "moviepy",
     "numpy",
     "einops",
     "chex",
     "flax",
+    "distrax",
     "readchar",
     "typer",
     "tqdm",
+    "wandb",
+    "orbax-checkpoint",
 ]
 
 [project.scripts]

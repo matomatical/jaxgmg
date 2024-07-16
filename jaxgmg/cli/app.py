@@ -13,13 +13,12 @@ to launch the program. This is used in two places:
 * It is imported and called in `jaxgmg.__main__`, supporting invocation of
   the CLI via `python -m jaxgmg`.
 * It is referenced as entry point `jaxgmg.cli.app:app` inside pyproject.toml,
-  supporting invocation of the CLI via the bare command `jaxgmg`.
+  supporting invocation of the CLI via the command `jaxgmg`.
 """
 
 import typer
 
-from jaxgmg.cli import util
-
+from jaxgmg.cli import heatmaps
 from jaxgmg.cli import noisegen
 from jaxgmg.cli import mazegen
 from jaxgmg.cli import mazesoln
@@ -27,41 +26,71 @@ from jaxgmg.cli import parse
 from jaxgmg.cli import play
 from jaxgmg.cli import solve
 from jaxgmg.cli import speedtest
+from jaxgmg.cli import splay
+from jaxgmg.cli import train
 
 
 # # #
-# Configure the Typer application
+# Helper function: Create a Typer application.
 
-TYPER_CONFIG = {
-    'no_args_is_help': True,
-    'add_completion': False,
-    'pretty_exceptions_show_locals': False, # can turn on during debugging
-}
+
+def make_typer_app(name, help, subcommands):
+    """
+    Transform a list of functions into a typer application.
+    """
+    app = typer.Typer(
+        name=name,
+        help=help,
+        no_args_is_help=True,
+        add_completion=False,
+        pretty_exceptions_show_locals=False,
+    )
+    for subcommand in subcommands:
+        app.command()(subcommand)
+    return app
 
 
 # # # 
 # Create the Typer application
 
-app = typer.Typer(**TYPER_CONFIG)
+
+app = make_typer_app(
+    name='jaxgmg',
+    help="""
+        JAX-based environments and RL baselines for studying goal
+        misgeneralisation.
+    """,
+    subcommands=(),
+)
 
 
 # # # 
-# Assemble various entrypoints into a Typer app
+# Assemble various entrypoints as subapplications/subcommands.
+
+
+# heatmaps
+app.add_typer(make_typer_app(
+    name='heatmaps',
+    help=heatmaps.__doc__,
+    subcommands=(
+        heatmaps.corner,
+    ),
+))
+
 
 # noise generation
-app.add_typer(util.make_typer_app(
+app.add_typer(make_typer_app(
     name='noisegen',
     help=noisegen.__doc__,
     subcommands=(
         noisegen.perlin,
         noisegen.fractal,
     ),
-    **TYPER_CONFIG,
 ))
 
 
 # maze generation
-app.add_typer(util.make_typer_app(
+app.add_typer(make_typer_app(
     name='mazegen',
     help=mazegen.__doc__,
     subcommands=(
@@ -72,12 +101,11 @@ app.add_typer(util.make_typer_app(
         mazegen.open,
         mazegen.mural,
     ),
-    **TYPER_CONFIG,
 ))
 
 
 # maze solving
-app.add_typer(util.make_typer_app(
+app.add_typer(make_typer_app(
     name='mazesoln',
     help=mazesoln.__doc__,
     subcommands=(
@@ -85,28 +113,11 @@ app.add_typer(util.make_typer_app(
         mazesoln.directions,
         mazesoln.distances_and_directions,
     ),
-    **TYPER_CONFIG,
 ))
 
 
-# play environments
-app.add_typer(util.make_typer_app(
-    name='play',
-    help=play.__doc__,
-    subcommands=(
-        play.corner,
-        play.dish,
-        play.follow,
-        play.keys,
-        play.lava,
-        play.monsters,
-    ),
-    **TYPER_CONFIG,
-))
-
-
-# testing parsers
-app.add_typer(util.make_typer_app(
+# parsers
+app.add_typer(make_typer_app(
     name='parse',
     help=parse.__doc__,
     subcommands=(
@@ -117,28 +128,56 @@ app.add_typer(util.make_typer_app(
         parse.lava,
         parse.monsters,
     ),
-    **TYPER_CONFIG,
+))
+
+
+# play environments
+app.add_typer(make_typer_app(
+    name='play',
+    help=play.__doc__,
+    subcommands=(
+        play.corner,
+        play.dish,
+        play.follow,
+        play.keys,
+        play.lava,
+        play.monsters,
+    ),
+))
+
+
+# training
+app.add_typer(make_typer_app(
+    name='train',
+    help=train.__doc__,
+    subcommands=(
+        train.corner,
+        # train.dish,
+        # train.follow,
+        # train.keys,
+        # train.lava,
+        # train.monsters,
+    ),
 ))
 
 
 # solve environments
-app.add_typer(util.make_typer_app(
+app.add_typer(make_typer_app(
     name='solve',
     help=solve.__doc__,
     subcommands=(
         solve.corner,
         # solve.dish, # not yet implemented
         # solve.follow, # not yet implemented
-        solve.keys,
+        # solve.keys, # not yet implemented
         # solve.lava, # not yet implemented
         # solve.monsters, # not yet implemented
     ),
-    **TYPER_CONFIG,
 ))
 
 
 # speedtests
-app.add_typer(util.make_typer_app(
+app.add_typer(make_typer_app(
     name='speedtest',
     help=speedtest.__doc__,
     subcommands=(
@@ -157,6 +196,16 @@ app.add_typer(util.make_typer_app(
         speedtest.mazesoln_directional_distances,
         speedtest.mazesoln_optimal_directions,
     ),
-    **TYPER_CONFIG,
 ))
+
+
+# splayer demonstration
+app.add_typer(make_typer_app(
+    name='splay',
+    help=splay.__doc__,
+    subcommands=(
+        splay.corner,
+    ),
+))
+
 
