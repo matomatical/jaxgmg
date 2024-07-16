@@ -171,6 +171,7 @@ class Env(base.Env):
 
         # check if mouse got to cheese
         got_cheese = (state.mouse_pos == state.level.cheese_pos).all()
+        got_cheese_first_time = got_cheese & ~state.got_cheese
         state = state.replace(got_cheese=state.got_cheese | got_cheese)
         
         # check if mouse got to corner
@@ -178,10 +179,8 @@ class Env(base.Env):
         got_corner_first_time = got_corner & ~state.got_corner
         state = state.replace(got_corner=state.got_corner | got_corner)
 
-        # reward
-        reward = got_cheese.astype(float)
-
-        # proxy reward
+        # rewards
+        reward = got_cheese_first_time.astype(float)
         proxy_reward = got_corner_first_time.astype(float)
         
         # end of episode
