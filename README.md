@@ -1,15 +1,11 @@
 `jaxgmg`: JAX-accelerated Goal MisGeneralisation
 ================================================
 
-JAX-based
-  environments (WIP)
-and
-  RL baselines ([WIP](https://github.com/matomatical/jaxgmg/pull/8))
-for studying goal misgeneralisation.
+JAX-based environments and RL baselines for studying goal misgeneralisation.
 
 > [!NOTE]  
 > `jaxgmg` is a work in progress. This is a pre-1.0 research codebase. Not
-> everything is finished, tested, or documented.
+> everything is finished, tested, documented, or stable.
 > See also the [roadmap](#roadmap-towards-jaxgmg-10).
 
 Installation
