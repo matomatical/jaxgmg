@@ -7,6 +7,7 @@ import functools
 import os
 import datetime
 import numpy as np
+import jax
 import jax.numpy as jnp
 import einops
 import PIL.Image as pillow
@@ -63,8 +64,13 @@ def dict2str(dct):
                 yield from dict2lines(value, depth+1)
             else:
                 yield (depth, key, value)
+    def render(value):
+        if isinstance(value, jax.Array):
+            if value.shape != ():
+                return f'{value.dtype}{value.shape}'
+        return str(value)
     return '\n'.join([
-        '  '*depth + (key + ':').ljust(42-2*depth) + str(value)
+        '  '*depth + (key + ':').ljust(42-2*depth) + render(value)
         for depth, key, value in dict2lines(dct, 1)
     ])
 

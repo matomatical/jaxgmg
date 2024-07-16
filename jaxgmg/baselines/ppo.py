@@ -162,9 +162,6 @@ def run(
     )
 
 
-    # 
-
-
     # on-policy training loop
     print("begin training loop!")
     print("(note: first two cycles are slow due to compilation)")
@@ -534,11 +531,12 @@ def collect_trajectories(
             compute_average_return,
             in_axes=(1,1,None),
         )
-        avg_actual_return = vmap_avg_return(
+        actual_returns = vmap_avg_return(
             trajectories.reward,
             trajectories.done,
             discount_rate,
-        ).mean()
+        )
+        avg_actual_return = actual_returns.mean()
         avg_benchmark_return = benchmark_returns.mean()
         
         metrics = {
@@ -550,25 +548,33 @@ def collect_trajectories(
             # average reward per step
             'avg_reward':
                 trajectories.reward.mean(),
-            # average return per episode (by level, vs. benchmark)
+            # averages returns per episode (by level, vs. benchmark)
             'avg_return_by_level':
                 avg_actual_return,
             'avg_benchmark_return_by_level':
                 avg_benchmark_return,
             'benchmark_minus_actual_return':
                 avg_benchmark_return - avg_actual_return,
+            # return distributions
+            'all_returns_by_level':
+                actual_returns,
+            'all_benchmark_returns_by_level':
+                benchmark_returns,
         }
         if "proxy_rewards" in trajectories.info:
             for proxy, r_proxy in trajectories.info["proxy_rewards"].items():
+                proxy_returns = vmap_avg_return(
+                    r_proxy,
+                    trajectories.done,
+                    discount_rate,
+                )
                 metrics.update({
-                    'avg_reward_proxy_'+proxy:
+                    'proxy_'+proxy+'/avg_reward':
                         r_proxy.mean(),
-                    'avg_return_proxy_'+proxy+'_by_level':
-                        vmap_avg_return(
-                            r_proxy,
-                            trajectories.done,
-                            discount_rate,
-                        ).mean(),
+                    'proxy_'+proxy+'/avg_return_by_level':
+                        proxy_returns.mean(),
+                    'proxy_'+proxy+'/all_returns_by_level':
+                        proxy_returns,
                 })
     else:
         metrics = {}
