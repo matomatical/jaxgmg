@@ -26,11 +26,11 @@ def corner(
     # policy config
     net: str = "relu",
     # PPO hyperparameters
-    ppo_lr: float = 1e-4,               # learning rate
-    ppo_gamma: float = 0.995,           # discount rate
+    ppo_lr: float = 0.0005,             # learning rate
+    ppo_gamma: float = 0.999,           # discount rate
     ppo_clip_eps: float = 0.2,
-    ppo_gae_lambda: float = 0.98,
-    ppo_entropy_coeff: float = 1e-3,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
