@@ -80,7 +80,6 @@ def run(
     gif_level_of_detail: int,           # 1, 3, 4, or 8; sprite pixel width
     num_cycles_per_splay: int,
     save_files_to: str,
-
 ):
 
 
@@ -91,6 +90,10 @@ def run(
 
     
     # TODO: Would be a good idea to save the config as a file again
+
+
+    # TODO: Would be a good idea to checkpoint the training levels and eval
+    # levels...
 
 
     # TODO: Would also be a good idea for this program to initialise and
@@ -289,7 +292,7 @@ def run(
                     "=" * 59,
                 ]))
             if wandb_log:
-                wandb.log(step=t, data=util.flatten_dict(metrics))
+                wandb.log(step=t, data=util.wandb_metrics_dict(metrics))
         
 
         # periodic checkpointing
@@ -556,9 +559,9 @@ def collect_trajectories(
             'benchmark_minus_actual_return':
                 avg_benchmark_return - avg_actual_return,
             # return distributions
-            'all_returns_by_level':
+            'all_returns_by_level_hist':
                 actual_returns,
-            'all_benchmark_returns_by_level':
+            'all_benchmark_returns_by_level_hist':
                 benchmark_returns,
         }
         if "proxy_rewards" in trajectories.info:
@@ -573,7 +576,7 @@ def collect_trajectories(
                         r_proxy.mean(),
                     'proxy_'+proxy+'/avg_return_by_level':
                         proxy_returns.mean(),
-                    'proxy_'+proxy+'/all_returns_by_level':
+                    'proxy_'+proxy+'/all_returns_by_level_hist':
                         proxy_returns,
                 })
     else:
