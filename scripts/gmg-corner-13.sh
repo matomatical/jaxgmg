@@ -1,0 +1,11 @@
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs1  --net impala --env-size 13 --env-corner-size 1 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs2  --net impala --env-size 13 --env-corner-size 2 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs3  --net impala --env-size 13 --env-corner-size 3 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs4  --net impala --env-size 13 --env-corner-size 4 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs5  --net impala --env-size 13 --env-corner-size 5 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs6  --net impala --env-size 13 --env-corner-size 6 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs7  --net impala --env-size 13 --env-corner-size 7 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs8  --net impala --env-size 13 --env-corner-size 8 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs9  --net impala --env-size 13 --env-corner-size 9 
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs10 --net impala --env-size 13 --env-corner-size 10
+jaxgmg train corner --wandb-log --wandb-project gmg-corner-13 --wandb-name cs11 --net impala --env-size 13 --env-corner-size 11
