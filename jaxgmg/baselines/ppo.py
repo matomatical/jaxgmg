@@ -684,7 +684,7 @@ def analyse_splayset(
         trajectories.reward,
         trajectories.done,
         discount_rate,
-    ).mean()
+    )
     rollout_heatmap = generate_heatmap(
         data=returns,
         shape=shape,
