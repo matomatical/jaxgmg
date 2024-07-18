@@ -21,8 +21,8 @@ Classes:
 * `LevelSolver` class, provides a `solve` method for levels and further
   methods to query the solution for the optimal value of the level and the
   value or optimal action from any state within that level.
-* `LevelSplayer` class, provides static `splay_*` methods for transforming
-  a level into sets of similar levels.
+* `LevelSplayer` classes, providing static `splay` methods for transforming a
+  level into sets of similar levels.
 """
 
 from typing import Tuple, Dict
@@ -75,7 +75,7 @@ class EnvState(base.EnvState):
     got_corner: bool
 
 
-class Env(base.Env):
+class Env(base.Env): # TODO: make environments jittable?
     """
     Cheese in the Corner environment.
 
@@ -684,131 +684,123 @@ class LevelSolver(base.LevelSolver):
         return action
 
 
-@struct.dataclass
-class LevelSplayer:
-    """
-    Note that these methods are not jittable.
-
-    TODO: This is definitely a rough draft and seems like the API is not
-    quite right. Also still needs to be documented.
-    """
+# # # 
+# Splay functions
+# Note that these functions are not jittable.
 
 
-    @staticmethod
-    def splay_mouse(level: Level) -> base.SplayedLevelSet:
-        free_map = ~level.wall_map
-        free_map = free_map.at[
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ].set(False)
+def splay_mouse(level: Level):
+    free_map = ~level.wall_map
+    free_map = free_map.at[
+        level.cheese_pos[0],
+        level.cheese_pos[1],
+    ].set(False)
 
-        # assemble level batch
-        num_levels = free_map.sum()
-        levels = Level(
-            wall_map=einops.repeat(
-                level.wall_map,
-                'h w -> n h w',
-                n=num_levels,
-            ),
-            cheese_pos=einops.repeat(
-                level.cheese_pos,
-                'c -> n c',
-                n=num_levels,
-            ),
-            initial_mouse_pos=jnp.stack(jnp.where(free_map), axis=1),
-        )
-        
-        # remember how to put the levels back together into a grid
-        levels_pos = jnp.where(free_map)
-        grid_shape = free_map.shape
-        
-        return base.SplayedLevelSet(
-            levels=levels,
-            num_levels=num_levels,
-            levels_pos=levels_pos,
-            grid_shape=grid_shape,
-        )
-
-
-    @staticmethod
-    def splay_cheese(level: Level) -> base.SplayedLevelSet:
-        free_map = ~level.wall_map
-        free_map = free_map.at[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-        ].set(False)
-
-        # assemble level batch
-        num_levels = free_map.sum()
-        levels = Level(
-            wall_map=einops.repeat(
-                level.wall_map,
-                'h w -> n h w',
-                n=num_levels,
-            ),
-            cheese_pos=jnp.stack(jnp.where(free_map), axis=1),
-            initial_mouse_pos=einops.repeat(
-                level.initial_mouse_pos,
-                'c -> n c',
-                n=num_levels,
-            ),
-        )
-        
-        # remember how to put the levels back together into a grid
-        levels_pos = jnp.where(free_map)
-        grid_shape = free_map.shape
-        
-        return base.SplayedLevelSet(
-            levels=levels,
-            num_levels=num_levels,
-            levels_pos=levels_pos,
-            grid_shape=grid_shape,
-        )
+    # assemble level batch
+    num_levels = free_map.sum()
+    levels = Level(
+        wall_map=einops.repeat(
+            level.wall_map,
+            'h w -> n h w',
+            n=num_levels,
+        ),
+        cheese_pos=einops.repeat(
+            level.cheese_pos,
+            'c -> n c',
+            n=num_levels,
+        ),
+        initial_mouse_pos=jnp.stack(jnp.where(free_map), axis=1),
+    )
+    
+    # remember how to put the levels back together into a grid
+    levels_pos = jnp.where(free_map)
+    grid_shape = free_map.shape
+    
+    return (
+        levels,
+        num_levels,
+        levels_pos,
+        grid_shape,
+    )
 
 
-    @staticmethod
-    def splay_cheese_and_mouse(level: Level) -> base.SplayedLevelSet:
-        free_map = ~level.wall_map
-        # macromaze
-        free_metamap = free_map[None,None,:,:] & free_map[:,:,None,None]
-        # remove mouse/cheese clashes
-        free_pos = jnp.where(free_map)
-        clash_pos = free_pos + free_pos # concatenate tuples
-        free_metamap = free_metamap.at[clash_pos].set(False)
-        # rearrange into appropriate order(s)
-        free_metamap_hhww = einops.rearrange(
-            free_metamap,
-            'H W h w -> H h W w',
-        )
+def splay_cheese(level: Level):
+    free_map = ~level.wall_map
+    free_map = free_map.at[
+        level.initial_mouse_pos[0],
+        level.initial_mouse_pos[1],
+    ].set(False)
 
-        # assemble level batch
-        num_spaces = free_map.sum()
-        num_levels = (num_spaces - 1) * num_spaces
-        # cheese/mouse spawn locations
-        cheese1, mouse1, cheese2, mouse2 = jnp.where(free_metamap_hhww)
-        levels = Level(
-            wall_map=einops.repeat(
-                level.wall_map,
-                'h w -> n h w',
-                n=num_levels,
-            ),
-            cheese_pos=jnp.stack((cheese1, cheese2), axis=1),
-            initial_mouse_pos=jnp.stack((mouse1, mouse2), axis=1),
-        )
+    # assemble level batch
+    num_levels = free_map.sum()
+    levels = Level(
+        wall_map=einops.repeat(
+            level.wall_map,
+            'h w -> n h w',
+            n=num_levels,
+        ),
+        cheese_pos=jnp.stack(jnp.where(free_map), axis=1),
+        initial_mouse_pos=einops.repeat(
+            level.initial_mouse_pos,
+            'c -> n c',
+            n=num_levels,
+        ),
+    )
+    
+    # remember how to put the levels back together into a grid
+    levels_pos = jnp.where(free_map)
+    grid_shape = free_map.shape
+    
+    return (
+        levels,
+        num_levels,
+        levels_pos,
+        grid_shape,
+    )
 
-        # remember how to put the levels back together into a grid
-        free_metamap_grid = einops.rearrange(
-            free_metamap_hhww[1:-1,:,1:-1,:],
-            'H h W w -> (H h) (W w)',
-        )
-        levels_pos = jnp.where(free_metamap_grid)
-        grid_shape = free_metamap_grid.shape
-        
-        return base.SplayedLevelSet(
-            levels=levels,
-            num_levels=num_levels,
-            levels_pos=levels_pos,
-            grid_shape=grid_shape,
-        )
+
+def splay_cheese_and_mouse(level: Level):
+    free_map = ~level.wall_map
+    # macromaze
+    free_metamap = free_map[None,None,:,:] & free_map[:,:,None,None]
+    # remove mouse/cheese clashes
+    free_pos = jnp.where(free_map)
+    clash_pos = free_pos + free_pos # concatenate tuples
+    free_metamap = free_metamap.at[clash_pos].set(False)
+    # rearrange into appropriate order(s)
+    free_metamap_hhww = einops.rearrange(
+        free_metamap,
+        'H W h w -> H h W w',
+    )
+
+    # assemble level batch
+    num_spaces = free_map.sum()
+    num_levels = (num_spaces - 1) * num_spaces
+    # cheese/mouse spawn locations
+    cheese1, mouse1, cheese2, mouse2 = jnp.where(free_metamap_hhww)
+    levels = Level(
+        wall_map=einops.repeat(
+            level.wall_map,
+            'h w -> n h w',
+            n=num_levels,
+        ),
+        cheese_pos=jnp.stack((cheese1, cheese2), axis=1),
+        initial_mouse_pos=jnp.stack((mouse1, mouse2), axis=1),
+    )
+
+    # remember how to put the levels back together into a grid
+    free_metamap_grid = einops.rearrange(
+        free_metamap_hhww[1:-1,:,1:-1,:],
+        'H h W w -> (H h) (W w)',
+    )
+    levels_pos = jnp.where(free_metamap_grid)
+    grid_shape = free_metamap_grid.shape
+    
+    return (
+        levels,
+        num_levels,
+        levels_pos,
+        grid_shape,
+    )
 
 

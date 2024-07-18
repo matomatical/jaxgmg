@@ -417,11 +417,3 @@ class LevelSolver:
         return vectorised_level_value(solns, levels)
 
 
-@struct.dataclass
-class SplayedLevelSet:
-    levels: Level
-    num_levels: int
-    levels_pos: Tuple[chex.Array, chex.Array]
-    grid_shape: Tuple[int, int]
-
-
