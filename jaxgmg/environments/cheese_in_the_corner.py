@@ -96,6 +96,9 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
+    terminate_after_cheese_and_corner: bool = False
+
+
     class Action(enum.IntEnum):
         """
         The environment has a discrete action space of size 4 with the following
@@ -184,7 +187,10 @@ class Env(base.Env):
         proxy_reward = got_corner_first_time.astype(float)
         
         # end of episode
-        done = state.got_cheese & state.got_corner
+        if self.terminate_after_cheese_and_corner:
+            done = state.got_cheese & state.got_corner
+        else:
+            done = state.got_cheese
 
         return (
             state,
