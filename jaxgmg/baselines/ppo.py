@@ -3,6 +3,7 @@ Proximal policy optimisation for a given network, environment, and set of
 training/eval levels.
 """
 
+import collections
 import functools
 import time
 
@@ -26,10 +27,21 @@ from jaxgmg.baselines import networks
 
 from typing import Tuple, Dict, Any
 from chex import Array, PRNGKey
-from jaxgmg.environments.base import EnvState, Env, Level
-from jaxgmg.environments.base import SplayedLevelSet
+from jaxgmg.environments.base import EnvState, Env, Level, LevelGenerator
 Observation = Array
 Metrics = Dict[str, Any]
+
+@struct.dataclass
+class TrainLevelSet:
+    def get_batch(self, rng, num_levels_in_batch: int) -> Level:
+        raise NotImplementedError
+
+@struct.dataclass
+class Eval:
+    def eval(self, rng: PRNGKey, train_state: TrainState) -> Metrics:
+        raise NotImplementedError
+
+
 
 
 # # # 
@@ -39,17 +51,11 @@ Metrics = Dict[str, Any]
 def run(
     rng: PRNGKey,
     env: Env,
-    train_levels: Level,                            # Level[n]
-    eval_levels_dict: Dict[str, Level],             # {str: Level[n]}
-    train_benchmark_returns: Array,                 # float[n]
-    eval_benchmark_returns_dict: Dict[str, Array],  # {str: float[n]}
-    splayset_dict: Dict[str, SplayedLevelSet],
+    train_level_set: TrainLevelSet,
+    evals_dict: Dict[str, Eval],
+    big_evals_dict: Dict[str, Eval],
     # policy config
     net: str,
-    # training dimensions
-    num_total_env_steps: int,
-    num_env_steps_per_cycle: int,
-    num_parallel_envs: int,
     # PPO hyperparameters
     ppo_lr: float,                      # learning rate
     ppo_gamma: float,                   # discount rate
@@ -61,25 +67,27 @@ def run(
     ppo_lr_annealing: bool,
     num_minibatches_per_epoch: int,
     num_epochs_per_cycle: int,
-    # evaluation config
+    # training dimensions
+    num_total_env_steps: int,
+    num_env_steps_per_cycle: int,
+    num_parallel_envs: int,
+    # evals dimensions
     num_cycles_per_eval: int,
-    num_env_steps_per_eval: int,
+    num_cycles_per_big_eval: int,
+    # training animation dimensions
+    train_gifs: bool,
+    train_gif_grid_width: int,
+    train_gif_level_of_detail: int,
+    # logging config
+    num_cycles_per_log: int,
+    save_files_to: str,                 # where to log metrics to disk
+    console_log: bool,                  # whether to log metrics to stdout
+    wandb_log: bool,                    # whether to log metrics to wandb
     # checkpointing config
     checkpointing: bool,
     keep_all_checkpoints: bool,
     max_num_checkpoints: int,
     num_cycles_per_checkpoint: int,
-    # logging config
-    console_log: bool,                  # whether to log metrics to stdout
-    wandb_log: bool,                    # whether to log metrics to wandb
-    num_cycles_per_log: int,
-    train_gifs: bool,
-    eval_gifs: bool,
-    num_cycles_per_gif: int,
-    gif_grid_width: int,
-    gif_level_of_detail: int,           # 1, 3, 4, or 8; sprite pixel width
-    num_cycles_per_splay: int,
-    save_files_to: str,
 ):
 
 
@@ -104,21 +112,9 @@ def run(
     num_total_env_steps_per_cycle = num_env_steps_per_cycle * num_parallel_envs
     num_total_cycles = num_total_env_steps // num_total_env_steps_per_cycle
     num_updates_per_cycle = num_epochs_per_cycle * num_minibatches_per_epoch
-    num_train_levels = jax.tree.leaves(train_levels)[0].shape[0]
     
 
-    # alternative axes
-    if wandb_log:
-        wandb.define_metric("step/env-step")
-        wandb.define_metric("env/train/*", step_metric="step/env-step")
-        for eval_name in eval_levels_dict.keys():
-            wandb.define_metric(
-                f"env/eval/{eval_name}/*",
-                step_metric="step/env-step",
-            )
-        wandb.define_metric("step/ppo-update")
-        wandb.define_metric("ppo/*", step_metric="step/ppo-update")
-        wandb.define_metric("ppo/std/*", step_metric="step/ppo-update")
+    # TODO: define wandb axes
 
     
     print(f"setting up agent with {net} architecture...")
@@ -128,7 +124,11 @@ def run(
     )
     # initialise the network
     rng_model, rng = jax.random.split(rng, 2)
-    example_level = jax.tree.map(lambda x: x[0], train_levels)
+    rng_example_level, rng = jax.random.split(rng, 2)
+    example_level = jax.tree.map(
+        lambda x: x[0],
+        train_level_set.get_batch(rng_example_level, 1),
+    )
     example_obs, _ = env.reset_to_level(example_level)
     net_init_params = net.init(rng_model, example_obs)
             
@@ -177,15 +177,11 @@ def run(
     )
     for t in range(num_total_cycles):
         rng_t, rng = jax.random.split(rng)
-        log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
-        if log_cycle:
-            metrics = {
-                'step': {},
-                'perf': {},
-                'env/train': {},
-                'env/eval': {},
-                'ppo': {},
-            }
+        log_ever = (console_log or wandb_log) 
+        log_cycle = log_ever and t % num_cycles_per_log == 0
+        eval_cycle = log_ever and t % num_cycles_per_eval == 0
+        big_eval_cycle = log_ever and t % num_cycles_per_big_eval == 0
+        metrics = collections.defaultdict(dict)
 
 
         # step counting
@@ -201,15 +197,10 @@ def run(
                 'env-step-after': t_env_after,
             })
 
+
         # choose levels for this round
         rng_levels, rng_t = jax.random.split(rng_t)
-        level_ids_t = jax.random.choice(
-            rng_levels,
-            num_train_levels,
-            (num_parallel_envs,),
-            replace=(num_parallel_envs >= num_train_levels),
-        )
-        levels_t = jax.tree.map(lambda x: x[level_ids_t], train_levels)
+        levels_t = train_level_set.get_batch(rng_levels, num_parallel_envs)
     
         
         # collect experience
@@ -222,9 +213,9 @@ def run(
             env=env,
             levels=levels_t,
             num_steps=num_env_steps_per_cycle,
-            discount_rate=ppo_gamma,
             compute_metrics=log_cycle,
-            benchmark_returns=train_benchmark_returns[level_ids_t],
+            discount_rate=ppo_gamma,
+            benchmark_returns=None,
         )
         if log_cycle:
             env_elapsed_time = time.perf_counter() - env_start_time
@@ -232,6 +223,14 @@ def run(
             metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
+        if log_cycle and train_gifs:
+            frames = animate_trajectories(
+                trajectories,
+                grid_width=train_gif_grid_width,
+                force_lod=train_gif_level_of_detail,
+                env=env,
+            )
+            metrics['env/train'].update({'rollouts_gif': frames})
 
 
         # ppo update network on this data a few times
@@ -260,39 +259,75 @@ def run(
             )
         
 
-        # periodic evaluation on fixed test levels
-        if log_cycle and t % num_cycles_per_eval == 0:
-            rng_eval, rng_t = jax.random.split(rng_t)
-            # this is a tree map but writing it that way would make it worse
-            eval_trajectories = {}
+        # periodic evaluations
+        if t % num_cycles_per_eval == 0:
+            rng_evals, rng_t = jax.random.split(rng_t)
             eval_metrics = {}
-            for eval_name, eval_levels in eval_levels_dict.items():
-                rng_eval_, rng_eval = jax.random.split(rng_eval)
-                eval_trajectories_, *_, eval_metrics_ = collect_trajectories(
+            for eval_name, eval_obj in evals_dict.items():
+                rng_eval, rng_evals = jax.random.split(rng_evals)
+                eval_metrics[eval_name] = eval_obj.eval(
                     rng=rng_eval,
                     train_state=train_state,
-                    env=env,
-                    levels=eval_levels,
-                    num_steps=num_env_steps_per_eval,
-                    discount_rate=ppo_gamma,
-                    compute_metrics=log_cycle,
-                    benchmark_returns=eval_benchmark_returns_dict[eval_name],
                 )
-                eval_trajectories[eval_name] = eval_trajectories_
-                eval_metrics[eval_name] = eval_metrics_
             metrics['env/eval'].update(eval_metrics)
         
+        # periodic big evals
+        if t % num_cycles_per_big_eval == 0:
+            rng_big_evals, rng_t = jax.random.split(rng_t)
+            eval_metrics = {}
+            for eval_name, eval_obj in big_evals_dict.items():
+                rng_eval, rng_big_evals = jax.random.split(rng_big_evals)
+                eval_metrics[eval_name] = eval_obj.eval(
+                    rng=rng_eval,
+                    train_state=train_state,
+                )
+            metrics['env/eval'].update(eval_metrics)
+       
 
         # periodic logging
-        if log_cycle:
+        if metrics:
+            # log to console
             if console_log:
                 progress.write("\n".join([
                     "=" * 59,
                     util.dict2str(metrics),
                     "=" * 59,
                 ]))
+            
+            # log to wandb
             if wandb_log:
-                wandb.log(step=t, data=util.wandb_metrics_dict(metrics))
+                metrics_wandb = util.flatten_dict(metrics)
+                for key, val in metrics_wandb.items():
+                    if key.endswith("_hist"):
+                        metrics_wandb[key] = wandb.Histogram(val)
+                    elif key.endswith("_gif"):
+                        metrics_wandb[key] = util.wandb_gif(val)
+                    elif key.endswith("_img"):
+                        metrics_wandb[key] = util.wandb_img(val)
+                    wandb.log(step=t, data=metrics_wandb)
+            
+            # log to disk
+            metrics_disk = util.flatten_dict(metrics)
+            metrics_path = fileman.get_path(f"metrics/{t}/")
+            progress.write(f"saving metrics to {metrics_path}...")
+            skip_keys = []
+            for key, val in metrics_disk.items():
+                if key.endswith("_hist"):
+                    metrics_disk[key] = val.tolist()
+                elif key.endswith("_gif"):
+                    path = metrics_path + key[:-4].replace('/','-') + ".gif"
+                    util.save_gif(val, path)
+                    skip_keys.append(key)
+                elif key.endswith("_img"):
+                    path = metrics_path + key[:-4].replace('/','-') + ".png"
+                    util.save_image(val, path)
+                    skip_keys.append(key)
+                elif isinstance(val, jax.Array):
+                    metrics_disk[key] = val.item()
+            for key in skip_keys:
+                del metrics_disk[key]
+            util.save_json(metrics_disk, metrics_path + "metrics.json")
+
         
 
         # periodic checkpointing
@@ -308,78 +343,6 @@ def run(
         #         t,
         #         args=ocp.args.PyTreeRestore(train_state_dtype),
         #     )
-
-        
-        # periodic training animation saving
-        if train_gifs and t % num_cycles_per_gif == 0:
-            frames = animate_trajectories(
-                trajectories,
-                grid_width=gif_grid_width,
-                force_lod=gif_level_of_detail,
-                env=env,
-            )
-            gif_path = fileman.get_path(f"gifs/train/{t}.gif")
-            util.save_gif(frames, gif_path)
-            progress.write("saved gif to " + gif_path)
-            
-            if wandb_log:
-                wandb.log(
-                    step=t,
-                    data={'gifs/train': util.wandb_gif(frames)},
-                )
-
-        
-        # periodic eval animation saving
-        if eval_gifs and t % num_cycles_per_gif == 0:
-            for eval_name, eval_trajectories_ in eval_trajectories.items():
-                frames = animate_trajectories(
-                    eval_trajectories_,
-                    grid_width=gif_grid_width,
-                    force_lod=gif_level_of_detail,
-                    env=env,
-                )
-                gif_path = fileman.get_path(f"gifs/eval-{eval_name}/{t}.gif")
-                util.save_gif(frames, gif_path)
-                progress.write("saved gif to " + gif_path)
-                
-                if wandb_log:
-                    wandb.log(
-                        step=t,
-                        data={'gifs/eval-'+eval_name: util.wandb_gif(frames)},
-                    )
-        
-
-        # periodic heatmaps from fixed splayed level sets
-        if log_cycle and t % num_cycles_per_splay == 0:
-            rng_splay, rng_t = jax.random.split(rng_t)
-            images = {}
-            for splay_name, splayset in splayset_dict.items():
-                rng_splay_, rng_splay = jax.random.split(rng_splay)
-                images[splay_name] = analyse_splayset(
-                    rng=rng_splay_,
-                    train_state=train_state,
-                    env=env,
-                    splayset=splayset,
-                    shape=splayset.grid_shape, # static
-                    num_steps=num_env_steps_per_eval,
-                    discount_rate=ppo_gamma,
-                )
-            images = util.flatten_dict(images)
-            for img_name, img in images.items():
-                img_path = fileman.get_path(f"imgs/splay-{img_name}/{t}.png")
-                util.save_image(img, img_path)
-            progress.write(
-                "saved some splay heatmaps to "
-                + fileman.get_path('imgs/splay-*')
-            )
-            if wandb_log:
-                wandb.log(
-                    step=t,
-                    data={
-                        f'splays/{k}': util.wandb_img(v)
-                        for k, v in images.items()
-                    },
-                )
 
 
         # ending cycle
@@ -427,11 +390,11 @@ def collect_trajectories(
     rng: PRNGKey,
     train_state: TrainState,
     env: Env,
-    levels: Level,              # Level[num_levels]
+    levels: Level,                      # Level[num_levels]
     num_steps: int,
-    discount_rate: float,
     compute_metrics: bool,
-    benchmark_returns: Array,   # float[num_levels]
+    discount_rate: float | None,
+    benchmark_returns: Array | None,    # float[num_levels]
 ) -> Tuple[
     Transition,
     Observation,
@@ -459,10 +422,10 @@ def collect_trajectories(
             parallel.
     * num_steps : int
             The environments will run forward for this many steps.
-    * discount_rate : float
-            Used in computing the return metric.
     * compute_metrics : bool (default True)
             Whether to compute metrics.
+    * discount_rate : float
+            Used in computing the return metric.
     * benchmark_returns : float[num_levels]
             For each level, what is the benchmark (e.g. optimal) return to be
             aiming for? Only used if `compute_metrics` is True.
@@ -540,8 +503,7 @@ def collect_trajectories(
             discount_rate,
         )
         avg_actual_return = actual_returns.mean()
-        avg_benchmark_return = benchmark_returns.mean()
-        
+
         metrics = {
             # approx. mean episode completion time (by episode and by level)
             'avg_episode_length_by_episode':
@@ -554,16 +516,20 @@ def collect_trajectories(
             # averages returns per episode (by level, vs. benchmark)
             'avg_return_by_level':
                 avg_actual_return,
-            'avg_benchmark_return_by_level':
-                avg_benchmark_return,
-            'benchmark_minus_actual_return':
-                avg_benchmark_return - avg_actual_return,
             # return distributions
             'all_returns_by_level_hist':
                 actual_returns,
-            'all_benchmark_returns_by_level_hist':
-                benchmark_returns,
         }
+        if benchmark_returns is not None:
+            avg_benchmark_return = benchmark_returns.mean()
+            metrics.update({
+                'avg_benchmark_return_by_level':
+                    avg_benchmark_return,
+                'benchmark_minus_actual_return':
+                    avg_benchmark_return - avg_actual_return,
+                'all_benchmark_returns_by_level_hist':
+                    benchmark_returns,
+            })
         if "proxy_rewards" in trajectories.info:
             for proxy, r_proxy in trajectories.info["proxy_rewards"].items():
                 proxy_returns = vmap_avg_return(
@@ -642,82 +608,6 @@ def compute_average_return(
     average_return = total_first_step_returns / num_episodes
     
     return average_return
-
-
-@functools.partial(jax.jit, static_argnames=('env', 'shape', 'num_steps'))
-def analyse_splayset(
-    rng: PRNGKey,
-    train_state: TrainState,
-    env: Env,
-    splayset: SplayedLevelSet,
-    shape: int,
-    num_steps: int,
-    discount_rate: float,
-) -> Metrics:
-    obs, _ = env.vreset_to_level(splayset.levels)
-    action_distr, values = train_state.apply_fn(train_state.params, obs)
-
-    # model value -> heatmap
-    value_heatmap = generate_heatmap(
-        data=values,
-        shape=shape,
-        pos=splayset.levels_pos,
-    )
-    
-    # model policy -> diamond map
-    action_probs = action_distr.probs
-    action_diamond_plot = generate_diamond_plot(
-        data=action_probs,
-        shape=shape,
-        pos=splayset.levels_pos,
-    )
-    
-    # model policy rollout returns -> heatmap
-    trajectories, *_ = collect_trajectories(
-        rng=rng,
-        train_state=train_state,
-        env=env,
-        levels=splayset.levels,
-        num_steps=num_steps,
-        discount_rate=discount_rate,
-        compute_metrics=False,
-        benchmark_returns=None,
-    )
-    returns = jax.vmap(compute_average_return, in_axes=(1,1,None))(
-        trajectories.reward,
-        trajectories.done,
-        discount_rate,
-    )
-    rollout_heatmap = generate_heatmap(
-        data=returns,
-        shape=shape,
-        pos=splayset.levels_pos,
-    )
-
-    return {
-        'value': value_heatmap,
-        'action-probs': action_diamond_plot,
-        'policy-rollout-return': rollout_heatmap,
-    }
-    
-    
-@functools.partial(jax.jit, static_argnames=('shape',))
-def generate_heatmap(data, shape, pos):
-    return util.viridis(jnp.zeros(shape).at[pos].set(data))
-
-
-@functools.partial(jax.jit, static_argnames=('shape',))
-def generate_diamond_plot(data, shape, pos):
-    color_data = util.viridis(data)
-    return einops.rearrange(
-        jnp.full((5, 5, *shape, 3), 0.4)
-            .at[:, :, pos[0], pos[1], :].set(0.5)
-            .at[1, 2, pos[0], pos[1], :].set(color_data[:,0,:])
-            .at[2, 1, pos[0], pos[1], :].set(color_data[:,1,:])
-            .at[3, 2, pos[0], pos[1], :].set(color_data[:,2,:])
-            .at[2, 3, pos[0], pos[1], :].set(color_data[:,3,:]),
-        'col row h w rgb -> (h col) (w row) rgb',
-    )
 
 
 # # # 
@@ -911,6 +801,179 @@ def ppo_loss(
 
 
 # # # 
+# TRAINING LEVEL SETS
+
+
+@struct.dataclass
+class FixedTrainLevelSet(TrainLevelSet):
+    num_levels: int
+    levels: Level       # Level[num_levels]
+
+
+    @functools.partial(
+        jax.jit,
+        static_argnames=['self', 'num_levels_in_batch'],
+    )
+    def get_batch(self, rng, num_levels_in_batch) -> Level:
+        level_ids = jax.random.choice(
+            rng,
+            self.num_levels,
+            (num_levels_in_batch,),
+            replace=(num_levels_in_batch >= self.num_levels),
+        )
+        levels_batch = jax.tree.map(lambda x: x[level_ids], self.levels)
+        return levels_batch
+
+
+@struct.dataclass
+class OnDemandTrainLevelSet(TrainLevelSet):
+    level_generator: LevelGenerator
+
+
+    @functools.partial(
+        jax.jit,
+        static_argnames=['self', 'num_levels_in_batch'],
+    )
+    def get_batch(self, rng, num_levels_in_batch) -> Level:
+        levels_batch = self.level_generator.vsample(
+            rng,
+            num_levels=num_levels_in_batch,
+        )
+        return levels_batch
+
+
+# # # 
+# EVALUATIONS
+
+
+@struct.dataclass
+class FixedLevelsEval(Eval):
+    num_levels: int
+    num_steps: int
+    discount_rate: float
+    env: Env
+    levels: Level       # Level[num_levels]
+    benchmarks: Array   # float[num_levels]
+
+
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+    ) -> Metrics:
+        *_, eval_metrics = collect_trajectories(
+            rng=rng,
+            train_state=train_state,
+            env=self.env,
+            levels=self.levels,
+            num_steps=self.num_steps,
+            discount_rate=self.discount_rate,
+            compute_metrics=True,
+            benchmark_returns=self.benchmarks,
+        )
+        return eval_metrics
+
+
+@struct.dataclass
+class AnimatedRolloutsEval(Eval):
+    num_levels: int
+    levels: Level       # Level[num_levels]
+    num_steps: int
+    gif_grid_width: int
+    gif_level_of_detail: int
+    env: Env
+
+
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+    ) -> Metrics:
+        trajectories, *_ = collect_trajectories(
+            rng=rng,
+            train_state=train_state,
+            env=self.env,
+            levels=self.levels,
+            num_steps=self.num_steps,
+            compute_metrics=False,
+            # n/a because compute metrics is false
+            discount_rate=None,
+            benchmark_returns=None,
+        )
+        frames = animate_trajectories(
+            trajectories,
+            grid_width=self.gif_grid_width,
+            force_lod=self.gif_level_of_detail,
+            env=self.env,
+        )
+        return {'rollouts_gif': frames}
+
+
+@struct.dataclass
+class HeatmapVisualisationEval(Eval):
+    levels: Level
+    num_levels: int
+    levels_pos: Tuple[Array, Array]
+    grid_shape: Tuple[int, int]
+    num_steps: int
+    discount_rate: float
+    env: Env
+
+
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+    ) -> Metrics:
+        obs, _ = self.env.vreset_to_level(self.levels)
+        action_distr, values = train_state.apply_fn(train_state.params, obs)
+
+        # model value -> heatmap
+        value_heatmap = generate_heatmap(
+            data=values,
+            shape=self.grid_shape,
+            pos=self.levels_pos,
+        )
+    
+        # model policy -> diamond map
+        action_probs = action_distr.probs
+        action_diamond_plot = generate_diamond_plot(
+            data=action_probs,
+            shape=self.grid_shape,
+            pos=self.levels_pos,
+        )
+    
+        # model policy rollout returns -> heatmap
+        trajectories, *_ = collect_trajectories(
+            rng=rng,
+            train_state=train_state,
+            env=self.env,
+            levels=self.levels,
+            num_steps=self.num_steps,
+            compute_metrics=False,
+            # n/a because compute metrics is false
+            discount_rate=None,
+            benchmark_returns=None,
+        )
+        returns = jax.vmap(compute_average_return, in_axes=(1,1,None))(
+            trajectories.reward,
+            trajectories.done,
+            self.discount_rate,
+        )
+        rollout_heatmap = generate_heatmap(
+            data=returns,
+            shape=self.grid_shape,
+            pos=self.levels_pos,
+        )
+
+        return {
+            'value_img': value_heatmap,
+            'action_probs_img': action_diamond_plot,
+            'policy_rollout_return_img': rollout_heatmap,
+        }
+    
+
+# # # 
 # Helper functions
 
 
@@ -924,8 +987,6 @@ def animate_trajectories(
     """
     Transform a trajectory into a sequence of images showing for each
     timestep a matrix of observations.
-
-    # TODO: show reward as flashes of colour filters?
     """
     obs = trajectories.obs
 
@@ -957,13 +1018,32 @@ def animate_trajectories(
     grid = jnp.pad(
         grid,
         pad_width=(
-            (0,16), # time
-            (1,0),  # height
-            (1,0),  # width
-            (0,0),  # channel
+            (0,8), # time
+            (1,0), # height
+            (1,0), # width
+            (0,0), # channel
         ),
     )
 
     return grid
+
+
+@functools.partial(jax.jit, static_argnames=('shape',))
+def generate_heatmap(data, shape, pos):
+    return util.viridis(jnp.zeros(shape).at[pos].set(data))
+
+
+@functools.partial(jax.jit, static_argnames=('shape',))
+def generate_diamond_plot(data, shape, pos):
+    color_data = util.viridis(data)
+    return einops.rearrange(
+        jnp.full((5, 5, *shape, 3), 0.4)
+            .at[:, :, pos[0], pos[1], :].set(0.5)
+            .at[1, 2, pos[0], pos[1], :].set(color_data[:,0,:])
+            .at[2, 1, pos[0], pos[1], :].set(color_data[:,1,:])
+            .at[3, 2, pos[0], pos[1], :].set(color_data[:,2,:])
+            .at[2, 3, pos[0], pos[1], :].set(color_data[:,3,:]),
+        'col row h w rgb -> (h col) (w row) rgb',
+    )
 
 
