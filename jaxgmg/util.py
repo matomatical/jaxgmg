@@ -70,7 +70,7 @@ def dict2str(dct):
         else:
             return str(value)
     return '\n'.join([
-        '  '*depth + (key + ':').ljust(42-2*depth) + render(value)
+        '  '*depth + (key + ':').ljust(48-2*depth) + render(value)
         for depth, key, value in dict2lines(dct, 1)
     ])
 
@@ -260,22 +260,6 @@ def wandb_gif(frames, fps=12):
         ),
         fps=fps,
     )
-
-
-def wandb_metrics_dict(metrics):
-    """
-    take a nested / typed metrics dict and convert it into a format
-    wandb will be able to handle
-    """
-    metrics_flat = flatten_dict(metrics)
-    for key, val in metrics_flat.items():
-        if key.endswith("_hist"):
-            metrics_flat[key] = wandb.Histogram(val)
-        if key.endswith("_gif"):
-            metrics_flat[key] = wandb_gif(val)
-        if key.endswith("_img"):
-            metrics_flat[key] = wandb_image(val)
-    return metrics_flat
 
 
 # # # 

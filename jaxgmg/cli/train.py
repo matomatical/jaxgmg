@@ -37,8 +37,10 @@ def corner(
     num_parallel_envs: int = 32,
     fixed_train_levels: bool = False,
     num_train_levels: int = 2048,
-    # other
-    seed: int = 42,
+    # training animation dimensions
+    train_gifs: bool = True,
+    train_gif_grid_width: int = 8,
+    train_gif_level_of_detail: int = 1,
     # evals config
     num_cycles_per_eval: int = 64,
     num_eval_levels: int = 256,
@@ -61,6 +63,8 @@ def corner(
     keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
     max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
     num_cycles_per_checkpoint: int = 512,
+    # other
+    seed: int = 42,
 ):
     util.print_config(locals())
 
@@ -119,6 +123,7 @@ def corner(
         benchmarks=eval_on_benchmark_returns,
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
+        env=env,
     )
 
     # off distribution
@@ -139,10 +144,11 @@ def corner(
     )
     eval_off_level_set = ppo.FixedLevelsEval(
         num_levels=num_eval_levels,
-        levels=eval_off_levels,
-        benchmarks=eval_off_benchmark_returns,
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
+        levels=eval_off_levels,
+        benchmarks=eval_off_benchmark_returns,
+        env=env,
     )
     
     # gif animations from those levels
@@ -152,6 +158,7 @@ def corner(
         num_steps=env.max_steps_in_episode,
         gif_grid_width=eval_gif_grid_width,
         gif_level_of_detail=eval_gif_level_of_detail,
+        env=env,
     )
     eval_off_animation = ppo.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
@@ -159,6 +166,7 @@ def corner(
         num_steps=env.max_steps_in_episode,
         gif_grid_width=eval_gif_grid_width,
         gif_level_of_detail=eval_gif_level_of_detail,
+        env=env,
     )
 
     # splayed eval levels
@@ -171,26 +179,29 @@ def corner(
             splay = cheese_in_the_corner.splay_cheese_and_mouse 
         case _:
             raise ValueError(f'unknown level splayer {level_splayer!r}')
-    # TODO: refactor to be explicit about this bit
     eval_on_heatmap_0 = ppo.HeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[0], eval_on_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
+        env=env,
     )
     eval_on_heatmap_1 = ppo.HeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[1], eval_on_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
+        env=env,
     )
     eval_off_heatmap_0 = ppo.HeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[0], eval_off_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
+        env=env,
     )
     eval_off_heatmap_1 = ppo.HeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[1], eval_off_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
+        env=env,
     )
 
     ppo.run(
@@ -227,6 +238,10 @@ def corner(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
+        # training animation dimensions
+        train_gifs=train_gifs,
+        train_gif_grid_width=train_gif_grid_width,
+        train_gif_level_of_detail=train_gif_level_of_detail,
         # evals
         num_cycles_per_eval=num_cycles_per_eval,
         num_cycles_per_big_eval=num_cycles_per_big_eval,

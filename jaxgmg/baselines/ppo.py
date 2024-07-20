@@ -3,6 +3,7 @@ Proximal policy optimisation for a given network, environment, and set of
 training/eval levels.
 """
 
+import collections
 import functools
 import time
 
@@ -73,9 +74,13 @@ def run(
     # evals dimensions
     num_cycles_per_eval: int,
     num_cycles_per_big_eval: int,
+    # training animation dimensions
+    train_gifs: bool,
+    train_gif_grid_width: int,
+    train_gif_level_of_detail: int,
     # logging config
     num_cycles_per_log: int,
-    save_files_to: str,
+    save_files_to: str,                 # where to log metrics to disk
     console_log: bool,                  # whether to log metrics to stdout
     wandb_log: bool,                    # whether to log metrics to wandb
     # checkpointing config
@@ -109,19 +114,7 @@ def run(
     num_updates_per_cycle = num_epochs_per_cycle * num_minibatches_per_epoch
     
 
-    # alternative axes
-    # TODO: this is out of date
-    if wandb_log:
-        wandb.define_metric("step/env-step")
-        wandb.define_metric("env/train/*", step_metric="step/env-step")
-        for eval_name in eval_levels_dict.keys():
-            wandb.define_metric(
-                f"env/eval/{eval_name}/*",
-                step_metric="step/env-step",
-            )
-        wandb.define_metric("step/ppo-update")
-        wandb.define_metric("ppo/*", step_metric="step/ppo-update")
-        wandb.define_metric("ppo/std/*", step_metric="step/ppo-update")
+    # TODO: define wandb axes
 
     
     print(f"setting up agent with {net} architecture...")
@@ -184,15 +177,11 @@ def run(
     )
     for t in range(num_total_cycles):
         rng_t, rng = jax.random.split(rng)
-        log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
-        if log_cycle:
-            metrics = {
-                'step': {},
-                'perf': {},
-                'env/train': {},
-                'env/eval': {},
-                'ppo': {},
-            }
+        log_ever = (console_log or wandb_log) 
+        log_cycle = log_ever and t % num_cycles_per_log == 0
+        eval_cycle = log_ever and t % num_cycles_per_eval == 0
+        big_eval_cycle = log_ever and t % num_cycles_per_big_eval == 0
+        metrics = collections.defaultdict(dict)
 
 
         # step counting
@@ -207,6 +196,7 @@ def run(
                 'ppo-update-ater': t_ppo_after,
                 'env-step-after': t_env_after,
             })
+
 
         # choose levels for this round
         rng_levels, rng_t = jax.random.split(rng_t)
@@ -233,6 +223,14 @@ def run(
             metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
+        if log_cycle and train_gifs:
+            frames = animate_trajectories(
+                trajectories,
+                grid_width=train_gif_grid_width,
+                force_lod=train_gif_level_of_detail,
+                env=env,
+            )
+            metrics['env/train'].update({'rollouts_gif': frames})
 
 
         # ppo update network on this data a few times
@@ -262,7 +260,7 @@ def run(
         
 
         # periodic evaluations
-        if log_cycle and t % num_cycles_per_eval == 0:
+        if t % num_cycles_per_eval == 0:
             rng_evals, rng_t = jax.random.split(rng_t)
             eval_metrics = {}
             for eval_name, eval_obj in evals_dict.items():
@@ -270,21 +268,66 @@ def run(
                 eval_metrics[eval_name] = eval_obj.eval(
                     rng=rng_eval,
                     train_state=train_state,
-                    env=env,
                 )
             metrics['env/eval'].update(eval_metrics)
         
+        # periodic big evals
+        if t % num_cycles_per_big_eval == 0:
+            rng_big_evals, rng_t = jax.random.split(rng_t)
+            eval_metrics = {}
+            for eval_name, eval_obj in big_evals_dict.items():
+                rng_eval, rng_big_evals = jax.random.split(rng_big_evals)
+                eval_metrics[eval_name] = eval_obj.eval(
+                    rng=rng_eval,
+                    train_state=train_state,
+                )
+            metrics['env/eval'].update(eval_metrics)
+       
 
         # periodic logging
-        if log_cycle:
+        if metrics:
+            # log to console
             if console_log:
                 progress.write("\n".join([
                     "=" * 59,
                     util.dict2str(metrics),
                     "=" * 59,
                 ]))
+            
+            # log to wandb
             if wandb_log:
-                wandb.log(step=t, data=util.wandb_metrics_dict(metrics))
+                metrics_wandb = util.flatten_dict(metrics)
+                for key, val in metrics_wandb.items():
+                    if key.endswith("_hist"):
+                        metrics_wandb[key] = wandb.Histogram(val)
+                    elif key.endswith("_gif"):
+                        metrics_wandb[key] = util.wandb_gif(val)
+                    elif key.endswith("_img"):
+                        metrics_wandb[key] = util.wandb_img(val)
+                    wandb.log(step=t, data=metrics_wandb)
+            
+            # log to disk
+            metrics_disk = util.flatten_dict(metrics)
+            metrics_path = fileman.get_path(f"metrics/{t}/")
+            progress.write(f"saving metrics to {metrics_path}...")
+            skip_keys = []
+            for key, val in metrics_disk.items():
+                if key.endswith("_hist"):
+                    metrics_disk[key] = val.tolist()
+                elif key.endswith("_gif"):
+                    path = metrics_path + key[:-4].replace('/','-') + ".gif"
+                    util.save_gif(val, path)
+                    skip_keys.append(key)
+                elif key.endswith("_img"):
+                    path = metrics_path + key[:-4].replace('/','-') + ".png"
+                    util.save_image(val, path)
+                    skip_keys.append(key)
+                elif isinstance(val, jax.Array):
+                    metrics_disk[key] = val.item()
+            for key in skip_keys:
+                del metrics_disk[key]
+            util.save_json(metrics_disk, metrics_path + "metrics.json")
+
         
 
         # periodic checkpointing
@@ -300,78 +343,6 @@ def run(
         #         t,
         #         args=ocp.args.PyTreeRestore(train_state_dtype),
         #     )
-
-        
-        # periodic training animation saving
-        if train_gifs and t % num_cycles_per_gif == 0:
-            frames = animate_trajectories(
-                trajectories,
-                grid_width=gif_grid_width,
-                force_lod=gif_level_of_detail,
-                env=env,
-            )
-            gif_path = fileman.get_path(f"gifs/train/{t}.gif")
-            util.save_gif(frames, gif_path)
-            progress.write("saved gif to " + gif_path)
-            
-            if wandb_log:
-                wandb.log(
-                    step=t,
-                    data={'gifs/train': util.wandb_gif(frames)},
-                )
-
-        
-        # periodic eval animation saving
-        if eval_gifs and t % num_cycles_per_gif == 0:
-            for eval_name, eval_trajectories_ in eval_trajectories.items():
-                frames = animate_trajectories(
-                    eval_trajectories_,
-                    grid_width=gif_grid_width,
-                    force_lod=gif_level_of_detail,
-                    env=env,
-                )
-                gif_path = fileman.get_path(f"gifs/eval-{eval_name}/{t}.gif")
-                util.save_gif(frames, gif_path)
-                progress.write("saved gif to " + gif_path)
-                
-                if wandb_log:
-                    wandb.log(
-                        step=t,
-                        data={'gifs/eval-'+eval_name: util.wandb_gif(frames)},
-                    )
-        
-
-        # periodic heatmaps from fixed splayed level sets
-        if log_cycle and t % num_cycles_per_splay == 0:
-            rng_splay, rng_t = jax.random.split(rng_t)
-            images = {}
-            for splay_name, splayset in splayset_dict.items():
-                rng_splay_, rng_splay = jax.random.split(rng_splay)
-                images[splay_name] = analyse_splayset(
-                    rng=rng_splay_,
-                    train_state=train_state,
-                    env=env,
-                    splayset=splayset,
-                    shape=splayset.grid_shape, # static
-                    num_steps=num_env_steps_per_eval,
-                    discount_rate=ppo_gamma,
-                )
-            images = util.flatten_dict(images)
-            for img_name, img in images.items():
-                img_path = fileman.get_path(f"imgs/splay-{img_name}/{t}.png")
-                util.save_image(img, img_path)
-            progress.write(
-                "saved some splay heatmaps to "
-                + fileman.get_path('imgs/splay-*')
-            )
-            if wandb_log:
-                wandb.log(
-                    step=t,
-                    data={
-                        f'splays/{k}': util.wandb_img(v)
-                        for k, v in images.items()
-                    },
-                )
 
 
         # ending cycle
@@ -878,27 +849,22 @@ class OnDemandTrainLevelSet(TrainLevelSet):
 @struct.dataclass
 class FixedLevelsEval(Eval):
     num_levels: int
-    levels: Level       # Level[num_levels]
-    benchmarks: Array   # float[num_levels]
     num_steps: int
     discount_rate: float
+    env: Env
+    levels: Level       # Level[num_levels]
+    benchmarks: Array   # float[num_levels]
 
-    # TODO: NEED TO FIND A WAY TO SPLIT THE LEVELS AND BENCHMARKS (not
-    # hashable, cant be static) FROM THE ENV AND NUM_STEPS (not jittable,
-    # need to be static)
 
-
-    @functools.partial(jax.jit, static_argnames=['env'])
     def eval(
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        env: Env,
     ) -> Metrics:
         *_, eval_metrics = collect_trajectories(
             rng=rng,
             train_state=train_state,
-            env=env,
+            env=self.env,
             levels=self.levels,
             num_steps=self.num_steps,
             discount_rate=self.discount_rate,
@@ -915,19 +881,18 @@ class AnimatedRolloutsEval(Eval):
     num_steps: int
     gif_grid_width: int
     gif_level_of_detail: int
+    env: Env
 
 
-    @functools.partial(jax.jit, static_argnames=['env'])
     def eval(
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        env: Env,
     ) -> Metrics:
         trajectories, *_ = collect_trajectories(
             rng=rng,
             train_state=train_state,
-            env=env,
+            env=self.env,
             levels=self.levels,
             num_steps=self.num_steps,
             compute_metrics=False,
@@ -939,7 +904,7 @@ class AnimatedRolloutsEval(Eval):
             trajectories,
             grid_width=self.gif_grid_width,
             force_lod=self.gif_level_of_detail,
-            env=env,
+            env=self.env,
         )
         return {'rollouts_gif': frames}
 
@@ -952,16 +917,15 @@ class HeatmapVisualisationEval(Eval):
     grid_shape: Tuple[int, int]
     num_steps: int
     discount_rate: float
+    env: Env
 
 
-    @functools.partial(jax.jit, static_argnames=['env'])
     def eval(
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        env: Env,
     ) -> Metrics:
-        obs, _ = env.vreset_to_level(self.levels)
+        obs, _ = self.env.vreset_to_level(self.levels)
         action_distr, values = train_state.apply_fn(train_state.params, obs)
 
         # model value -> heatmap
@@ -983,7 +947,7 @@ class HeatmapVisualisationEval(Eval):
         trajectories, *_ = collect_trajectories(
             rng=rng,
             train_state=train_state,
-            env=env,
+            env=self.env,
             levels=self.levels,
             num_steps=self.num_steps,
             compute_metrics=False,
@@ -1003,9 +967,9 @@ class HeatmapVisualisationEval(Eval):
         )
 
         return {
-            'value': value_heatmap,
-            'action-probs': action_diamond_plot,
-            'policy-rollout-return': rollout_heatmap,
+            'value_img': value_heatmap,
+            'action_probs_img': action_diamond_plot,
+            'policy_rollout_return_img': rollout_heatmap,
         }
     
 
