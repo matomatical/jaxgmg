@@ -75,7 +75,8 @@ class EnvState(base.EnvState):
     got_corner: bool
 
 
-class Env(base.Env): # TODO: make environments jittable?
+@struct.dataclass
+class Env(base.Env):
     """
     Cheese in the Corner environment.
 

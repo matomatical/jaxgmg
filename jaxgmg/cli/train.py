@@ -17,6 +17,7 @@ def corner(
     env_size: int = 9,
     env_layout: str = 'blocks',
     env_corner_size: int = 1,
+    env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "relu",
@@ -75,6 +76,7 @@ def corner(
     env = cheese_in_the_corner.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
+        terminate_after_cheese_and_corner=env_terminate_after_corner,
     )
 
     print(f"generating training level distribution...")
