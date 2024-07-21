@@ -94,7 +94,6 @@ def corner(
             num_levels=num_train_levels,
         )
         train_level_set = ppo.FixedTrainLevelSet(
-            num_levels=num_train_levels,
             levels=train_levels,
         )
     else:

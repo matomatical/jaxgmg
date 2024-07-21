@@ -806,20 +806,20 @@ def ppo_loss(
 
 @struct.dataclass
 class FixedTrainLevelSet(TrainLevelSet):
-    num_levels: int
     levels: Level       # Level[num_levels]
 
 
     @functools.partial(
         jax.jit,
-        static_argnames=['self', 'num_levels_in_batch'],
+        static_argnames=['num_levels_in_batch'],
     )
     def get_batch(self, rng, num_levels_in_batch) -> Level:
+        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
         level_ids = jax.random.choice(
             rng,
-            self.num_levels,
+            num_levels,
             (num_levels_in_batch,),
-            replace=(num_levels_in_batch >= self.num_levels),
+            replace=(num_levels_in_batch >= num_levels),
         )
         levels_batch = jax.tree.map(lambda x: x[level_ids], self.levels)
         return levels_batch
