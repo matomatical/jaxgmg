@@ -6,6 +6,7 @@ training/eval levels.
 import collections
 import functools
 import time
+import os
 
 import jax
 import jax.numpy as jnp
@@ -40,8 +41,6 @@ class TrainLevelSet:
 class Eval:
     def eval(self, rng: PRNGKey, train_state: TrainState) -> Metrics:
         raise NotImplementedError
-
-
 
 
 # # # 
@@ -269,7 +268,7 @@ def run(
                     rng=rng_eval,
                     train_state=train_state,
                 )
-            metrics['env/eval'].update(eval_metrics)
+            metrics['eval'].update(eval_metrics)
         
         # periodic big evals
         if t % num_cycles_per_big_eval == 0:
@@ -281,7 +280,7 @@ def run(
                     rng=rng_eval,
                     train_state=train_state,
                 )
-            metrics['env/eval'].update(eval_metrics)
+            metrics['eval'].update(eval_metrics)
        
 
         # periodic logging
@@ -329,7 +328,6 @@ def run(
             util.save_json(metrics_disk, metrics_path + "metrics.json")
 
         
-
         # periodic checkpointing
         if checkpointing and t % num_cycles_per_checkpoint == 0:
             checkpoint_manager.save(
@@ -354,6 +352,91 @@ def run(
     print("finishing checkpoints...")
     checkpoint_manager.wait_until_finished()
     checkpoint_manager.close()
+
+
+# # # 
+# Restore and evaluate a checkpoint
+
+
+def eval_checkpoint(
+    rng: PRNGKey,
+    checkpoint_path: str,
+    checkpoint_number: int,
+    env: Env,
+    net: str,
+    example_level: Level,
+    evals_dict: Dict[str, Eval],
+    save_files_to: str,
+):
+    fileman = util.RunFilesManager(root_path=save_files_to)
+    print("  run folder:", fileman.path)
+    
+    # initialise the checkpointer
+    checkpoint_manager = ocp.CheckpointManager(
+        directory=os.path.abspath(checkpoint_path),
+        options=ocp.CheckpointManagerOptions(
+            max_to_keep=None,
+            save_interval_steps=0,
+        ),
+    )
+    
+    # select agent architecture
+    net = networks.get_architecture_class_from_name(net)(
+        num_actions=env.num_actions,
+    )
+    # initialise the network to get the example type
+    rng_model, rng = jax.random.split(rng, 2)
+    example_obs, _ = env.reset_to_level(example_level)
+    net_init_params = net.init(rng_model, example_obs)
+
+    # reload checkpoint of interest
+    train_state = TrainState.create(
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0)),
+        params=net_init_params,
+        tx=optax.sgd(0),
+    )
+    train_state_dtype = jax.tree.map(
+        ocp.utils.to_shape_dtype_struct,
+        train_state,
+    )
+    train_state = checkpoint_manager.restore(
+        checkpoint_number,
+        args=ocp.args.PyTreeRestore(train_state_dtype),
+    )
+
+    # perform evals and log metrics
+    metrics = {}
+    for eval_name, eval_obj in evals_dict.items():
+        print("running eval", eval_name, "...")
+        rng_eval, rng = jax.random.split(rng)
+        metrics[eval_name] = eval_obj.eval(
+            rng=rng_eval,
+            train_state=train_state,
+        )
+        print(util.dict2str(metrics[eval_name]))
+        print("=" * 59)
+        
+    # log the metrics disk
+    metrics_disk = util.flatten_dict(metrics)
+    metrics_path = fileman.get_path(f"metrics/")
+    print(f"saving metrics to {metrics_path}...")
+    skip_keys = []
+    for key, val in metrics_disk.items():
+        if key.endswith("_hist"):
+            metrics_disk[key] = val.tolist()
+        elif key.endswith("_gif"):
+            path = metrics_path + key[:-4].replace('/','-') + ".gif"
+            util.save_gif(val, path)
+            skip_keys.append(key)
+        elif key.endswith("_img"):
+            path = metrics_path + key[:-4].replace('/','-') + ".png"
+            util.save_image(val, path)
+            skip_keys.append(key)
+        elif isinstance(val, jax.Array):
+            metrics_disk[key] = val.item()
+    for key in skip_keys:
+        del metrics_disk[key]
+    util.save_json(metrics_disk, metrics_path + "metrics.json")
 
 
 # # # 
