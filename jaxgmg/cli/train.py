@@ -20,7 +20,7 @@ def corner(
     env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
-    net_spec: str = "relu",                 # e.g. 'impla', 'impala:lstm'
+    net: str = "relu",                 # e.g. 'impla', 'impala:lstm'
     # PPO hyperparameters
     ppo_lr: float = 0.0005,                 # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -223,7 +223,7 @@ def corner(
             'off_distribution_eval_level_1_heatmaps': eval_off_heatmap_1,
         },
         # architecture
-        net_spec=net_spec,
+        net_spec=net,
         # algorithm
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
