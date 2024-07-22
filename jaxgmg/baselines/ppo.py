@@ -31,7 +31,7 @@ from chex import Array, ArrayTree, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, LevelGenerator
 Observation = Array
 Metrics = Dict[str, Any]
-ActorCriticCarry = ArrayTree
+ActorCriticState = ArrayTree
 
 @struct.dataclass
 class TrainLevelSet:
@@ -122,7 +122,7 @@ def run(
     net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network
     rng_model_init, rng = jax.random.split(rng, 2)
-    net_init_params, net_init_carry = net.init_params_and_carry(
+    net_init_params, net_init_state = net.init_params_and_state(
         rng=rng_model_init,
         obs_shape=env.obs_shape,
         obs_dtype=env.obs_dtype,
@@ -151,10 +151,13 @@ def run(
         lr = lr_schedule
     else:
         lr = ppo_lr
+    
+
+    # init train state
     train_state = TrainState.create(
         apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0)),
         params=net_init_params,
-        net_init_carry=net_init_carry,
+        net_init_state=net_init_state,
         tx=optax.chain(
             optax.clip_by_global_norm(ppo_max_grad_norm),
             optax.adam(learning_rate=lr),
@@ -383,7 +386,7 @@ def eval_checkpoint(
     net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network to get the example type
     rng_model_init, rng = jax.random.split(rng, 2)
-    net_init_params, net_init_carry = net.init_params_and_carry(
+    net_init_params, net_init_state = net.init_params_and_carry(
         rng=rng_model,
         obs_shape=env.obs_shape,
         obs_dtype=env.obs_dtype,
@@ -393,7 +396,7 @@ def eval_checkpoint(
     train_state = TrainState.create(
         apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0)),
         params=net_init_params,
-        net_init_carry=net_init_carry,
+        net_init_state=net_init_state,
         tx=optax.sgd(0), # dummy, will be overridden
     )
     train_state_dtype = jax.tree.map(
@@ -454,6 +457,7 @@ class Transition:
     """
     env_state: EnvState
     obs: Observation
+    rnn_state: ActorCriticState
     value: float
     action: int
     log_prob: float
@@ -502,7 +506,7 @@ def collect_trajectories(
     * env : jaxgmg.environments.base.Env
             Provides functions `reset` and `step` (actually, vectorised
             versions `vreset` and `vstep`).
-    * net_init_carry : ActorCriticCarry
+    * net_init_state : ActorCriticState
             An initial carry for the network.
     * levels : jaxgmg.environments.base.Level[num_levels]
             Vector of Level structs. This many environments will be run in
@@ -537,21 +541,25 @@ def collect_trajectories(
     # reset environments to these levels
     env_obs, env_state = env.vreset_to_level(levels=levels)
     num_levels = jax.tree.leaves(levels)[0].shape[0]
-    vec_net_init_carry = jax.tree.map(
+    vec_net_init_state = jax.tree.map(
         lambda c: einops.repeat(c, '... -> num_levels ...'),
-        train_state.net_init_carry,
+        train_state.net_init_state,
     )
-    initial_carry = (env_obs, env_state, vec_net_init_carry)
+    initial_carry = (env_obs, env_state, vec_net_init_state)
 
     def _env_step(carry, rng):
-        obs, env_state, net_carry = carry
+        obs, env_state, net_state = carry
 
         # select action
         rng_action, rng = jax.random.split(rng)
-        action_distribution, critic_value, net_carry = train_state.apply_fn(
+        (
+            action_distribution,
+            critic_value,
+            next_net_state,
+        ) = train_state.apply_fn(
             train_state.params,
             obs,
-            net_carry,
+            net_state,
         )
         action = action_distribution.sample(seed=rng_action)
         log_prob = action_distribution.log_prob(action)
@@ -564,22 +572,23 @@ def collect_trajectories(
             action,
         )
 
-        # reset net_init_carry where env reset
-        net_carry = jax.tree.map(
+        # reset to net_init_state in the environmnets that will reset
+        next_net_state = jax.tree.map(
             lambda c: jnp.where(
                 done,
                 vec_net_init_carry,
-                net_carry,
+                next_net_state,
             ),
-            net_carry,
+            next_net_state,
         )
         
         # carry to next step
-        carry = (next_obs, next_env_state, net_carry)
+        carry = (next_obs, next_env_state, next_net_state)
         # output
         transition = Transition(
             env_state=env_state,
             obs=obs,
+            net_state=net_state,
             value=critic_value,
             action=action,
             log_prob=log_prob,
@@ -594,12 +603,12 @@ def collect_trajectories(
         initial_carry,
         jax.random.split(rng, num_steps),
     )
-    final_obs, final_env_state, final_net_carry = final_carry
+    final_obs, final_env_state, final_net_state = final_carry
     final_value, _policy, _carry = train_state.
     final_pi, final_value, _final_carry = train_state.apply_fn(
         train_state.params,
         final_obs,
-        final_net_carry,
+        final_net_state,
     )
 
 
@@ -873,10 +882,13 @@ def ppo_loss(
 ]:
     # unpack minibatch
     trajectories, advantages, targets = data
-    # TODO: get the trajectories to have a hidden state in them
 
     # run network to get current value/log_prob prediction
-    action_distribution, value = apply_fn(params, trajectories.obs)
+    action_distribution, value = apply_fn(
+        params,
+        trajectories.obs,
+        trajectories.net_state,
+    )
     log_prob = action_distribution.log_prob(trajectories.action)
     
     # actor loss
@@ -1028,6 +1040,7 @@ class HeatmapVisualisationEval(Eval):
     num_steps: int
     discount_rate: float
     env: Env
+    # TODO: a flag for 'do rollouts'?
 
 
     def eval(
@@ -1035,16 +1048,25 @@ class HeatmapVisualisationEval(Eval):
         rng: PRNGKey,
         train_state: TrainState,
     ) -> Metrics:
-        obs, _ = self.env.vreset_to_level(self.levels)
-        action_distr, values = train_state.apply_fn(train_state.params, obs)
 
+        # CHEAP EVALS FROM INIT STATE ONLY
+        obs, _ = self.env.vreset_to_level(self.levels)
+        vec_net_init_state = jax.tree.map(
+            lambda c: einops.repeat(c, '... -> num_levels ...'),
+            train_state.net_init_state,
+            num_levels=self.num_levels,
+        )
+        action_distr, values = train_state.apply_fn(
+            train_state.params,
+            obs,
+            vec_net_init_state,
+        )
         # model value -> heatmap
         value_heatmap = generate_heatmap(
             data=values,
             shape=self.grid_shape,
             pos=self.levels_pos,
         )
-    
         # model policy -> diamond map
         action_probs = action_distr.probs
         action_diamond_plot = generate_diamond_plot(
@@ -1053,6 +1075,8 @@ class HeatmapVisualisationEval(Eval):
             pos=self.levels_pos,
         )
     
+        # EXPENSIVE EVALS, ROLLOUTS
+        # TODO: CONSIDER SEPARATING THESE INTO TWO DIFFERENT EVAL CLASSES
         # model policy rollout returns -> heatmap
         trajectories, *_ = collect_trajectories(
             rng=rng,

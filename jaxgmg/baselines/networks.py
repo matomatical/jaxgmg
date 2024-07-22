@@ -63,18 +63,18 @@ class ActorCriticNetwork(nn.Module):
     `@compact`). The call function should follow this API:
     
     ```
-    pi, v, carry = architecture.apply(
+    pi, v, next_state = architecture.apply(
         {'params': params},
         obs=obs,
-        carry=carry,
+        state=state,
     )
     ```
 
-    Then this superclass provides an `init_params_and_carry` method that
+    Then this superclass provides an `init_params_and_state` method that
     follows this API:
 
     ```
-    init_params, init_carry = net.init_params_and_carry(
+    init_params, init_state = net.init_params_and_state(
         rng=rng_init,
         obs_shape=obs.shape,
         obs_dtype=obs.dtype,
@@ -84,15 +84,15 @@ class ActorCriticNetwork(nn.Module):
     num_actions: int
 
 
-    def init_params_and_carry(self, rng, obs_shape, obs_dtype):
-        rng_init_carry, rng_init_params = jax.random.split(rng)
-        init_carry = self.initialize_carry(rng=rng_init_carry)
+    def init_params_and_state(self, rng, obs_shape, obs_dtype):
+        rng_init_state, rng_init_params = jax.random.split(rng)
+        init_state = self.initialize_state(rng=rng_init_state)
         input_shape = jax.ShapeDtypeStruct(shape=obs_shape, dtype=obs_dtype)
-        params = self.lazy_init(rngs=rng_init_params, input_shape, init_carry)
-        return params, init_carry
+        params = self.lazy_init(rngs=rng_init_params, input_shape, init_state)
+        return params, init_state
 
 
-    def initialize_carry(self, rng):
+    def initialize_state(self, rng):
         raise NotImplementedError
 
 
@@ -116,7 +116,7 @@ class ImpalaSmall(ActorCriticNetwork):
 
 
     @nn.compact
-    def __call__(self, x, carry):
+    def __call__(self, x, state):
         # state embedding
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
@@ -129,7 +129,7 @@ class ImpalaSmall(ActorCriticNetwork):
         # TODO: previous reward, previous action embedding?
         
         if use_lstm:
-            carry, x = nn.OptimizedLSTMCell(features=256)(carry, x)
+            state, x = nn.OptimizedLSTMCell(features=256)(state, x)
         else:
             x = nn.Dense(features=256)(x)
             x = nn.relu(x)
@@ -142,10 +142,10 @@ class ImpalaSmall(ActorCriticNetwork):
         v = nn.Dense(1)(x)
         v = jnp.squeeze(v)
 
-        return pi, v, carry
+        return pi, v, state
 
     
-    def initialize_carry(self, rng):
+    def initialize_state(self, rng):
         if self.use_lstm:
             # TODO: get THE module's LSTM Cell? This spawns a new one
             return nn.OptimizedLSTMCell(features=256).initialize_carry(
@@ -172,7 +172,7 @@ class ImpalaLarge(ActorCriticNetwork):
 
 
     @nn.compact
-    def __call__(self, x, carry):
+    def __call__(self, x, state):
         # state embedding
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
@@ -196,7 +196,7 @@ class ImpalaLarge(ActorCriticNetwork):
         # TODO: previous reward, previous action embedding?
         
         if use_lstm:
-            carry, x = nn.OptimizedLSTMCell(features=256)(carry, x)
+            state, x = nn.OptimizedLSTMCell(features=256)(state, x)
         else:
             x = nn.Dense(features=256)(x)
             x = nn.relu(x)
@@ -209,10 +209,10 @@ class ImpalaLarge(ActorCriticNetwork):
         v = nn.Dense(1)(x)
         v = jnp.squeeze(v)
 
-        return pi, v, carry
+        return pi, v, state
 
 
-    def initialize_carry(self, rng):
+    def initialize_state(self, rng):
         if self.use_lstm:
             # TODO: get THE module's LSTM Cell? This spawns a new one
             return nn.OptimizedLSTMCell(features=256).initialize_carry(
@@ -232,7 +232,7 @@ class ReLUFF(ActorCriticNetwork):
 
     
     @nn.compact
-    def __call__(self, x, carry):
+    def __call__(self, x, state):
         # state embedding
         x = jnp.ravel(x)
         for embedding_residual_block in range(self.num_embedding_layers):
@@ -248,9 +248,9 @@ class ReLUFF(ActorCriticNetwork):
         v = nn.Dense(1)(x)
         v = jnp.squeeze(v)
 
-        return pi, v, carry
+        return pi, v, state
 
 
-    def initialize_carry(self, rng):
+    def initialize_state(self, rng):
         return None
 
