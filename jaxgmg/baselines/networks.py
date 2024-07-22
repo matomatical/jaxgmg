@@ -21,7 +21,7 @@ def get_architecture(
     match spec:
         # relu net (optionally with a custom shape)
         case ["relu"]:
-            return ReLUFF(num_actions=num_actions)
+            return ReLUFF(num_actions=num_actions) # default layers x width
         case ["relu", layers_by_width]:
             layers, width = layers_by_width.split("x")
             return ReLUFF(
@@ -32,17 +32,17 @@ def get_architecture(
         # impala large (default, lstm, or ff)
         case ["impala"]:
             return ImpalaLarge(num_actions=num_actions) # default LSTM
-        case ["impala", "lstm"]:
-            return ImpalaLarge(num_actions=num_actions, use_lstm=True)
         case ["impala", "ff"]:
             return ImpalaLarge(num_actions=num_actions, use_lstm=False)
+        case ["impala", "lstm"]:
+            return ImpalaLarge(num_actions=num_actions, use_lstm=True)
         # impala small (default, lstm, or ff)
         case ["impala", "small"]:
             return ImpalaSmall(num_actions=num_actions) # default LSTM
-        case ["impala", "small", "lstm"]:
-            return ImpalaSmall(num_actions=num_actions, use_lstm=True)
         case ["impala", "small", "ff"]:
             return ImpalaSmall(num_actions=num_actions, use_lstm=False)
+        case ["impala", "small", "lstm"]:
+            return ImpalaSmall(num_actions=num_actions, use_lstm=True)
         case _:
             raise ValueError(f"Unknown net architecture spec: {name!r}.")
 
@@ -238,10 +238,10 @@ class ReLUFF(ActorCriticNetwork):
     def __call__(self, x, state):
         # state embedding
         x = jnp.ravel(x)
-        # at least one layer
+        # at least one layer (to start the residual stream)
         x = nn.Dense(self.embedding_layer_width)(x)
         x = nn.relu(x)
-        # remaining residual layers
+        # remaining residual layers (adding to residual stream)
         for embedding_residual_block in range(self.num_embedding_layers-1):
             y = nn.Dense(self.embedding_layer_width)(x)
             y = nn.relu(y)
