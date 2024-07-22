@@ -27,10 +27,11 @@ from jaxgmg.baselines import networks
 # types
 
 from typing import Tuple, Dict, Any
-from chex import Array, PRNGKey
+from chex import Array, ArrayTree, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, LevelGenerator
 Observation = Array
 Metrics = Dict[str, Any]
+ActorCriticCarry = ArrayTree
 
 @struct.dataclass
 class TrainLevelSet:
@@ -54,7 +55,7 @@ def run(
     evals_dict: Dict[str, Eval],
     big_evals_dict: Dict[str, Eval],
     # policy config
-    net: str,
+    net_spec: str,
     # PPO hyperparameters
     ppo_lr: float,                      # learning rate
     ppo_gamma: float,                   # discount rate
@@ -116,20 +117,16 @@ def run(
     # TODO: define wandb axes
 
     
-    print(f"setting up agent with {net} architecture...")
-    # select agent architecture
-    net = networks.get_architecture_class_from_name(net)(
-        num_actions=env.num_actions,
-    )
+    print(f"setting up agent with architecture {net_spec!r}...")
+    # select architecture
+    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network
-    rng_model, rng = jax.random.split(rng, 2)
-    rng_example_level, rng = jax.random.split(rng, 2)
-    example_level = jax.tree.map(
-        lambda x: x[0],
-        train_level_set.get_batch(rng_example_level, 1),
+    rng_model_init, rng = jax.random.split(rng, 2)
+    net_init_params, net_init_carry = net.init_params_and_carry(
+        rng=rng_model_init,
+        obs_shape=env.obs_shape,
+        obs_dtype=env.obs_dtype,
     )
-    example_obs, _ = env.reset_to_level(example_level)
-    net_init_params = net.init(rng_model, example_obs)
             
 
     # initialise the checkpointer
@@ -155,8 +152,9 @@ def run(
     else:
         lr = ppo_lr
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0)),
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0)),
         params=net_init_params,
+        net_init_carry=net_init_carry,
         tx=optax.chain(
             optax.clip_by_global_norm(ppo_max_grad_norm),
             optax.adam(learning_rate=lr),
@@ -206,7 +204,13 @@ def run(
         rng_env, rng_t = jax.random.split(rng_t)
         if log_cycle:
             env_start_time = time.perf_counter()
-        trajectories, env_obs, env_state, env_metrics = collect_trajectories(
+        (
+            trajectories,
+            env_obs,
+            env_state,
+            final_value,
+            env_metrics,
+        ) = collect_trajectories(
             rng=rng_env,
             train_state=train_state,
             env=env,
@@ -241,6 +245,7 @@ def run(
             train_state=train_state,
             trajectories=trajectories,
             final_obs=env_obs,
+            final_value=final_value,
             num_epochs=num_epochs_per_cycle,
             num_minibatches_per_epoch=num_minibatches_per_epoch,
             gamma=ppo_gamma,
@@ -335,12 +340,6 @@ def run(
                 args=ocp.args.PyTreeSave(train_state),
             )
             progress.write(f"saving checkpoint to {checkpoint_path}/{t}...")
-        #     # this would be the code to restore
-        #     train_state_type = jax.tree.map(ocp.utils.to_shape_dtype_struct, train_state)
-        #     train_state = checkpoint_manager.restore(
-        #         t,
-        #         args=ocp.args.PyTreeRestore(train_state_dtype),
-        #     )
 
 
         # ending cycle
@@ -363,7 +362,7 @@ def eval_checkpoint(
     checkpoint_path: str,
     checkpoint_number: int,
     env: Env,
-    net: str,
+    net_spec: str,
     example_level: Level,
     evals_dict: Dict[str, Eval],
     save_files_to: str,
@@ -381,19 +380,21 @@ def eval_checkpoint(
     )
     
     # select agent architecture
-    net = networks.get_architecture_class_from_name(net)(
-        num_actions=env.num_actions,
-    )
+    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network to get the example type
-    rng_model, rng = jax.random.split(rng, 2)
-    example_obs, _ = env.reset_to_level(example_level)
-    net_init_params = net.init(rng_model, example_obs)
+    rng_model_init, rng = jax.random.split(rng, 2)
+    net_init_params, net_init_carry = net.init_params_and_carry(
+        rng=rng_model,
+        obs_shape=env.obs_shape,
+        obs_dtype=env.obs_dtype,
+    )
 
     # reload checkpoint of interest
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0)),
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0)),
         params=net_init_params,
-        tx=optax.sgd(0),
+        net_init_carry=net_init_carry,
+        tx=optax.sgd(0), # dummy, will be overridden
     )
     train_state_dtype = jax.tree.map(
         ocp.utils.to_shape_dtype_struct,
@@ -479,8 +480,9 @@ def collect_trajectories(
     discount_rate: float | None,
     benchmark_returns: Array | None,    # float[num_levels]
 ) -> Tuple[
-    Transition,
-    Observation,
+    Transition,                         # Transition[num_steps, num_levels]
+    Observation,                        # Observation[num_levels]
+    Array,                              # float[num_levels]
     EnvState,
     Metrics,
 ]:
@@ -500,6 +502,8 @@ def collect_trajectories(
     * env : jaxgmg.environments.base.Env
             Provides functions `reset` and `step` (actually, vectorised
             versions `vreset` and `vstep`).
+    * net_init_carry : ActorCriticCarry
+            An initial carry for the network.
     * levels : jaxgmg.environments.base.Level[num_levels]
             Vector of Level structs. This many environments will be run in
             parallel.
@@ -523,6 +527,8 @@ def collect_trajectories(
     * final_env_state : jaxgmg.environments.base.EnvState[num_levels]
             The env state arising after the final transition in each
             trajectory.
+    * final_value : float[num_levels]
+            The network's output for the result of the final transition.
     * metrics : {str: Any}
             A dictionary of statistics calculated based on the collected
             experience. Each key is prefixed with `metrics_prefix`.
@@ -530,16 +536,22 @@ def collect_trajectories(
     """
     # reset environments to these levels
     env_obs, env_state = env.vreset_to_level(levels=levels)
-    initial_carry = (env_obs, env_state)
+    num_levels = jax.tree.leaves(levels)[0].shape[0]
+    vec_net_init_carry = jax.tree.map(
+        lambda c: einops.repeat(c, '... -> num_levels ...'),
+        train_state.net_init_carry,
+    )
+    initial_carry = (env_obs, env_state, vec_net_init_carry)
 
     def _env_step(carry, rng):
-        obs, env_state = carry
+        obs, env_state, net_carry = carry
 
         # select action
         rng_action, rng = jax.random.split(rng)
-        action_distribution, critic_value = train_state.apply_fn(
+        action_distribution, critic_value, net_carry = train_state.apply_fn(
             train_state.params,
             obs,
+            net_carry,
         )
         action = action_distribution.sample(seed=rng_action)
         log_prob = action_distribution.log_prob(action)
@@ -551,9 +563,19 @@ def collect_trajectories(
             env_state,
             action,
         )
+
+        # reset net_init_carry where env reset
+        net_carry = jax.tree.map(
+            lambda c: jnp.where(
+                done,
+                vec_net_init_carry,
+                net_carry,
+            ),
+            net_carry,
+        )
         
         # carry to next step
-        carry = (next_obs, next_env_state)
+        carry = (next_obs, next_env_state, net_carry)
         # output
         transition = Transition(
             env_state=env_state,
@@ -572,7 +594,14 @@ def collect_trajectories(
         initial_carry,
         jax.random.split(rng, num_steps),
     )
-    final_obs, final_env_state = final_carry
+    final_obs, final_env_state, final_net_carry = final_carry
+    final_value, _policy, _carry = train_state.
+    final_pi, final_value, _final_carry = train_state.apply_fn(
+        train_state.params,
+        final_obs,
+        final_net_carry,
+    )
+
 
     if compute_metrics:
         # compute returns
@@ -635,6 +664,7 @@ def collect_trajectories(
         trajectories,
         final_obs,
         final_env_state,
+        final_value,
         metrics,
     )
 
@@ -694,10 +724,6 @@ def compute_average_return(
 
 
 # # # 
-# RUN FILES MANAGEMENT
-
-
-# # # 
 # PPO loss function and optimisation
 
 
@@ -714,8 +740,9 @@ def ppo_update(
     # training state
     train_state: TrainState,
     # data
-    trajectories: Transition,
-    final_obs: Observation,
+    trajectories: Transition,   # Transition[num_steps, num_levels]
+    final_obs: Observation,     # Observation[num_levels]
+    final_value: Array,         # float[num_levels]
     # ppo hyperparameters
     num_epochs: int,
     num_minibatches_per_epoch: int,
@@ -732,7 +759,6 @@ def ppo_update(
     Metrics,
 ]:
     # generalised advantage estimation
-    _, final_value = train_state.apply_fn(train_state.params, final_obs)
     initial_carry = (
         jnp.zeros_like(final_value),
         final_value,
@@ -847,6 +873,7 @@ def ppo_loss(
 ]:
     # unpack minibatch
     trajectories, advantages, targets = data
+    # TODO: get the trajectories to have a hidden state in them
 
     # run network to get current value/log_prob prediction
     action_distribution, value = apply_fn(params, trajectories.obs)
