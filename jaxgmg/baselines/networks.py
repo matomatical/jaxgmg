@@ -26,8 +26,8 @@ def get_architecture(
             layers, width = layers_by_width.split("x")
             return ReLUFF(
                 num_actions=num_actions,
-                num_embedding_layers=layers,
-                embedding_layer_width=width,
+                num_embedding_layers=int(layers),
+                embedding_layer_width=int(width),
             )
         # impala large (default, lstm, or ff)
         case ["impala"]:
