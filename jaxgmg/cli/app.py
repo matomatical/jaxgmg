@@ -218,7 +218,7 @@ app.add_typer(make_typer_app(
         train.corner,
         # train.dish,
         # train.follow,
-        # train.keys,
+        train.keys,
         # train.lava,
         # train.monsters,
     ),

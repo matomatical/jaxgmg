@@ -509,9 +509,9 @@ def collect_trajectories(
             Whether to compute metrics.
     * discount_rate : float
             Used in computing the return metric.
-    * benchmark_returns : float[num_levels]
+    * benchmark_returns : float[num_levels] | None
             For each level, what is the benchmark (e.g. optimal) return to be
-            aiming for? Only used if `compute_metrics` is True.
+            aiming for? Only used if `compute_metrics` is True and non-null.
 
     Returns:
 
@@ -931,6 +931,33 @@ class OnDemandTrainLevelSet(TrainLevelSet):
 
 @struct.dataclass
 class FixedLevelsEval(Eval):
+    num_levels: int
+    num_steps: int
+    discount_rate: float
+    env: Env
+    levels: Level       # Level[num_levels]
+
+
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+    ) -> Metrics:
+        *_, eval_metrics = collect_trajectories(
+            rng=rng,
+            train_state=train_state,
+            env=self.env,
+            levels=self.levels,
+            num_steps=self.num_steps,
+            discount_rate=self.discount_rate,
+            compute_metrics=True,
+            benchmark_returns=None,
+        )
+        return eval_metrics
+
+
+@struct.dataclass
+class FixedLevelsEvalWithBenchmarkReturns(Eval):
     num_levels: int
     num_steps: int
     discount_rate: float
