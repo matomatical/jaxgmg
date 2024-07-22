@@ -2,7 +2,7 @@
 Actor-critic architectures for RL experiments.
 """
 
-import numpy as np
+import jax
 import jax.numpy as jnp
 import flax.linen as nn
 import distrax
@@ -84,11 +84,14 @@ class ActorCriticNetwork(nn.Module):
     num_actions: int
 
 
-    def init_params_and_state(self, rng, obs_shape, obs_dtype):
+    def init_params_and_state(self, rng, obs_type):
         rng_init_state, rng_init_params = jax.random.split(rng)
         init_state = self.initialize_state(rng=rng_init_state)
-        input_shape = jax.ShapeDtypeStruct(shape=obs_shape, dtype=obs_dtype)
-        params = self.lazy_init(rngs=rng_init_params, input_shape, init_state)
+        params = self.lazy_init(
+            rngs=rng_init_params,
+            x=obs_type,
+            state=init_state,
+        )
         return params, init_state
 
 
@@ -96,7 +99,7 @@ class ActorCriticNetwork(nn.Module):
         raise NotImplementedError
 
 
-    def __call__(self, rng):
+    def __call__(self, rng, x, state):
         raise NotImplementedError
 
 
@@ -235,7 +238,11 @@ class ReLUFF(ActorCriticNetwork):
     def __call__(self, x, state):
         # state embedding
         x = jnp.ravel(x)
-        for embedding_residual_block in range(self.num_embedding_layers):
+        # at least one layer
+        x = nn.Dense(self.embedding_layer_width)(x)
+        x = nn.relu(x)
+        # remaining residual layers
+        for embedding_residual_block in range(self.num_embedding_layers-1):
             y = nn.Dense(self.embedding_layer_width)(x)
             y = nn.relu(y)
             x = x + y
