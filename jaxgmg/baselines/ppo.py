@@ -595,7 +595,7 @@ def collect_trajectories(
         next_net_state = jax.tree.map(
             lambda c: jnp.where(
                 done,
-                vec_net_init_carry,
+                vec_net_init_state,
                 next_net_state,
             ),
             next_net_state,
