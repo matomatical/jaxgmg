@@ -421,8 +421,8 @@ def eval_checkpoint(
     net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network to get the example type
     rng_model_init, rng = jax.random.split(rng, 2)
-    net_init_params, net_init_state = net.init_params_and_carry(
-        rng=rng_model,
+    net_init_params, net_init_state = net.init_params_and_state(
+        rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
 
@@ -430,7 +430,6 @@ def eval_checkpoint(
     train_state = TrainState.create(
         apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
         params=net_init_params,
-        net_init_state=net_init_state,
         tx=optax.sgd(0), # dummy, will be overridden
     )
     train_state_dtype = jax.tree.map(
