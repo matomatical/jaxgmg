@@ -12,3 +12,7 @@ jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env
 # IMPALA LSTM
 jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala-small:lstm
 jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:lstm
+
+# long running LSTM test
+jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:lstm --num-total-env-steps 200000000 --env-terminate-after-corner
+jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:ff   --num-total-env-steps 200000000 --env-terminate-after-corner

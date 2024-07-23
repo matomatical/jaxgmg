@@ -65,6 +65,7 @@ class ActorCriticNetwork(nn.Module):
         params=params,
         obs=obs,
         state=state,
+        prev_action=prev_action, # or -1 for first step in episode
     )
     ```
 
@@ -86,8 +87,9 @@ class ActorCriticNetwork(nn.Module):
         init_state = self.initialize_state(rng=rng_init_state)
         params = self.lazy_init(
             rngs=rng_init_params,
-            x=obs_type,
+            obs=obs_type,
             state=init_state,
+            prev_action=-1,
         )
         return params, init_state
 
@@ -96,7 +98,7 @@ class ActorCriticNetwork(nn.Module):
         raise NotImplementedError
 
 
-    def __call__(self, rng, x, state):
+    def __call__(self, obs, state, prev_action):
         raise NotImplementedError
 
 
@@ -120,8 +122,9 @@ class ImpalaLargeFF(ActorCriticNetwork):
 
 
     @nn.compact
-    def __call__(self, x, state):
-        # state embedding
+    def __call__(self, obs, state, prev_action):
+        # obs embedding
+        x = obs
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -140,18 +143,27 @@ class ImpalaLargeFF(ActorCriticNetwork):
         x = nn.relu(x)
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
+        obs_embedding = x
+
+        # previous action embedding
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+
+        # combined embedding
+        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
         
-        # TODO: previous reward, previous action embedding?
-        
-        x = nn.Dense(features=256)(x)
-        x = nn.relu(x)
+        # dense block in lieu of lstm
+        x = nn.Dense(features=256)(embedding)
+        lstm_out = nn.relu(x)
 
         # actor head
-        logits = nn.Dense(self.num_actions)(x)
+        logits = nn.Dense(self.num_actions)(lstm_out)
         pi = distrax.Categorical(logits=logits)
 
         # critic head
-        v = nn.Dense(1)(x)
+        v = nn.Dense(1)(lstm_out)
         v = jnp.squeeze(v)
 
         return pi, v, state
@@ -176,8 +188,10 @@ class ImpalaSmallFF(ActorCriticNetwork):
 
 
     @nn.compact
-    def __call__(self, x, state):
-        # state embedding
+    def __call__(self, obs, state, prev_action):
+
+        # obs embedding
+        x = obs
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -185,18 +199,27 @@ class ImpalaSmallFF(ActorCriticNetwork):
         x = jnp.ravel(x)
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
+        obs_embedding = x
 
-        # TODO: previous reward, previous action embedding?
+        # previous action embedding
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+
+        # combined embedding
+        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
         
-        x = nn.Dense(features=256)(x)
-        x = nn.relu(x)
+        # dense block in lieu of lstm
+        x = nn.Dense(features=256)(embedding)
+        lstm_out = nn.relu(x)
 
         # actor head
-        logits = nn.Dense(self.num_actions)(x)
+        logits = nn.Dense(self.num_actions)(lstm_out)
         pi = distrax.Categorical(logits=logits)
 
         # critic head
-        v = nn.Dense(1)(x)
+        v = nn.Dense(1)(lstm_out)
         v = jnp.squeeze(v)
 
         return pi, v, state
@@ -222,8 +245,9 @@ class ImpalaLarge(ActorCriticNetwork):
 
 
     @nn.compact
-    def __call__(self, x, state):
-        # state embedding
+    def __call__(self, obs, state, prev_action):
+        # obs embedding
+        x = obs
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -242,17 +266,26 @@ class ImpalaLarge(ActorCriticNetwork):
         x = nn.relu(x)
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
+        obs_embedding = x
         
-        # TODO: previous reward, previous action embedding?
-        
-        state, x = self._lstm_block(state, x)
+        # previous action embedding
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+
+        # combined embedding
+        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+
+        # lstm block
+        state, lstm_out = self._lstm_block(state, embedding)
 
         # actor head
-        logits = nn.Dense(self.num_actions)(x)
+        logits = nn.Dense(self.num_actions)(lstm_out)
         pi = distrax.Categorical(logits=logits)
 
         # critic head
-        v = nn.Dense(1)(x)
+        v = nn.Dense(1)(lstm_out)
         v = jnp.squeeze(v)
 
         return pi, v, state
@@ -277,8 +310,9 @@ class ImpalaSmall(ActorCriticNetwork):
 
 
     @nn.compact
-    def __call__(self, x, state):
-        # state embedding
+    def __call__(self, obs, state, prev_action):
+        # obs embedding
+        x = obs
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -286,17 +320,26 @@ class ImpalaSmall(ActorCriticNetwork):
         x = jnp.ravel(x)
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
+        obs_embedding = x
 
-        # TODO: previous reward, previous action embedding?
-        
-        state, x = self._lstm_block(state, x)
+        # previous action embedding
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+
+        # combined embedding
+        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+
+        # lstm block
+        state, lstm_out = self._lstm_block(state, embedding)
 
         # actor head
-        logits = nn.Dense(self.num_actions)(x)
+        logits = nn.Dense(self.num_actions)(lstm_out)
         pi = distrax.Categorical(logits=logits)
 
         # critic head
-        v = nn.Dense(1)(x)
+        v = nn.Dense(1)(lstm_out)
         v = jnp.squeeze(v)
 
         return pi, v, state
@@ -322,9 +365,9 @@ class ReLUFF(ActorCriticNetwork):
 
     
     @nn.compact
-    def __call__(self, x, state):
-        # state embedding
-        x = jnp.ravel(x)
+    def __call__(self, obs, state, prev_action):
+        # obs embedding
+        x = jnp.ravel(obs)
         # at least one layer (to start the residual stream)
         x = nn.Dense(self.embedding_layer_width)(x)
         x = nn.relu(x)
@@ -333,13 +376,23 @@ class ReLUFF(ActorCriticNetwork):
             y = nn.Dense(self.embedding_layer_width)(x)
             y = nn.relu(y)
             x = x + y
+        obs_embedding = x
+
+        # previous action embedding
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+
+        # combined embedding
+        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
 
         # actor head
-        logits = nn.Dense(self.num_actions)(x)
+        logits = nn.Dense(self.num_actions)(embedding)
         pi = distrax.Categorical(logits=logits)
 
         # critic head
-        v = nn.Dense(1)(x)
+        v = nn.Dense(1)(embedding)
         v = jnp.squeeze(v)
 
         return pi, v, state

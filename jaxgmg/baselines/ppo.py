@@ -63,6 +63,7 @@ class Transition:
     env_state: EnvState
     obs: Observation
     net_state: ActorCriticState
+    prev_action: int
     value: float
     action: int
     log_prob: float
@@ -188,7 +189,7 @@ def run(
 
     # init train state
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0)),
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
         params=net_init_params,
         tx=optax.chain(
             optax.clip_by_global_norm(ppo_max_grad_norm),
@@ -427,7 +428,7 @@ def eval_checkpoint(
 
     # reload checkpoint of interest
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0)),
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
         params=net_init_params,
         net_init_state=net_init_state,
         tx=optax.sgd(0), # dummy, will be overridden
@@ -565,10 +566,16 @@ def collect_trajectories(
         ),
         net_init_state,
     )
-    initial_carry = (env_obs, env_state, vec_net_init_state)
+    vec_default_prev_action = -jnp.ones(num_levels, dtype=int)
+    initial_carry = (
+        env_obs,
+        env_state,
+        vec_net_init_state,
+        vec_default_prev_action,
+    )
 
     def _env_step(carry, rng):
-        obs, env_state, net_state = carry
+        obs, env_state, net_state, prev_action = carry
 
         # select action
         rng_action, rng = jax.random.split(rng)
@@ -580,6 +587,7 @@ def collect_trajectories(
             train_state.params,
             obs,
             net_state,
+            prev_action,
         )
         action = action_distribution.sample(seed=rng_action)
         log_prob = action_distribution.log_prob(action)
@@ -592,7 +600,7 @@ def collect_trajectories(
             action,
         )
 
-        # reset to net_init_state in the parallel envs that are done
+        # reset to net_init_state and prev_action in the parallel envs that are done
         next_net_state = jax.tree.map(
             lambda r, s: jnp.where(
                 # reverse broadcast to shape of r (= shape of s)
@@ -603,13 +611,19 @@ def collect_trajectories(
             vec_net_init_state,
             next_net_state,
         )
+        next_prev_action = jnp.where(
+            done, 
+            vec_default_prev_action,
+            action,
+        )
         
         # carry to next step
-        carry = (next_obs, next_env_state, next_net_state)
+        carry = (next_obs, next_env_state, next_net_state, next_prev_action)
         # output
         transition = Transition(
             env_state=env_state,
             obs=obs,
+            prev_action=prev_action,
             net_state=net_state,
             value=critic_value,
             action=action,
@@ -625,11 +639,17 @@ def collect_trajectories(
         initial_carry,
         jax.random.split(rng, num_steps),
     )
-    final_obs, final_env_state, final_net_state = final_carry
-    final_pi, final_value, _final_carry = train_state.apply_fn(
+    (
+        final_obs,
+        final_env_state,
+        final_net_state,
+        final_prev_action,
+    ) = final_carry
+    final_pi, final_value, _final_net_state = train_state.apply_fn(
         train_state.params,
         final_obs,
         final_net_state,
+        final_prev_action,
     )
 
 
@@ -908,6 +928,7 @@ def ppo_loss(
         params,
         trajectories.obs,
         trajectories.net_state,
+        trajectories.prev_action,
     )
     log_prob = action_distribution.log_prob(trajectories.action)
     
@@ -1096,6 +1117,7 @@ class HeatmapVisualisationEval(Eval):
             train_state.params,
             obs,
             vec_net_init_state,
+            -jnp.ones(self.num_levels, dtype=int),
         )
         # model value -> heatmap
         value_heatmap = generate_heatmap(
