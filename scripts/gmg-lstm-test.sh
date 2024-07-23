@@ -6,9 +6,9 @@ jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env
 jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net relu:4x512
 
 # IMPALA FF
-jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:small:ff
+jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala-small:ff
 jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:ff
 
 # IMPALA LSTM
-jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:small:lstm
+jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala-small:lstm
 jaxgmg train corner --wandb-log --wandb-project gmg-lstm-test --env-size 9 --env-corner-size 1 --net impala:lstm
