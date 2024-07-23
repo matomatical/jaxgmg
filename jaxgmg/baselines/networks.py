@@ -62,7 +62,7 @@ class ActorCriticNetwork(nn.Module):
     
     ```
     pi, v, next_state = architecture.apply(
-        {'params': params},
+        params=params,
         obs=obs,
         state=state,
     )
@@ -74,8 +74,7 @@ class ActorCriticNetwork(nn.Module):
     ```
     init_params, init_state = net.init_params_and_state(
         rng=rng_init,
-        obs_shape=obs.shape,
-        obs_dtype=obs.dtype,
+        obs_type=env.obs_type(level=example_level),
     )
     ```
     """
