@@ -30,17 +30,15 @@ def get_architecture(
                 embedding_layer_width=int(width),
             )
         # impala large (ff or lstm)
-        case ["impala", "ff"]:
+        case ["impala"] | ["impala", "ff"]:
             return ImpalaLargeFF(num_actions=num_actions)
         case ["impala", "lstm"]:
             return ImpalaLarge(num_actions=num_actions)
         # impala small (default, lstm, or ff)
-        case ["impala-small", "ff"]:
+        case ["impala"] | ["impala", "small", "ff"]:
             return ImpalaSmallFF(num_actions=num_actions)
-        case ["impala-small", "lstm"]:
+        case ["impala", "small", "lstm"]:
             return ImpalaSmall(num_actions=num_actions)
-        case ["impala"] | ["impala-small"]:
-            raise ValueError(f"Please specify ':ff' or ':lstm'.")
         case _:
             raise ValueError(f"Unknown net architecture spec: {name!r}.")
 
