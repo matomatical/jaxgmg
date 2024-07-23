@@ -23,6 +23,7 @@ dependencies = [
     "numpy",
     "einops",
     "chex",
+    "jaxtyping",
     "flax",
     "distrax",
     "readchar",

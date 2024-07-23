@@ -1,10 +1,15 @@
+"""
+Abstract base classes for jaxgmg environment.
+"""
+
 import functools
-from typing import Tuple, Optional, Dict
-from flax import struct
-import chex
 
 import jax
 import jax.numpy as jnp
+from flax import struct
+
+import chex
+from jaxtyping import PyTree
 
 from jaxgmg.graphics import LevelOfDetail, load_spritesheet
 
@@ -76,16 +81,19 @@ class Env:
 
     Methods:
 
+    * obs_type(level) -> obs_type
     * env.reset_to_level(level) -> (obs, start_state)
     * env.step(rng, state, action) -> (obs, new_state, reward, done, info)
     * env.get_obs(state) -> obs
 
     Instructions for sublassing: Implement the following methods:
 
-    * _reset(level) -> start_state
-    * _step(rng, state, action) -> (new_state, reward, done, info)
-    * _get_obs_bool(state) -> obs_bool
-    * _get_obs_rgb(state) -> obs_rgb
+    * @property num_actions(self) -> num_actions
+    * obs_type(self, level) -> obs_type
+    * _reset(self, level) -> start_state
+    * _step(self, rng, state, action) -> (new_state, reward, done, info)
+    * _get_obs_bool(self, state) -> obs_bool
+    * _get_obs_rgb(self, state) -> obs_rgb
     """
 
 
@@ -98,6 +106,10 @@ class Env:
 
     @property
     def num_actions(self) -> int:
+        raise NotImplementedError
+
+
+    def obs_type(self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
         raise NotImplementedError
 
 
@@ -116,7 +128,7 @@ class Env:
         rng: chex.PRNGKey,
         state: EnvState,
         action: int,
-    ) -> Tuple[
+    ) -> tuple[
         EnvState,
         float,
         bool,
@@ -132,7 +144,7 @@ class Env:
     def _get_obs_rgb(
         self,
         state: EnvState,
-        spritesheet: Dict[str, chex.Array],
+        spritesheet: dict[str, chex.Array],
     ) -> chex.Array:
         raise NotImplementedError
     
@@ -144,7 +156,7 @@ class Env:
     def reset_to_level(
         self,
         level: Level,
-    ) -> Tuple[
+    ) -> tuple[
         chex.Array,
         EnvState,
     ]:
@@ -159,7 +171,7 @@ class Env:
         rng: chex.PRNGKey,
         state: EnvState,
         action: int,
-    ) -> Tuple[
+    ) -> tuple[
         chex.Array,
         EnvState,
         float,
@@ -217,7 +229,7 @@ class Env:
     def get_obs(
         self,
         state: EnvState,
-        force_lod: Optional[LevelOfDetail] = None,
+        force_lod: LevelOfDetail | None = None,
     ):
         # override LevelOfDetail
         if force_lod is None:
@@ -238,7 +250,7 @@ class Env:
     def vreset_to_level(
         self,
         levels: Level,      # Level[n]
-    ) -> Tuple[
+    ) -> tuple[
         chex.Array,         # Observation[n]
         EnvState,           # Level[n]
     ]:
@@ -256,7 +268,7 @@ class Env:
         rng: chex.PRNGKey,
         states: EnvState,    # EnvState[n]
         actions: chex.Array, # int[n]
-    ) -> Tuple[
+    ) -> tuple[
         chex.Array,
         EnvState,
         float,

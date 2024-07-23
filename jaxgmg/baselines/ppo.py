@@ -26,21 +26,52 @@ from jaxgmg.baselines import networks
 # # # 
 # types
 
-from typing import Tuple, Dict, Any
-from chex import Array, PRNGKey
+from typing import Any
+from chex import Array, ArrayTree, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, LevelGenerator
 Observation = Array
-Metrics = Dict[str, Any]
+Metrics = dict[str, Any]
+ActorCriticState = ArrayTree
 
 @struct.dataclass
 class TrainLevelSet:
-    def get_batch(self, rng, num_levels_in_batch: int) -> Level:
+    def get_batch(
+        self,
+        rng: PRNGKey,
+        num_levels_in_batch: int,
+    ) -> Level: # Level[num_levels_in_batch]
         raise NotImplementedError
 
 @struct.dataclass
 class Eval:
-    def eval(self, rng: PRNGKey, train_state: TrainState) -> Metrics:
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+        net_init_state: ActorCriticState,
+    ) -> Metrics:
         raise NotImplementedError
+
+@struct.dataclass
+class Transition:
+    """
+    Captures data involved in one environment step, from the observation to
+    the actor/critic response to the reward, termination, and info response
+    from the environment. Note: the next env_state and observation is
+    represented in the next transition.
+    """
+    env_state: EnvState
+    obs: Observation
+    net_state: ActorCriticState
+    prev_action: int
+    value: float
+    action: int
+    log_prob: float
+    reward: float
+    done: bool
+    info: dict
+
+
 
 
 # # # 
@@ -51,10 +82,10 @@ def run(
     rng: PRNGKey,
     env: Env,
     train_level_set: TrainLevelSet,
-    evals_dict: Dict[str, Eval],
-    big_evals_dict: Dict[str, Eval],
+    evals_dict: dict[str, Eval],
+    big_evals_dict: dict[str, Eval],
     # policy config
-    net: str,
+    net_spec: str,
     # PPO hyperparameters
     ppo_lr: float,                      # learning rate
     ppo_gamma: float,                   # discount rate
@@ -116,20 +147,20 @@ def run(
     # TODO: define wandb axes
 
     
-    print(f"setting up agent with {net} architecture...")
-    # select agent architecture
-    net = networks.get_architecture_class_from_name(net)(
-        num_actions=env.num_actions,
-    )
+    print(f"setting up agent with architecture {net_spec!r}...")
+    # select architecture
+    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network
-    rng_model, rng = jax.random.split(rng, 2)
-    rng_example_level, rng = jax.random.split(rng, 2)
-    example_level = jax.tree.map(
+    rng_model_init, rng = jax.random.split(rng)
+    rng_example_level, rng = jax.random.split(rng)
+    example_level=jax.tree.map(
         lambda x: x[0],
         train_level_set.get_batch(rng_example_level, 1),
     )
-    example_obs, _ = env.reset_to_level(example_level)
-    net_init_params = net.init(rng_model, example_obs)
+    net_init_params, net_init_state = net.init_params_and_state(
+        rng=rng_model_init,
+        obs_type=env.obs_type(level=example_level),
+    )
             
 
     # initialise the checkpointer
@@ -154,8 +185,11 @@ def run(
         lr = lr_schedule
     else:
         lr = ppo_lr
+    
+
+    # init train state
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0)),
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
         params=net_init_params,
         tx=optax.chain(
             optax.clip_by_global_norm(ppo_max_grad_norm),
@@ -206,9 +240,16 @@ def run(
         rng_env, rng_t = jax.random.split(rng_t)
         if log_cycle:
             env_start_time = time.perf_counter()
-        trajectories, env_obs, env_state, env_metrics = collect_trajectories(
+        (
+            trajectories,
+            _final_obs,
+            _final_state,
+            final_value,
+            env_metrics,
+        ) = collect_trajectories(
             rng=rng_env,
             train_state=train_state,
+            net_init_state=net_init_state,
             env=env,
             levels=levels_t,
             num_steps=num_env_steps_per_cycle,
@@ -240,7 +281,7 @@ def run(
             rng=rng_update,
             train_state=train_state,
             trajectories=trajectories,
-            final_obs=env_obs,
+            final_value=final_value,
             num_epochs=num_epochs_per_cycle,
             num_minibatches_per_epoch=num_minibatches_per_epoch,
             gamma=ppo_gamma,
@@ -267,6 +308,7 @@ def run(
                 eval_metrics[eval_name] = eval_obj.eval(
                     rng=rng_eval,
                     train_state=train_state,
+                    net_init_state=net_init_state,
                 )
             metrics['eval'].update(eval_metrics)
         
@@ -279,6 +321,7 @@ def run(
                 eval_metrics[eval_name] = eval_obj.eval(
                     rng=rng_eval,
                     train_state=train_state,
+                    net_init_state=net_init_state,
                 )
             metrics['eval'].update(eval_metrics)
        
@@ -335,12 +378,6 @@ def run(
                 args=ocp.args.PyTreeSave(train_state),
             )
             progress.write(f"saving checkpoint to {checkpoint_path}/{t}...")
-        #     # this would be the code to restore
-        #     train_state_type = jax.tree.map(ocp.utils.to_shape_dtype_struct, train_state)
-        #     train_state = checkpoint_manager.restore(
-        #         t,
-        #         args=ocp.args.PyTreeRestore(train_state_dtype),
-        #     )
 
 
         # ending cycle
@@ -363,9 +400,9 @@ def eval_checkpoint(
     checkpoint_path: str,
     checkpoint_number: int,
     env: Env,
-    net: str,
+    net_spec: str,
     example_level: Level,
-    evals_dict: Dict[str, Eval],
+    evals_dict: dict[str, Eval],
     save_files_to: str,
 ):
     fileman = util.RunFilesManager(root_path=save_files_to)
@@ -381,19 +418,19 @@ def eval_checkpoint(
     )
     
     # select agent architecture
-    net = networks.get_architecture_class_from_name(net)(
-        num_actions=env.num_actions,
-    )
+    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
     # initialise the network to get the example type
-    rng_model, rng = jax.random.split(rng, 2)
-    example_obs, _ = env.reset_to_level(example_level)
-    net_init_params = net.init(rng_model, example_obs)
+    rng_model_init, rng = jax.random.split(rng, 2)
+    net_init_params, net_init_state = net.init_params_and_state(
+        rng=rng_model_init,
+        obs_type=env.obs_type(level=example_level),
+    )
 
     # reload checkpoint of interest
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0)),
+        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
         params=net_init_params,
-        tx=optax.sgd(0),
+        tx=optax.sgd(0), # dummy, will be overridden
     )
     train_state_dtype = jax.tree.map(
         ocp.utils.to_shape_dtype_struct,
@@ -412,6 +449,7 @@ def eval_checkpoint(
         metrics[eval_name] = eval_obj.eval(
             rng=rng_eval,
             train_state=train_state,
+            net_init_state=net_init_state,
         )
         print(util.dict2str(metrics[eval_name]))
         print("=" * 59)
@@ -443,24 +481,6 @@ def eval_checkpoint(
 # Experience collection / rollouts
 
 
-@struct.dataclass
-class Transition:
-    """
-    Captures data involved in one environment step, from the observation to
-    the actor/critic response to the reward, termination, and info response
-    from the environment. Note: the next env_state and observation is
-    represented in the next transition.
-    """
-    env_state: EnvState
-    obs: Observation
-    value: float
-    action: int
-    log_prob: float
-    reward: float
-    done: bool
-    info: dict
-
-
 @functools.partial(
     jax.jit,
     static_argnames=(
@@ -473,14 +493,16 @@ def collect_trajectories(
     rng: PRNGKey,
     train_state: TrainState,
     env: Env,
+    net_init_state: ActorCriticState,
     levels: Level,                      # Level[num_levels]
     num_steps: int,
     compute_metrics: bool,
     discount_rate: float | None,
     benchmark_returns: Array | None,    # float[num_levels]
-) -> Tuple[
-    Transition,
-    Observation,
+) -> tuple[
+    Transition,                         # Transition[num_steps, num_levels]
+    Observation,                        # Observation[num_levels]
+    Array,                              # float[num_levels]
     EnvState,
     Metrics,
 ]:
@@ -500,6 +522,8 @@ def collect_trajectories(
     * env : jaxgmg.environments.base.Env
             Provides functions `reset` and `step` (actually, vectorised
             versions `vreset` and `vstep`).
+    * net_init_state : ActorCriticState
+            An initial carry for the network.
     * levels : jaxgmg.environments.base.Level[num_levels]
             Vector of Level structs. This many environments will be run in
             parallel.
@@ -523,6 +547,8 @@ def collect_trajectories(
     * final_env_state : jaxgmg.environments.base.EnvState[num_levels]
             The env state arising after the final transition in each
             trajectory.
+    * final_value : float[num_levels]
+            The network's output for the result of the final transition.
     * metrics : {str: Any}
             A dictionary of statistics calculated based on the collected
             experience. Each key is prefixed with `metrics_prefix`.
@@ -530,16 +556,37 @@ def collect_trajectories(
     """
     # reset environments to these levels
     env_obs, env_state = env.vreset_to_level(levels=levels)
-    initial_carry = (env_obs, env_state)
+    num_levels = jax.tree.leaves(levels)[0].shape[0]
+    vec_net_init_state = jax.tree.map(
+        lambda c: einops.repeat(
+            c,
+            '... -> num_levels ...',
+            num_levels=num_levels,
+        ),
+        net_init_state,
+    )
+    vec_default_prev_action = -jnp.ones(num_levels, dtype=int)
+    initial_carry = (
+        env_obs,
+        env_state,
+        vec_net_init_state,
+        vec_default_prev_action,
+    )
 
     def _env_step(carry, rng):
-        obs, env_state = carry
+        obs, env_state, net_state, prev_action = carry
 
         # select action
         rng_action, rng = jax.random.split(rng)
-        action_distribution, critic_value = train_state.apply_fn(
+        (
+            action_distribution,
+            critic_value,
+            next_net_state,
+        ) = train_state.apply_fn(
             train_state.params,
             obs,
+            net_state,
+            prev_action,
         )
         action = action_distribution.sample(seed=rng_action)
         log_prob = action_distribution.log_prob(action)
@@ -551,13 +598,32 @@ def collect_trajectories(
             env_state,
             action,
         )
+
+        # reset to net_init_state and prev_action in the parallel envs that are done
+        next_net_state = jax.tree.map(
+            lambda r, s: jnp.where(
+                # reverse broadcast to shape of r (= shape of s)
+                done.reshape(-1, *([1] * (len(r.shape)-1))),
+                r,
+                s,
+            ),
+            vec_net_init_state,
+            next_net_state,
+        )
+        next_prev_action = jnp.where(
+            done, 
+            vec_default_prev_action,
+            action,
+        )
         
         # carry to next step
-        carry = (next_obs, next_env_state)
+        carry = (next_obs, next_env_state, next_net_state, next_prev_action)
         # output
         transition = Transition(
             env_state=env_state,
             obs=obs,
+            prev_action=prev_action,
+            net_state=net_state,
             value=critic_value,
             action=action,
             log_prob=log_prob,
@@ -572,7 +638,19 @@ def collect_trajectories(
         initial_carry,
         jax.random.split(rng, num_steps),
     )
-    final_obs, final_env_state = final_carry
+    (
+        final_obs,
+        final_env_state,
+        final_net_state,
+        final_prev_action,
+    ) = final_carry
+    final_pi, final_value, _final_net_state = train_state.apply_fn(
+        train_state.params,
+        final_obs,
+        final_net_state,
+        final_prev_action,
+    )
+
 
     if compute_metrics:
         # compute returns
@@ -635,6 +713,7 @@ def collect_trajectories(
         trajectories,
         final_obs,
         final_env_state,
+        final_value,
         metrics,
     )
 
@@ -694,10 +773,6 @@ def compute_average_return(
 
 
 # # # 
-# RUN FILES MANAGEMENT
-
-
-# # # 
 # PPO loss function and optimisation
 
 
@@ -714,8 +789,8 @@ def ppo_update(
     # training state
     train_state: TrainState,
     # data
-    trajectories: Transition,
-    final_obs: Observation,
+    trajectories: Transition,   # Transition[num_steps, num_levels]
+    final_value: Array,         # float[num_levels]
     # ppo hyperparameters
     num_epochs: int,
     num_minibatches_per_epoch: int,
@@ -726,13 +801,12 @@ def ppo_update(
     critic_coeff: float,
     # metrics
     compute_metrics: bool,
-) -> Tuple[
+) -> tuple[
     TrainState,
     Array, # GAE estimates
     Metrics,
 ]:
     # generalised advantage estimation
-    _, final_value = train_state.apply_fn(train_state.params, final_obs)
     initial_carry = (
         jnp.zeros_like(final_value),
         final_value,
@@ -833,13 +907,13 @@ def ppo_update(
 def ppo_loss(
     params,
     apply_fn,
-    data: Tuple[Transition, Array, Array],
+    data: tuple[Transition, Array, Array],
     clip_eps: float,
     critic_coeff: float,
     entropy_coeff: float,
-) -> Tuple[
+) -> tuple[
     float,      # loss
-    Tuple[      # breakdown of loss into three components
+    tuple[      # breakdown of loss into three components
         float,
         float,
         float,
@@ -849,7 +923,12 @@ def ppo_loss(
     trajectories, advantages, targets = data
 
     # run network to get current value/log_prob prediction
-    action_distribution, value = apply_fn(params, trajectories.obs)
+    action_distribution, value, _net_state = apply_fn(
+        params,
+        trajectories.obs,
+        trajectories.net_state,
+        trajectories.prev_action,
+    )
     log_prob = action_distribution.log_prob(trajectories.action)
     
     # actor loss
@@ -896,7 +975,11 @@ class FixedTrainLevelSet(TrainLevelSet):
         jax.jit,
         static_argnames=['num_levels_in_batch'],
     )
-    def get_batch(self, rng, num_levels_in_batch) -> Level:
+    def get_batch(
+        self,
+        rng: PRNGKey,
+        num_levels_in_batch: int,
+    ) -> Level: # Level[num_levels_in_batch]
         num_levels = jax.tree.leaves(self.levels)[0].shape[0]
         level_ids = jax.random.choice(
             rng,
@@ -917,7 +1000,11 @@ class OnDemandTrainLevelSet(TrainLevelSet):
         jax.jit,
         static_argnames=['self', 'num_levels_in_batch'],
     )
-    def get_batch(self, rng, num_levels_in_batch) -> Level:
+    def get_batch(
+        self,
+        rng: PRNGKey,
+        num_levels_in_batch: int,
+    ) -> Level: # Level[num_levels_in_batch]
         levels_batch = self.level_generator.vsample(
             rng,
             num_levels=num_levels_in_batch,
@@ -970,11 +1057,13 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
+        net_init_state: ActorCriticState,
     ) -> Metrics:
         *_, eval_metrics = collect_trajectories(
             rng=rng,
             train_state=train_state,
             env=self.env,
+            net_init_state=net_init_state,
             levels=self.levels,
             num_steps=self.num_steps,
             discount_rate=self.discount_rate,
@@ -998,11 +1087,13 @@ class AnimatedRolloutsEval(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
+        net_init_state: ActorCriticState,
     ) -> Metrics:
         trajectories, *_ = collect_trajectories(
             rng=rng,
             train_state=train_state,
             env=self.env,
+            net_init_state=net_init_state,
             levels=self.levels,
             num_steps=self.num_steps,
             compute_metrics=False,
@@ -1023,28 +1114,43 @@ class AnimatedRolloutsEval(Eval):
 class HeatmapVisualisationEval(Eval):
     levels: Level
     num_levels: int
-    levels_pos: Tuple[Array, Array]
-    grid_shape: Tuple[int, int]
+    levels_pos: tuple[Array, Array]
+    grid_shape: tuple[int, int]
     num_steps: int
     discount_rate: float
     env: Env
+    # TODO: a flag for 'do rollouts'?
 
 
     def eval(
         self,
         rng: PRNGKey,
         train_state: TrainState,
+        net_init_state: ActorCriticState,
     ) -> Metrics:
-        obs, _ = self.env.vreset_to_level(self.levels)
-        action_distr, values = train_state.apply_fn(train_state.params, obs)
 
+        # CHEAP EVALS FROM INIT STATE ONLY
+        obs, _ = self.env.vreset_to_level(self.levels)
+        vec_net_init_state = jax.tree.map(
+            lambda c: einops.repeat(
+                c,
+                '... -> num_levels ...',
+                num_levels=self.num_levels,
+            ),
+            net_init_state,
+        )
+        action_distr, values, _net_state = train_state.apply_fn(
+            train_state.params,
+            obs,
+            vec_net_init_state,
+            -jnp.ones(self.num_levels, dtype=int),
+        )
         # model value -> heatmap
         value_heatmap = generate_heatmap(
             data=values,
             shape=self.grid_shape,
             pos=self.levels_pos,
         )
-    
         # model policy -> diamond map
         action_probs = action_distr.probs
         action_diamond_plot = generate_diamond_plot(
@@ -1053,11 +1159,14 @@ class HeatmapVisualisationEval(Eval):
             pos=self.levels_pos,
         )
     
+        # EXPENSIVE EVALS, ROLLOUTS
+        # TODO: CONSIDER SEPARATING THESE INTO TWO DIFFERENT EVAL CLASSES
         # model policy rollout returns -> heatmap
         trajectories, *_ = collect_trajectories(
             rng=rng,
             train_state=train_state,
             env=self.env,
+            net_init_state=net_init_state,
             levels=self.levels,
             num_steps=self.num_steps,
             compute_metrics=False,

@@ -19,15 +19,16 @@ Classes:
   designing Level structs based on ASCII depictions.
 """
 
-from typing import Tuple, Dict
 import enum
 import functools
 
 import jax
 import jax.numpy as jnp
-import chex
 import einops
 from flax import struct
+
+import chex
+from jaxtyping import PyTree
 
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
@@ -108,6 +109,15 @@ class Env(base.Env):
         return len(Env.Action)
 
 
+    def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
+        H, W = level.wall_map.shape
+        C = len(Env.Channel)
+        return jax.ShapeDtypeStruct(
+            shape=(H, W, C),
+            dtype=bool,
+        )
+
+
     class Channel(enum.IntEnum):
         """
         The observations returned by the environment are an `h` by `w` by
@@ -143,7 +153,7 @@ class Env(base.Env):
         rng: chex.PRNGKey,
         state: EnvState,
         action: int,
-    ) -> Tuple[
+    ) -> tuple[
         EnvState,
         float,
         bool,
@@ -224,7 +234,7 @@ class Env(base.Env):
     def _get_obs_rgb(
         self,
         state: EnvState,
-        spritesheet: Dict[str, chex.Array],
+        spritesheet: dict[str, chex.Array],
     ) -> chex.Array:
         """
         Return an RGB observation based on a grid of tiles from the given

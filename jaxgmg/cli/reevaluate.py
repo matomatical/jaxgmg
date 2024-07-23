@@ -167,7 +167,7 @@ def corner(
         checkpoint_path=checkpoint_path,
         checkpoint_number=checkpoint_number,
         env=env,
-        net=net,
+        net_spec=net,
         example_level=example_level,
         evals_dict={
             'on_distribution': eval_on_level_set,
