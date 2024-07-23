@@ -198,7 +198,7 @@ class ImpalaLarge(ActorCriticNetwork):
         
         # TODO: previous reward, previous action embedding?
         
-        if use_lstm:
+        if self.use_lstm:
             state, x = nn.OptimizedLSTMCell(features=256)(state, x)
         else:
             x = nn.Dense(features=256)(x)
