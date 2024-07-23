@@ -449,6 +449,7 @@ def eval_checkpoint(
         metrics[eval_name] = eval_obj.eval(
             rng=rng_eval,
             train_state=train_state,
+            net_init_state=net_init_state,
         )
         print(util.dict2str(metrics[eval_name]))
         print("=" * 59)
@@ -591,13 +592,15 @@ def collect_trajectories(
             action,
         )
 
-        # reset to net_init_state in the environmnets that will reset
+        # reset to net_init_state in the parallel envs that are done
         next_net_state = jax.tree.map(
-            lambda c: jnp.where(
-                done,
-                vec_net_init_state,
-                next_net_state,
+            lambda r, s: jnp.where(
+                # reverse broadcast to shape of r (= shape of s)
+                done.reshape(-1, *([1] * (len(r.shape)-1))),
+                r,
+                s,
             ),
+            vec_net_init_state,
             next_net_state,
         )
         
@@ -1076,7 +1079,7 @@ class HeatmapVisualisationEval(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        net_init_state: ActorCriticState
+        net_init_state: ActorCriticState,
     ) -> Metrics:
 
         # CHEAP EVALS FROM INIT STATE ONLY
