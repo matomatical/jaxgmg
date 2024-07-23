@@ -1029,11 +1029,13 @@ class FixedLevelsEval(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
+        net_init_state: ActorCriticState,
     ) -> Metrics:
         *_, eval_metrics = collect_trajectories(
             rng=rng,
             train_state=train_state,
             env=self.env,
+            net_init_state=net_init_state,
             levels=self.levels,
             num_steps=self.num_steps,
             discount_rate=self.discount_rate,
