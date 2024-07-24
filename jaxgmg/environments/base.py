@@ -14,6 +14,9 @@ from jaxtyping import PyTree
 from jaxgmg.graphics import LevelOfDetail, load_spritesheet
 
 
+Observation = chex.ArrayTree
+
+
 @struct.dataclass
 class Level:
     """
@@ -137,7 +140,7 @@ class Env:
         raise NotImplementedError
 
     
-    def _get_obs_bool(self, state: EnvState) -> chex.Array:
+    def _get_obs_bool(self, state: EnvState) -> Observation:
         raise NotImplementedError
     
 
@@ -145,7 +148,7 @@ class Env:
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
-    ) -> chex.Array:
+    ) -> Observation:
         raise NotImplementedError
     
 
@@ -157,7 +160,7 @@ class Env:
         self,
         level: Level,
     ) -> tuple[
-        chex.Array,
+        Observation,
         EnvState,
     ]:
         start_state = self._reset(level)
@@ -172,7 +175,7 @@ class Env:
         state: EnvState,
         action: int,
     ) -> tuple[
-        chex.Array,
+        Observation,
         EnvState,
         float,
         bool,
@@ -251,7 +254,7 @@ class Env:
         self,
         levels: Level,      # Level[n]
     ) -> tuple[
-        chex.Array,         # Observation[n]
+        Observation,        # Observation[n]
         EnvState,           # Level[n]
     ]:
         vmapped_reset_to_level = jax.vmap(
@@ -266,14 +269,14 @@ class Env:
     def vstep(
         self,
         rng: chex.PRNGKey,
-        states: EnvState,    # EnvState[n]
-        actions: chex.Array, # int[n]
+        states: EnvState,       # EnvState[n]
+        actions: chex.Array,    # int[n]
     ) -> tuple[
-        chex.Array,
-        EnvState,
-        float,
-        bool,
-        dict,
+        Observation,            # Observation[n]
+        EnvState,               # EnvState[n]
+        chex.Array,             # float[n]
+        chex.Array,             # bool[n]
+        chex.ArrayTree,         # dict[n]
     ]:
         vmapped_step = jax.vmap(
             self.step,

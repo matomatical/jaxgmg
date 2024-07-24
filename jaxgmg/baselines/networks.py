@@ -9,42 +9,10 @@ import distrax
 
 
 # # # 
-# Look-up a particular architecture
+# Types
 
-
-def get_architecture(
-    spec: str,
-    num_actions: int,
-    **kwargs,
-):
-    spec = spec.lower().split(":")
-    match spec:
-        # relu net (optionally with a custom shape)
-        case ["relu"]:
-            return ReLUFF(num_actions=num_actions) # default layers x width
-        case ["relu", layers_by_width]:
-            layers, width = layers_by_width.split("x")
-            return ReLUFF(
-                num_actions=num_actions,
-                num_embedding_layers=int(layers),
-                embedding_layer_width=int(width),
-            )
-        # impala large (ff or lstm)
-        case ["impala"] | ["impala", "ff"]:
-            return ImpalaLargeFF(num_actions=num_actions)
-        case ["impala", "lstm"]:
-            return ImpalaLarge(num_actions=num_actions)
-        # impala small (default, lstm, or ff)
-        case ["impala"] | ["impala", "small", "ff"]:
-            return ImpalaSmallFF(num_actions=num_actions)
-        case ["impala", "small", "lstm"]:
-            return ImpalaSmall(num_actions=num_actions)
-        case _:
-            raise ValueError(f"Unknown net architecture spec: {name!r}.")
-
-
-# # #
-# Abstract base class
+from chex import ArrayTree
+ActorCriticState = ArrayTree
 
 
 class ActorCriticNetwork(nn.Module):
@@ -398,4 +366,40 @@ class ReLUFF(ActorCriticNetwork):
 
     def initialize_state(self, rng):
         return None
+
+
+# # # 
+# Look-up a particular architecture
+
+
+def get_architecture(spec: str, num_actions: int) -> ActorCriticNetwork:
+    """
+    Parse a network specification string and instantiate the appropriate kind
+    of network.
+    """
+    spec = spec.lower().split(":")
+    match spec:
+        # relu net (optionally with a custom shape)
+        case ["relu"]:
+            return ReLUFF(num_actions=num_actions) # default layers x width
+        case ["relu", layers_by_width]:
+            layers, width = layers_by_width.split("x")
+            return ReLUFF(
+                num_actions=num_actions,
+                num_embedding_layers=int(layers),
+                embedding_layer_width=int(width),
+            )
+        # impala large (ff or lstm)
+        case ["impala"] | ["impala", "ff"]:
+            return ImpalaLargeFF(num_actions=num_actions)
+        case ["impala", "lstm"]:
+            return ImpalaLarge(num_actions=num_actions)
+        # impala small (default, lstm, or ff)
+        case ["impala"] | ["impala", "small", "ff"]:
+            return ImpalaSmallFF(num_actions=num_actions)
+        case ["impala", "small", "lstm"]:
+            return ImpalaSmall(num_actions=num_actions)
+        case _:
+            raise ValueError(f"Unknown net architecture spec: {name!r}.")
+
 

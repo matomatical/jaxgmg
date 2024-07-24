@@ -21,17 +21,21 @@ import wandb
 
 from jaxgmg import util
 from jaxgmg.baselines import networks
+from jaxgmg.baselines import experience
 
 
 # # # 
 # types
 
 from typing import Any
-from chex import Array, ArrayTree, PRNGKey
-from jaxgmg.environments.base import EnvState, Env, Level, LevelGenerator
-Observation = Array
+from chex import Array, PRNGKey
+from jaxgmg.environments.base import EnvState, Env, Level, Observation
+from jaxgmg.environments.base import LevelGenerator # this will go to UED
+from jaxgmg.baselines.networks import ActorCriticState
+from jaxgmg.baselines.experience import Transition, Rollout
+
 Metrics = dict[str, Any]
-ActorCriticState = ArrayTree
+
 
 @struct.dataclass
 class TrainLevelSet:
@@ -42,6 +46,7 @@ class TrainLevelSet:
     ) -> Level: # Level[num_levels_in_batch]
         raise NotImplementedError
 
+
 @struct.dataclass
 class Eval:
     def eval(
@@ -51,27 +56,6 @@ class Eval:
         net_init_state: ActorCriticState,
     ) -> Metrics:
         raise NotImplementedError
-
-@struct.dataclass
-class Transition:
-    """
-    Captures data involved in one environment step, from the observation to
-    the actor/critic response to the reward, termination, and info response
-    from the environment. Note: the next env_state and observation is
-    represented in the next transition.
-    """
-    env_state: EnvState
-    obs: Observation
-    net_state: ActorCriticState
-    prev_action: int
-    value: float
-    action: int
-    log_prob: float
-    reward: float
-    done: bool
-    info: dict
-
-
 
 
 # # # 
@@ -240,32 +224,28 @@ def run(
         rng_env, rng_t = jax.random.split(rng_t)
         if log_cycle:
             env_start_time = time.perf_counter()
-        (
-            trajectories,
-            _final_obs,
-            _final_state,
-            final_value,
-            env_metrics,
-        ) = collect_trajectories(
+        rollouts = experience.collect_rollouts(
             rng=rng_env,
+            num_steps=num_env_steps_per_cycle,
             train_state=train_state,
             net_init_state=net_init_state,
             env=env,
             levels=levels_t,
-            num_steps=num_env_steps_per_cycle,
-            compute_metrics=log_cycle,
-            discount_rate=ppo_gamma,
-            benchmark_returns=None,
         )
         if log_cycle:
+            env_metrics = compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=ppo_gamma,
+                benchmark_returns=None,
+            )
             env_elapsed_time = time.perf_counter() - env_start_time
             metrics['env/train'].update(env_metrics)
             metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
         if log_cycle and train_gifs:
-            frames = animate_trajectories(
-                trajectories,
+            frames = animate_rollouts(
+                rollouts=rollouts,
                 grid_width=train_gif_grid_width,
                 force_lod=train_gif_level_of_detail,
                 env=env,
@@ -280,8 +260,7 @@ def run(
         train_state, advantages, ppo_metrics = ppo_update(
             rng=rng_update,
             train_state=train_state,
-            trajectories=trajectories,
-            final_value=final_value,
+            rollouts=rollouts,
             num_epochs=num_epochs_per_cycle,
             num_minibatches_per_epoch=num_minibatches_per_epoch,
             gamma=ppo_gamma,
@@ -392,6 +371,284 @@ def run(
 
 
 # # # 
+# PPO update
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=(
+        'num_epochs',
+        'num_minibatches_per_epoch',
+        'compute_metrics',
+    ),
+)
+def ppo_update(
+    rng: PRNGKey,
+    train_state: TrainState,
+    rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
+    # ppo hyperparameters
+    num_epochs: int,
+    num_minibatches_per_epoch: int,
+    gamma: float,
+    clip_eps: float,
+    gae_lambda: float,
+    entropy_coeff: float,
+    critic_coeff: float,
+    # metrics
+    compute_metrics: bool,
+) -> tuple[
+    TrainState,
+    Array, # GAE estimates
+    Metrics,
+]:
+    """
+    Given a data set of rollouts, perform GAE followed by a few epochs of PPO
+    loss updates on the transitions contained in those rollouts.
+
+    TODO: document inputs and outputs.
+    """
+    # Generalised Advantage Estimation
+    initial_carry = (
+        jnp.zeros_like(rollouts.final_value),             # float[num_levels]
+        rollouts.final_value,                             # float[num_levels]
+    )
+    stepwise_transitions = jax.tree.map(
+        lambda x: einops.rearrange(x, 'levels steps ... -> steps levels ...'),
+        rollouts.transitions,
+    )                                  # -> Transition[num_steps, num_levels]
+    def _gae_accum(carry, transition):
+        gae, next_value = carry
+        reward = transition.reward                        # float[num_levels] 
+        this_value = transition.value                     # float[num_levels]
+        done = transition.done                            # bool[num_levels]
+        gae = (
+            reward
+            - this_value
+            + (1-done) * gamma * (next_value + gae_lambda * gae)
+        )
+        return (gae, this_value), gae
+    _final_carry, advantages = jax.lax.scan(
+        _gae_accum,
+        initial_carry,
+        stepwise_transitions,
+        reverse=True,
+        unroll=16, # TODO: parametrise and test this for effect on speed
+    )                             # advantages : float[num_steps, num_levels]
+
+    
+    # value targets
+    stepwise_values = einops.rearrange(
+        rollouts.transitions.value,
+        "levels steps -> steps levels",
+    )                                       # -> float[num_steps, num_levels]
+    targets = advantages + stepwise_values  # -> float[num_steps, num_levels]
+
+    
+    # compile data set
+    data = (stepwise_transitions, advantages, targets)
+    data = jax.tree.map(
+        lambda x: einops.rearrange(x, 'steps lvls ... -> (steps lvls) ...'),
+        data,
+    )
+    num_examples, = data[1].shape
+
+
+    # train on this data for a few epochs
+    def _epoch(train_state, rng_epoch):
+        # shuffle data
+        rng_shuffle, rng_epoch = jax.random.split(rng_epoch)
+        permutation = jax.random.permutation(rng_shuffle, num_examples)
+        data_shuf = jax.tree.map(lambda x: x[permutation], data)
+        # split into minibatches
+        data_batched = jax.tree.map(
+            lambda x: einops.rearrange(
+                x,
+                '(batch within_batch) ... -> batch within_batch ...',
+                batch=num_minibatches_per_epoch,
+            ),
+            data_shuf,
+        )
+        # process each minibatch
+        def _minibatch(train_state, minibatch):
+            ppo_loss_aux_and_grad = jax.value_and_grad(ppo_loss, has_aux=True)
+            (loss, loss_components), grads = ppo_loss_aux_and_grad(
+                train_state.params,
+                apply_fn=train_state.apply_fn,
+                data=minibatch,
+                clip_eps=clip_eps,
+                critic_coeff=critic_coeff,
+                entropy_coeff=entropy_coeff,
+            )
+            train_state = train_state.apply_gradients(grads=grads)
+            return train_state, (loss, loss_components, grads)
+        train_state, (losses, losses_components, grads) = jax.lax.scan(
+            _minibatch,
+            train_state,
+            data_batched,
+        )
+        return train_state, (losses, losses_components, grads)
+    train_state, (losses, losses_components, grads) = jax.lax.scan(
+        _epoch,
+        train_state,
+        jax.random.split(rng, num_epochs),
+    )
+
+    
+    # compute metrics
+    if compute_metrics:
+        # re-compute global grad norm for metrics
+        vvgnorm = jax.vmap(jax.vmap(optax.global_norm))
+        grad_norms = vvgnorm(grads) # -> float[num_epochs, num_minibatches]
+
+        metrics = {
+            # avg
+            'avg_loss': losses.mean(),
+            'avg_loss_actor': losses_components[0].mean(),
+            'avg_loss_critic': losses_components[1].mean(),
+            'avg_loss_entropy': losses_components[2].mean(),
+            'avg_advantage': advantages.mean(),
+            'avg_grad_norm_pre_clip': grad_norms.mean(),
+            # max
+            'max_loss': losses.max(),
+            'max_loss_actor': losses_components[0].max(),
+            'max_loss_critic': losses_components[1].max(),
+            'max_loss_entropy': losses_components[2].max(),
+            'max_advantage': advantages.max(),
+            'max_grad_norm_pre_clip': grad_norms.max(),
+            # std
+            'std_loss': losses.std(),
+            'std_loss_actor': losses_components[0].std(),
+            'std_loss_critic': losses_components[1].std(),
+            'std_loss_entropy': losses_components[2].std(),
+            'std_advantage': advantages.std(),
+            'std_grad_norm_pre_clip': grad_norms.std(),
+        }
+        # TODO: approx kl
+        # TODO: clip proportion
+    else:
+        metrics = {}
+    
+    return train_state, advantages, metrics
+
+
+# # # 
+# PPO loss function
+
+
+@functools.partial(jax.jit, static_argnames=('apply_fn',))
+def ppo_loss(
+    params,
+    apply_fn,
+    data: tuple[Transition, Array, Array], # each vectors of length num_data
+    clip_eps: float,
+    critic_coeff: float,
+    entropy_coeff: float,
+) -> tuple[
+    float,      # loss
+    tuple[      # breakdown of loss into three components
+        float,
+        float,
+        float,
+    ]
+]:
+    # unpack minibatch
+    trajectories, advantages, targets = data
+
+    # run network to get current value/log_prob prediction
+    action_distribution, value, _net_state = apply_fn(
+        params,
+        trajectories.obs,
+        trajectories.net_state,
+        trajectories.prev_action,
+    )
+    log_prob = action_distribution.log_prob(trajectories.action)
+
+
+    # actor loss
+    ratio = jnp.exp(log_prob - trajectories.log_prob)
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    actor_loss = -jnp.minimum(
+        advantages * ratio,
+        advantages * jnp.clip(ratio, 1-clip_eps, 1+clip_eps)
+    ).mean()
+
+
+    # critic loss
+    value_diff_clipped = jnp.clip(
+        value - trajectories.value,
+        -clip_eps,
+        clip_eps,
+    )
+    value_proximal = trajectories.value + value_diff_clipped
+    critic_loss = jnp.maximum(
+        jnp.square(value - targets),
+        jnp.square(value_proximal - targets),
+    ).mean() / 2
+
+
+    # entropy regularisation term
+    entropy = action_distribution.entropy().mean()
+
+
+    total_loss = (
+        actor_loss
+        + critic_coeff * critic_loss
+        - entropy_coeff * entropy
+    )
+    return total_loss, (actor_loss, critic_loss, entropy)
+
+
+# # # 
+# TRAINING LEVEL SETS
+
+
+@struct.dataclass
+class FixedTrainLevelSet(TrainLevelSet):
+    levels: Level       # Level[num_levels]
+
+
+    @functools.partial(
+        jax.jit,
+        static_argnames=['num_levels_in_batch'],
+    )
+    def get_batch(
+        self,
+        rng: PRNGKey,
+        num_levels_in_batch: int,
+    ) -> Level: # Level[num_levels_in_batch]
+        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
+        level_ids = jax.random.choice(
+            rng,
+            num_levels,
+            (num_levels_in_batch,),
+            replace=(num_levels_in_batch >= num_levels),
+        )
+        levels_batch = jax.tree.map(lambda x: x[level_ids], self.levels)
+        return levels_batch
+
+
+@struct.dataclass
+class OnDemandTrainLevelSet(TrainLevelSet):
+    level_generator: LevelGenerator
+
+
+    @functools.partial(
+        jax.jit,
+        static_argnames=['self', 'num_levels_in_batch'],
+    )
+    def get_batch(
+        self,
+        rng: PRNGKey,
+        num_levels_in_batch: int,
+    ) -> Level: # Level[num_levels_in_batch]
+        levels_batch = self.level_generator.vsample(
+            rng,
+            num_levels=num_levels_in_batch,
+        )
+        return levels_batch
+
+
+# # # 
 # Restore and evaluate a checkpoint
 
 
@@ -478,541 +735,6 @@ def eval_checkpoint(
 
 
 # # # 
-# Experience collection / rollouts
-
-
-@functools.partial(
-    jax.jit,
-    static_argnames=(
-        'env',
-        'num_steps',
-        'compute_metrics',
-    ),
-)
-def collect_trajectories(
-    rng: PRNGKey,
-    train_state: TrainState,
-    env: Env,
-    net_init_state: ActorCriticState,
-    levels: Level,                      # Level[num_levels]
-    num_steps: int,
-    compute_metrics: bool,
-    discount_rate: float | None,
-    benchmark_returns: Array | None,    # float[num_levels]
-) -> tuple[
-    Transition,                         # Transition[num_steps, num_levels]
-    Observation,                        # Observation[num_levels]
-    Array,                              # float[num_levels]
-    EnvState,
-    Metrics,
-]:
-    """
-    Reset an environment to `levels` and rollout a policy in these levels for
-    `env_steps` steps.
-
-    Parameters:
-
-    * rng : PRNGKey
-            Random state (consumed)
-    * train_state : TrainState
-            A flax trainstate object, including the policy parameter
-            (`.params`) and application function (`.apply_fn`).
-            The policy apply function should take params and an observation
-            and return an action distribution and value prediction.
-    * env : jaxgmg.environments.base.Env
-            Provides functions `reset` and `step` (actually, vectorised
-            versions `vreset` and `vstep`).
-    * net_init_state : ActorCriticState
-            An initial carry for the network.
-    * levels : jaxgmg.environments.base.Level[num_levels]
-            Vector of Level structs. This many environments will be run in
-            parallel.
-    * num_steps : int
-            The environments will run forward for this many steps.
-    * compute_metrics : bool (default True)
-            Whether to compute metrics.
-    * discount_rate : float
-            Used in computing the return metric.
-    * benchmark_returns : float[num_levels] | None
-            For each level, what is the benchmark (e.g. optimal) return to be
-            aiming for? Only used if `compute_metrics` is True and non-null.
-
-    Returns:
-
-    * trajectories : Transition[num_steps, num_levels]
-            The collected experience.
-    * final_obs : Observation[num_levels]
-            The observation arising after the final transition in each
-            trajectory.
-    * final_env_state : jaxgmg.environments.base.EnvState[num_levels]
-            The env state arising after the final transition in each
-            trajectory.
-    * final_value : float[num_levels]
-            The network's output for the result of the final transition.
-    * metrics : {str: Any}
-            A dictionary of statistics calculated based on the collected
-            experience. Each key is prefixed with `metrics_prefix`.
-            If `compute_metrics` is False, the dictionary is empty.
-    """
-    # reset environments to these levels
-    env_obs, env_state = env.vreset_to_level(levels=levels)
-    num_levels = jax.tree.leaves(levels)[0].shape[0]
-    vec_net_init_state = jax.tree.map(
-        lambda c: einops.repeat(
-            c,
-            '... -> num_levels ...',
-            num_levels=num_levels,
-        ),
-        net_init_state,
-    )
-    vec_default_prev_action = -jnp.ones(num_levels, dtype=int)
-    initial_carry = (
-        env_obs,
-        env_state,
-        vec_net_init_state,
-        vec_default_prev_action,
-    )
-
-    def _env_step(carry, rng):
-        obs, env_state, net_state, prev_action = carry
-
-        # select action
-        rng_action, rng = jax.random.split(rng)
-        (
-            action_distribution,
-            critic_value,
-            next_net_state,
-        ) = train_state.apply_fn(
-            train_state.params,
-            obs,
-            net_state,
-            prev_action,
-        )
-        action = action_distribution.sample(seed=rng_action)
-        log_prob = action_distribution.log_prob(action)
-
-        # step env
-        rng_step, rng = jax.random.split(rng)
-        next_obs, next_env_state, reward, done, info = env.vstep(
-            rng_step,
-            env_state,
-            action,
-        )
-
-        # reset to net_init_state and prev_action in the parallel envs that are done
-        next_net_state = jax.tree.map(
-            lambda r, s: jnp.where(
-                # reverse broadcast to shape of r (= shape of s)
-                done.reshape(-1, *([1] * (len(r.shape)-1))),
-                r,
-                s,
-            ),
-            vec_net_init_state,
-            next_net_state,
-        )
-        next_prev_action = jnp.where(
-            done, 
-            vec_default_prev_action,
-            action,
-        )
-        
-        # carry to next step
-        carry = (next_obs, next_env_state, next_net_state, next_prev_action)
-        # output
-        transition = Transition(
-            env_state=env_state,
-            obs=obs,
-            prev_action=prev_action,
-            net_state=net_state,
-            value=critic_value,
-            action=action,
-            log_prob=log_prob,
-            reward=reward,
-            done=done,
-            info=info,
-        )
-        return carry, transition
-
-    final_carry, trajectories = jax.lax.scan(
-        _env_step,
-        initial_carry,
-        jax.random.split(rng, num_steps),
-    )
-    (
-        final_obs,
-        final_env_state,
-        final_net_state,
-        final_prev_action,
-    ) = final_carry
-    final_pi, final_value, _final_net_state = train_state.apply_fn(
-        train_state.params,
-        final_obs,
-        final_net_state,
-        final_prev_action,
-    )
-
-
-    if compute_metrics:
-        # compute returns
-        vmap_avg_return = jax.vmap(
-            compute_average_return,
-            in_axes=(1,1,None),
-        )
-        actual_returns = vmap_avg_return(
-            trajectories.reward,
-            trajectories.done,
-            discount_rate,
-        )
-        avg_actual_return = actual_returns.mean()
-
-        metrics = {
-            # approx. mean episode completion time (by episode and by level)
-            'avg_episode_length_by_episode':
-                1 / (trajectories.done.mean() + 1e-10),
-            'avg_episode_length_by_level':
-                (1 / (trajectories.done.mean(axis=0) + 1e-10)).mean(),
-            # average reward per step
-            'avg_reward':
-                trajectories.reward.mean(),
-            # averages returns per episode (by level, vs. benchmark)
-            'avg_return_by_level':
-                avg_actual_return,
-            # return distributions
-            'all_returns_by_level_hist':
-                actual_returns,
-        }
-        if benchmark_returns is not None:
-            avg_benchmark_return = benchmark_returns.mean()
-            metrics.update({
-                'avg_benchmark_return_by_level':
-                    avg_benchmark_return,
-                'benchmark_minus_actual_return':
-                    avg_benchmark_return - avg_actual_return,
-                'all_benchmark_returns_by_level_hist':
-                    benchmark_returns,
-            })
-        if "proxy_rewards" in trajectories.info:
-            for proxy, r_proxy in trajectories.info["proxy_rewards"].items():
-                proxy_returns = vmap_avg_return(
-                    r_proxy,
-                    trajectories.done,
-                    discount_rate,
-                )
-                metrics.update({
-                    'proxy_'+proxy+'/avg_reward':
-                        r_proxy.mean(),
-                    'proxy_'+proxy+'/avg_return_by_level':
-                        proxy_returns.mean(),
-                    'proxy_'+proxy+'/all_returns_by_level_hist':
-                        proxy_returns,
-                })
-    else:
-        metrics = {}
-
-    return (
-        trajectories,
-        final_obs,
-        final_env_state,
-        final_value,
-        metrics,
-    )
-
-
-@jax.jit
-def compute_average_return(
-    rewards: Array,
-    dones: Array,
-    discount_rate: float,
-) -> Array:
-    """
-    Given a sequence of (reward, done) pairs, compute the average return for
-    each episode.
-
-    Parameters:
-
-    * rewards : float[t]
-            Scalar rewards delivered at the conclusion of each timestep.
-    * dones : bool[t]
-            True indicates the reward was delivered as the episode
-            terminated.
-    * discount_rate : float
-            The return is exponentially discounted sum of future rewards in
-            the episode, this is the discount rate (for one timestep).
-
-    Returns:
-
-    * average_return : float
-            The mean of the first-timestep returns for each episode
-            represented in the reward/done data.
-    """
-
-    # compute per-step returns
-    def _accumulate_return(
-        next_step_return,
-        this_step_reward_and_done,
-    ):
-        reward, done = this_step_reward_and_done
-        this_step_return = reward + (1-done) * discount_rate * next_step_return
-        return this_step_return, this_step_return
-    _, per_step_returns = jax.lax.scan(
-        _accumulate_return,
-        0,
-        (rewards, dones),
-        reverse=True,
-    )
-
-    # identify start of each episode
-    first_steps = jnp.roll(dones, 1).at[0].set(True)
-    
-    # average returns at the start of each episode
-    total_first_step_returns = jnp.sum(first_steps * per_step_returns)
-    num_episodes = jnp.sum(first_steps)
-    average_return = total_first_step_returns / num_episodes
-    
-    return average_return
-
-
-# # # 
-# PPO loss function and optimisation
-
-
-@functools.partial(
-    jax.jit,
-    static_argnames=(
-        'num_epochs',
-        'num_minibatches_per_epoch',
-        'compute_metrics',
-    ),
-)
-def ppo_update(
-    rng: PRNGKey,
-    # training state
-    train_state: TrainState,
-    # data
-    trajectories: Transition,   # Transition[num_steps, num_levels]
-    final_value: Array,         # float[num_levels]
-    # ppo hyperparameters
-    num_epochs: int,
-    num_minibatches_per_epoch: int,
-    gamma: float,
-    clip_eps: float,
-    gae_lambda: float,
-    entropy_coeff: float,
-    critic_coeff: float,
-    # metrics
-    compute_metrics: bool,
-) -> tuple[
-    TrainState,
-    Array, # GAE estimates
-    Metrics,
-]:
-    # generalised advantage estimation
-    initial_carry = (
-        jnp.zeros_like(final_value),
-        final_value,
-    )
-    def _gae_accum(carry, transition):
-        gae, next_value = carry
-        reward = transition.reward
-        this_value = transition.value
-        done = transition.done
-        gae = (
-            reward
-            - this_value
-            + (1-done) * gamma * (next_value + gae_lambda * gae)
-        )
-        return (gae, this_value), gae
-    _final_carry, advantages = jax.lax.scan(
-        _gae_accum,
-        initial_carry,
-        trajectories,
-        reverse=True,
-        unroll=16, # WHY? for speed? test this?
-    )
-
-
-    # value targets
-    targets = advantages + trajectories.value
-        
-
-    # compile data set
-    data = (trajectories, advantages, targets)
-    data = jax.tree.map(
-        lambda x: einops.rearrange(x, 't parallel ... -> (t parallel) ...'),
-        data,
-    )
-    num_examples, = data[1].shape
-
-
-    # train on these targets for a few epochs
-    def _epoch(train_state, rng_epoch):
-        # shuffle data
-        rng_shuffle, rng_epoch = jax.random.split(rng_epoch)
-        permutation = jax.random.permutation(rng_shuffle, num_examples)
-        data_shuf = jax.tree.map(lambda x: x[permutation], data)
-        # split into minibatches
-        data_batched = jax.tree.map(
-            lambda x: einops.rearrange(
-                x,
-                '(batch within_batch) ... -> batch within_batch ...',
-                batch=num_minibatches_per_epoch,
-            ),
-            data_shuf,
-        )
-        # process each minibatch
-        def _minibatch(train_state, minibatch):
-            ppo_loss_aux_and_grad = jax.value_and_grad(ppo_loss, has_aux=True)
-            (loss, loss_components), grads = ppo_loss_aux_and_grad(
-                train_state.params,
-                apply_fn=train_state.apply_fn,
-                data=minibatch,
-                clip_eps=clip_eps,
-                critic_coeff=critic_coeff,
-                entropy_coeff=entropy_coeff,
-            )
-            train_state = train_state.apply_gradients(grads=grads)
-            return train_state, (loss, loss_components)
-        train_state, (losses, losses_components) = jax.lax.scan(
-            _minibatch,
-            train_state,
-            data_batched,
-        )
-        return train_state, (losses, losses_components)
-    train_state, (losses, losses_components) = jax.lax.scan(
-        _epoch,
-        train_state,
-        jax.random.split(rng, num_epochs),
-    )
-
-    if compute_metrics:
-        metrics = {
-            'avg_loss': losses.mean(),
-            'avg_loss_actor': losses_components[0].mean(),
-            'avg_loss_critic': losses_components[1].mean(),
-            'avg_loss_entropy': losses_components[2].mean(),
-            'avg_advantage': advantages.mean(),
-            'std_loss': losses.std(),
-            'std_loss_actor': losses_components[0].std(),
-            'std_loss_critic': losses_components[1].std(),
-            'std_loss_entropy': losses_components[2].std(),
-            'std_advantage': advantages.std(),
-        }
-    else:
-        metrics = {}
-    
-    return train_state, advantages, metrics
-
-
-@functools.partial(jax.jit, static_argnames=('apply_fn',))
-def ppo_loss(
-    params,
-    apply_fn,
-    data: tuple[Transition, Array, Array],
-    clip_eps: float,
-    critic_coeff: float,
-    entropy_coeff: float,
-) -> tuple[
-    float,      # loss
-    tuple[      # breakdown of loss into three components
-        float,
-        float,
-        float,
-    ]
-]:
-    # unpack minibatch
-    trajectories, advantages, targets = data
-
-    # run network to get current value/log_prob prediction
-    action_distribution, value, _net_state = apply_fn(
-        params,
-        trajectories.obs,
-        trajectories.net_state,
-        trajectories.prev_action,
-    )
-    log_prob = action_distribution.log_prob(trajectories.action)
-    
-    # actor loss
-    ratio = jnp.exp(log_prob - trajectories.log_prob)
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-    actor_loss = -jnp.minimum(
-        advantages * ratio,
-        advantages * jnp.clip(ratio, 1-clip_eps, 1+clip_eps)
-    ).mean()
-
-    # critic loss
-    value_diff_clipped = jnp.clip(
-        value - trajectories.value,
-        -clip_eps,
-        clip_eps,
-    )
-    value_proximal = trajectories.value + value_diff_clipped
-    critic_loss = jnp.maximum(
-        jnp.square(value - targets),
-        jnp.square(value_proximal - targets),
-    ).mean() / 2
-
-    # entropy regularisation term
-    entropy = action_distribution.entropy().mean()
-
-    total_loss = (
-        actor_loss
-        + critic_coeff * critic_loss
-        - entropy_coeff * entropy
-    )
-    return total_loss, (actor_loss, critic_loss, entropy)
-
-
-# # # 
-# TRAINING LEVEL SETS
-
-
-@struct.dataclass
-class FixedTrainLevelSet(TrainLevelSet):
-    levels: Level       # Level[num_levels]
-
-
-    @functools.partial(
-        jax.jit,
-        static_argnames=['num_levels_in_batch'],
-    )
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
-        level_ids = jax.random.choice(
-            rng,
-            num_levels,
-            (num_levels_in_batch,),
-            replace=(num_levels_in_batch >= num_levels),
-        )
-        levels_batch = jax.tree.map(lambda x: x[level_ids], self.levels)
-        return levels_batch
-
-
-@struct.dataclass
-class OnDemandTrainLevelSet(TrainLevelSet):
-    level_generator: LevelGenerator
-
-
-    @functools.partial(
-        jax.jit,
-        static_argnames=['self', 'num_levels_in_batch'],
-    )
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        levels_batch = self.level_generator.vsample(
-            rng,
-            num_levels=num_levels_in_batch,
-        )
-        return levels_batch
-
-
-# # # 
 # EVALUATIONS
 
 
@@ -1031,15 +753,17 @@ class FixedLevelsEval(Eval):
         train_state: TrainState,
         net_init_state: ActorCriticState,
     ) -> Metrics:
-        *_, eval_metrics = collect_trajectories(
+        rollouts = experience.collect_rollouts(
             rng=rng,
-            train_state=train_state,
-            env=self.env,
-            net_init_state=net_init_state,
-            levels=self.levels,
             num_steps=self.num_steps,
+            train_state=train_state,
+            net_init_state=net_init_state,
+            env=self.env,
+            levels=self.levels,
+        )
+        eval_metrics = compute_rollout_metrics(
+            rollouts=rollouts,
             discount_rate=self.discount_rate,
-            compute_metrics=True,
             benchmark_returns=None,
         )
         return eval_metrics
@@ -1061,15 +785,17 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
         train_state: TrainState,
         net_init_state: ActorCriticState,
     ) -> Metrics:
-        *_, eval_metrics = collect_trajectories(
+        rollouts = experience.collect_rollouts(
             rng=rng,
-            train_state=train_state,
-            env=self.env,
-            net_init_state=net_init_state,
-            levels=self.levels,
             num_steps=self.num_steps,
+            train_state=train_state,
+            net_init_state=net_init_state,
+            env=self.env,
+            levels=self.levels,
+        )
+        eval_metrics = compute_rollout_metrics(
+            rollouts=rollouts,
             discount_rate=self.discount_rate,
-            compute_metrics=True,
             benchmark_returns=self.benchmarks,
         )
         return eval_metrics
@@ -1091,20 +817,16 @@ class AnimatedRolloutsEval(Eval):
         train_state: TrainState,
         net_init_state: ActorCriticState,
     ) -> Metrics:
-        trajectories, *_ = collect_trajectories(
+        rollouts = experience.collect_rollouts(
             rng=rng,
-            train_state=train_state,
-            env=self.env,
-            net_init_state=net_init_state,
-            levels=self.levels,
             num_steps=self.num_steps,
-            compute_metrics=False,
-            # n/a because compute metrics is false
-            discount_rate=None,
-            benchmark_returns=None,
+            train_state=train_state,
+            net_init_state=net_init_state,
+            env=self.env,
+            levels=self.levels,
         )
-        frames = animate_trajectories(
-            trajectories,
+        frames = animate_rollouts(
+            rollouts=rollouts,
             grid_width=self.gif_grid_width,
             force_lod=self.gif_level_of_detail,
             env=self.env,
@@ -1121,7 +843,6 @@ class HeatmapVisualisationEval(Eval):
     num_steps: int
     discount_rate: float
     env: Env
-    # TODO: a flag for 'do rollouts'?
 
 
     def eval(
@@ -1164,21 +885,17 @@ class HeatmapVisualisationEval(Eval):
         # EXPENSIVE EVALS, ROLLOUTS
         # TODO: CONSIDER SEPARATING THESE INTO TWO DIFFERENT EVAL CLASSES
         # model policy rollout returns -> heatmap
-        trajectories, *_ = collect_trajectories(
+        rollouts = experience.collect_rollouts(
             rng=rng,
-            train_state=train_state,
-            env=self.env,
-            net_init_state=net_init_state,
-            levels=self.levels,
             num_steps=self.num_steps,
-            compute_metrics=False,
-            # n/a because compute metrics is false
-            discount_rate=None,
-            benchmark_returns=None,
+            train_state=train_state,
+            net_init_state=net_init_state,
+            env=self.env,
+            levels=self.levels,
         )
-        returns = jax.vmap(compute_average_return, in_axes=(1,1,None))(
-            trajectories.reward,
-            trajectories.done,
+        returns = jax.vmap(compute_average_return, in_axes=(0,0,None))(
+            rollouts.transitions.reward,
+            rollouts.transitions.done,
             self.discount_rate,
         )
         rollout_heatmap = generate_heatmap(
@@ -1198,55 +915,149 @@ class HeatmapVisualisationEval(Eval):
 # Helper functions
 
 
-@functools.partial(jax.jit, static_argnames=('grid_width','force_lod','env'))
-def animate_trajectories(
-    trajectories: Transition,
-    grid_width: int,
-    force_lod: int = 1,
-    env: Env = None,
-) -> Array:
+@jax.jit
+def compute_rollout_metrics(
+    rollouts: Rollout,                  # Rollout[num_levels]
+    discount_rate: float,
+    benchmark_returns: Array | None,    # float[num_levels]
+) -> Metrics:
     """
-    Transform a trajectory into a sequence of images showing for each
-    timestep a matrix of observations.
+    Parameters:
+
+    * rollouts: Rollout[num_levels] (with Transition[num_steps] inside)
+            The rollouts to score.
+    * discount_rate : float
+            Used in computing the return metric.
+    * benchmark_returns : float[num_levels] | None
+            For each level, what is the benchmark (e.g. optimal) return to be
+            aiming for? If None, skip this metric.
+
+    Returns:
+
+    * metrics : {str: Any}
+            A dictionary of statistics calculated based on the collected
+            experience. Each key is prefixed with `metrics_prefix`.
+            If `compute_metrics` is False, the dictionary is empty.
     """
-    obs = trajectories.obs
+    # note: comments use shorthand L = num_levels, S = num_steps.
 
-    if force_lod != env.obs_level_of_detail:
-        vrender = jax.vmap(env.get_obs, in_axes=(0, None,)) # parallel envs
-        vvrender = jax.vmap(vrender, in_axes=(0, None,))    # time
-        obs = vvrender(trajectories.env_state, force_lod)
+    # compute returns
+    vmap_avg_return = jax.vmap(compute_average_return, in_axes=(0,0,None))
+    avg_returns = vmap_avg_return(
+        rollouts.transitions.reward,                # float[L (vmapped), S]
+        rollouts.transitions.done,                  # bool[L (vmapped), S]
+        discount_rate,                              # float
+    )                                               # -> float[L (vmapped)]
 
-    # flash the screen half black for the last frame of each episode
-    done_mask = einops.rearrange(trajectories.done, 't p -> t p 1 1 1')
-    obs = obs * (1. - .5 * done_mask)
+    # compute episode lengths
+    eps_per_step = (
+        rollouts.transitions.done.mean(axis=1)      # bool[L, S] -> float[L]
+    )
+    steps_per_ep = 1 / (eps_per_step + 1e-10)
+
+    # compute average reward
+    reward_per_step = (
+        rollouts.transitions.reward.mean(axis=1)    # float[L, S] -> float[L]
+    )
+
+    metrics = {
+        # average over all levels in the batch
+        'avg_avg_return': avg_returns.mean(),
+        'avg_avg_episode_length': steps_per_ep.mean(),
+        'avg_reward_per_step': reward_per_step.mean(),
+        # histogram of values for each level in the batch
+        'lvl_avg_return_hist': avg_returns,
+        'lvl_avg_episode_length_hist': steps_per_ep,
+        'lvl_reward_per_step_hist': reward_per_step,
+    }
+
+    # compare returns to benchmark returns if provided
+    # TODO: allow a dict of different benchmarks (like proxies)
+    if benchmark_returns is not None:
+        benchmark_regret = benchmark_returns - avg_returns
+        metrics.update({
+            # average over all levels in the batch
+            'avg_benchmark_return': benchmark_returns.mean(),
+            'avg_benchmark_regret': benchmark_regret.mean(),
+            # histograms of values for each level
+            'lvl_benchmark_return_hist': benchmark_returns,
+            'lvl_benchmark_regret_hist': benchmark_regret,
+        })
     
-    # rearrange into a (padded) grid of observations
-    obs = jnp.pad(
-        obs,
-        pad_width=(
-            (0,0), # time
-            (0,0), # parallel
-            (0,1), # height
-            (0,1), # width
-            (0,0), # channel
-        ),
-    )
-    grid = einops.rearrange(
-        obs,
-        't (p1 p2) h w c -> t (p1 h) (p2 w) c',
-        p2=grid_width,
-    )
-    grid = jnp.pad(
-        grid,
-        pad_width=(
-            (0,8), # time
-            (1,0), # height
-            (1,0), # width
-            (0,0), # channel
-        ),
+    # if there are any proxy rewards, add new metrics for each
+    proxy_dict = rollouts.transitions.info.get("proxy_rewards", {})
+    for proxy_name, proxy_rewards in proxy_dict.items():
+        avg_proxy_returns = vmap_avg_return(
+            proxy_rewards,              # float[L (vmapped), S]
+            rollouts.transitions.done,  # bool[L (vmapped), S]
+            discount_rate,              # float
+        )                               # -> float[L (vmapped)]
+        proxy_reward_per_step = (
+            proxy_rewards.mean(axis=1)  # float[L, S] -> float[L]
+        )
+        metrics[proxy_name] = {
+            # average over all levels in the batch
+            'avg_avg_return': avg_proxy_returns.mean(),
+            'avg_reward_per_step': proxy_reward_per_step.mean(),
+            # histrograms of values for each level
+            'lvl_avg_return_hist': avg_proxy_returns,
+            'lvl_reward_per_step_hist': proxy_reward_per_step,
+        }
+    
+    return metrics
+
+
+@jax.jit
+def compute_average_return(
+    rewards: Array,         # float[num_steps]
+    dones: Array,           # bool[num_steps]
+    discount_rate: float,
+) -> float:
+    """
+    Given a sequence of (reward, done) pairs, compute the average return for
+    each episode represented in the sequence.
+
+    Parameters:
+
+    * rewards : float[num_steps]
+            Scalar rewards delivered at the conclusion of each timestep.
+    * dones : bool[num_steps]
+            True indicates the reward was delivered as the episode
+            terminated.
+    * discount_rate : float
+            The return is exponentially discounted sum of future rewards in
+            the episode, this is the discount rate for that discounting.
+
+    Returns:
+
+    * average_return : float
+            The average of the returns for each episode represented in the
+            sequence of (reward, done) pairs.
+    """
+    # compute per-step returns
+    def _accumulate_return(
+        next_step_return,
+        this_step_reward_and_done,
+    ):
+        reward, done = this_step_reward_and_done
+        this_step_return = reward + (1-done) * discount_rate * next_step_return
+        return this_step_return, this_step_return
+    _, per_step_returns = jax.lax.scan(
+        _accumulate_return,
+        0,
+        (rewards, dones),
+        reverse=True,
     )
 
-    return grid
+    # identify start of each episode
+    first_steps = jnp.roll(dones, 1).at[0].set(True)
+    
+    # average returns at the start of each episode
+    total_first_step_returns = jnp.sum(first_steps * per_step_returns)
+    num_episodes = jnp.sum(first_steps)
+    average_return = total_first_step_returns / num_episodes
+    
+    return average_return
 
 
 @functools.partial(jax.jit, static_argnames=('shape',))
@@ -1266,5 +1077,111 @@ def generate_diamond_plot(data, shape, pos):
             .at[2, 3, pos[0], pos[1], :].set(color_data[:,3,:]),
         'col row h w rgb -> (h col) (w row) rgb',
     )
+
+
+@functools.partial(jax.jit, static_argnames=('grid_width','force_lod','env'))
+def animate_rollouts(
+    rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
+    grid_width: int,
+    force_lod: int | None = None,
+    env: Env | None = None,
+) -> Array:
+    """
+    Transform a vector of rollouts into a sequence of images showing for each
+    timestep a matrix of observations.
+
+    Inputs:
+
+    * rollouts : Rollout[num_levels] (each containing Transition[num_steps])
+            The rollouts to visualise.
+    * grid_width : static int
+            How many levels to put in each row of the grid. Must exactly
+            divide num_levels (the shape of rollouts).
+    * force_lod : optional int (any valid obs_level_of_detail for env)
+            Use this level of detail (lod) for the animations.
+    * env : optional Env (mandatory if force_lod is provided)
+            The environment provides the renderer, used if the level of
+            detail is different from the level of detail the obs are already
+            encoded at.
+
+    Returns:
+
+    * frames : float[num_steps+4, img_height, img_width, channels]
+            The animation.
+ 
+    Notes:
+
+    * In the output type:
+      * `num_steps+4` is for 4 frames inserted at the end of the animation to
+        mark the end.
+      * img_width = grid_width * cell_width + grid_width + 1
+      * img_height = grid_height * cell_height + grid_height + 1
+      * grid_height = num_levels / grid_width (divides exactly)
+      * cell_width and cell_height are dependent on the size of observations
+        at the given level of detail.
+      * the `+ grid_width + 1` and `+ grid_height + 1` come from 1 pixel of
+        padding that is inserted separating each observation in the grid.
+      * channels is usually 3 (rgb) but could be otherwise, it depends on the
+        shape of the observations.
+    
+    TODO:
+
+    * Currently the final result state from the rollout is not shown. We
+      could add that!
+      * It would require tweaking the rollout class to store the final obs
+        and the final env_state.
+      * It would slightly complicate the observation aseembly phase of this
+        function, see comments.
+      * It would change the first output axis to `num_steps + 1`.
+    """
+    num_levels = jax.tree.leaves(rollouts)[0].shape[0]
+    assert (num_levels % grid_width) == 0
+    assert not (force_lod is not None and env is None)
+
+    # assemble observations at desired level of detail
+    if force_lod is not None and force_lod != env.obs_level_of_detail:
+        # need to re-render the observations
+        vrender = jax.vmap(env.get_obs, in_axes=(0, None,)) # parallel envs
+        vvrender = jax.vmap(vrender, in_axes=(0, None,))    # time
+        obs = vvrender(rollouts.transitions.env_state, force_lod)
+        # TODO: first stack the final env state
+    else:
+        obs = rollouts.transitions.obs
+        # TODO: stack the final observation
+
+    # flash the screen half black for the last frame of each episode
+    done_mask = einops.rearrange(
+        rollouts.transitions.done,
+        'level step -> level step 1 1 1',
+    )
+    obs = obs * (1. - .4 * done_mask)
+    
+    # rearrange into a (padded) grid of observations
+    obs = jnp.pad(
+        obs,
+        pad_width=(
+            (0, 0), # levels
+            (0, 0), # steps
+            (0, 1), # height
+            (0, 1), # width
+            (0, 0), # channel
+        ),
+    )
+    grid = einops.rearrange(
+        obs,
+        '(level_h level_w) step h w c -> step (level_h h) (level_w w) c',
+        level_w=grid_width,
+    )
+    grid = jnp.pad(
+        grid,
+        pad_width=(
+            (0, 4), # time
+            (1, 0), # height
+            (1, 0), # width
+            (0, 0), # channel
+        ),
+    )
+
+    return grid
 
 
