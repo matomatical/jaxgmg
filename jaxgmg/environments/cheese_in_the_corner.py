@@ -315,6 +315,7 @@ class LevelGenerator(base.LevelGenerator):
     corner_size: int = 1
     cheese_location: Tuple[int, int] = (1, 1)
     cheese_in_center: bool = False
+    cheese_both_corners: bool= False
     
     def __post_init__(self):
         assert self.corner_size >= 1
@@ -350,6 +351,8 @@ class LevelGenerator(base.LevelGenerator):
             # first `corner_size` cols not including border
             & (coords[:, 1] >= 1)
             & (coords[:, 1] <= self.corner_size)
+            #add bottom right corner
+            
         ).flatten()
         # ... not on a wall (unless that's the only option)
         cheese_mask = corner_mask & no_wall_mask
@@ -367,6 +370,29 @@ class LevelGenerator(base.LevelGenerator):
             assert self.cheese_location[0] >= 1 and self.cheese_location[0] <= self.height
             assert self.cheese_location[1] >= 1 and self.cheese_location[1] <= self.width
             cheese_pos = jnp.array(self.cheese_location)
+        if self.cheese_both_corners:
+            # cheese is either placed in top left or bottom right corner (random and equal chance)
+            top_left_mask = (
+            (coords[:, 0] == 1) &
+            (coords[:, 1] == 1) 
+            )
+            bottom_right_mask = (
+                (coords[:, 0] == self.height - 2) &
+                (coords[:, 1] == self.width - 2) 
+            )
+
+            corner_mask = top_left_mask | bottom_right_mask
+            cheese_mask = corner_mask & no_wall_mask
+            cheese_mask = cheese_mask | (~(cheese_mask.any()) & corner_mask)
+            rng_spawn_cheese, rng = jax.random.split(rng)
+
+            cheese_pos = jax.random.choice(
+                key=rng_spawn_cheese,
+                a=coords,
+                axis=0,
+                p=cheese_mask,
+            )
+
         #in case cheese_in_center is set, and the cheese_location is not set, override the random choice
         if self.cheese_in_center:
             cheese_pos = jnp.array([self.height//2, self.width//2])

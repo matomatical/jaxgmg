@@ -35,6 +35,7 @@ def corner(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    cheese_both_corners: bool = True,
     cheese_in_center: bool = False,
     ppo_lr_annealing: bool = False,
     num_minibatches_per_epoch: int = 8,
@@ -97,6 +98,7 @@ def corner(
         corner_size=env_corner_size,
         cheese_in_center = cheese_in_center,
         cheese_location= tuple(cheese_location),
+        cheese_both_corners=cheese_both_corners,
     )
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if fixed_train_levels:
