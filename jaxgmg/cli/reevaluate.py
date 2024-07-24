@@ -7,6 +7,7 @@ import jax
 from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.baselines import ppo
+from jaxgmg.baselines import evals
 
 from jaxgmg import util
 
@@ -74,7 +75,7 @@ def corner(
         level_solver.vmap_solve(eval_on_levels),
         eval_on_levels,
     )
-    eval_on_level_set = ppo.FixedLevelsEval(
+    eval_on_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
         num_levels=num_eval_levels,
         levels=eval_on_levels,
         benchmarks=eval_on_benchmark_returns,
@@ -99,7 +100,7 @@ def corner(
         level_solver.vmap_solve(eval_off_levels),
         eval_off_levels,
     )
-    eval_off_level_set = ppo.FixedLevelsEval(
+    eval_off_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
         num_levels=num_eval_levels,
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
@@ -109,7 +110,7 @@ def corner(
     )
     
     # gif animations from those levels
-    eval_on_animation = ppo.AnimatedRolloutsEval(
+    eval_on_animation = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
         levels=eval_on_levels,
         num_steps=env.max_steps_in_episode,
@@ -117,7 +118,7 @@ def corner(
         gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
-    eval_off_animation = ppo.AnimatedRolloutsEval(
+    eval_off_animation = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
         levels=eval_off_levels,
         num_steps=env.max_steps_in_episode,
@@ -136,25 +137,43 @@ def corner(
             splay = cheese_in_the_corner.splay_cheese_and_mouse 
         case _:
             raise ValueError(f'unknown level splayer {level_splayer!r}')
-    eval_on_heatmap_0 = ppo.HeatmapVisualisationEval(
+    # actor critic heatmaps
+    eval_on_ac_heatmap_0 = evals.ActorCriticHeatmapVisualisationEval(
+        *splay(jax.tree.map(lambda x: x[0], eval_on_levels)),
+        env=env,
+    )
+    eval_on_ac_heatmap_1 = evals.ActorCriticHeatmapVisualisationEval(
+        *splay(jax.tree.map(lambda x: x[1], eval_on_levels)),
+        env=env,
+    )
+    eval_off_ac_heatmap_0 = evals.ActorCriticHeatmapVisualisationEval(
+        *splay(jax.tree.map(lambda x: x[0], eval_off_levels)),
+        env=env,
+    )
+    eval_off_ac_heatmap_1 = evals.ActorCriticHeatmapVisualisationEval(
+        *splay(jax.tree.map(lambda x: x[1], eval_off_levels)),
+        env=env,
+    )
+    # rollout heatmaps
+    eval_on_rollout_heatmap_0 = evals.RolloutHeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[0], eval_on_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
         env=env,
     )
-    eval_on_heatmap_1 = ppo.HeatmapVisualisationEval(
+    eval_on_rollout_heatmap_1 = evals.RolloutHeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[1], eval_on_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
         env=env,
     )
-    eval_off_heatmap_0 = ppo.HeatmapVisualisationEval(
+    eval_off_rollout_heatmap_0 = evals.RolloutHeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[0], eval_off_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
         env=env,
     )
-    eval_off_heatmap_1 = ppo.HeatmapVisualisationEval(
+    eval_off_rollout_heatmap_1 = evals.RolloutHeatmapVisualisationEval(
         *splay(jax.tree.map(lambda x: x[1], eval_off_levels)),
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
@@ -174,10 +193,14 @@ def corner(
             'off_distribution': eval_off_level_set,
             'on_distribution_animations': eval_on_animation,
             'off_distribution_animations': eval_off_animation,
-            'on_distribution_level_0_heatmaps': eval_on_heatmap_0,
-            'on_distribution_level_1_heatmaps': eval_on_heatmap_1,
-            'off_distribution_eval_level_0_heatmaps': eval_off_heatmap_0,
-            'off_distribution_eval_level_1_heatmaps': eval_off_heatmap_1,
+            'on_distribution_lvl0_ac_heatmaps': eval_on_ac_heatmap_0,
+            'on_distribution_lvl1_ac_heatmaps': eval_on_ac_heatmap_1,
+            'off_distribution_eval_lvl0_ac_heatmaps': eval_off_ac_heatmap_0,
+            'off_distribution_eval_lvl1_ac_heatmaps': eval_off_ac_heatmap_1,
+            'on_distribution_lvl0_rollout_heatmaps': eval_on_rollout_heatmap_0,
+            'on_distribution_lvl1_rollout_heatmaps': eval_on_rollout_heatmap_1,
+            'off_distribution_eval_lvl0_rollout_heatmaps': eval_off_rollout_heatmap_0,
+            'off_distribution_eval_lvl1_rollout_heatmaps': eval_off_rollout_heatmap_1,
         },
         save_files_to=save_files_to,
     )
