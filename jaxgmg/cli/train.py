@@ -34,7 +34,7 @@ def corner(
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
-    cheese_location: Tuple[int,int] = (2,2) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
     cheese_in_center: bool = False,
     ppo_lr_annealing: bool = False,
     num_minibatches_per_epoch: int = 8,
