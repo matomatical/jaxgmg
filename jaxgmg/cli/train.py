@@ -9,6 +9,7 @@ from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.baselines import ppo
 from jaxgmg.baselines import networks
+from jaxgmg.baselines import evals
 # from jaxgmg.baselines import ued
 
 from jaxgmg import util
@@ -136,7 +137,7 @@ def corner(
         level_solver.vmap_solve(eval_on_levels),
         eval_on_levels,
     )
-    eval_on_level_set = ppo.FixedLevelsEvalWithBenchmarkReturns(
+    eval_on_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
         num_levels=num_eval_levels,
         levels=eval_on_levels,
         benchmarks=eval_on_benchmark_returns,
@@ -161,7 +162,7 @@ def corner(
         level_solver.vmap_solve(eval_off_levels),
         eval_off_levels,
     )
-    eval_off_level_set = ppo.FixedLevelsEvalWithBenchmarkReturns(
+    eval_off_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
         num_levels=num_eval_levels,
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
@@ -171,7 +172,7 @@ def corner(
     )
     
     # gif animations from those levels
-    eval_on_animation = ppo.AnimatedRolloutsEval(
+    eval_on_rollouts = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
         levels=eval_on_levels,
         num_steps=env.max_steps_in_episode,
@@ -179,7 +180,7 @@ def corner(
         gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
-    eval_off_animation = ppo.AnimatedRolloutsEval(
+    eval_off_rollouts = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
         levels=eval_off_levels,
         num_steps=env.max_steps_in_episode,
@@ -198,30 +199,40 @@ def corner(
             splay = cheese_in_the_corner.splay_cheese_and_mouse 
         case _:
             raise ValueError(f'unknown level splayer {level_splayer!r}')
-    eval_on_heatmap_0 = ppo.HeatmapVisualisationEval(
-        *splay(jax.tree.map(lambda x: x[0], eval_on_levels)),
-        num_steps=num_env_steps_per_eval,
-        discount_rate=ppo_gamma,
-        env=env,
-    )
-    eval_on_heatmap_1 = ppo.HeatmapVisualisationEval(
-        *splay(jax.tree.map(lambda x: x[1], eval_on_levels)),
-        num_steps=num_env_steps_per_eval,
-        discount_rate=ppo_gamma,
-        env=env,
-    )
-    eval_off_heatmap_0 = ppo.HeatmapVisualisationEval(
-        *splay(jax.tree.map(lambda x: x[0], eval_off_levels)),
-        num_steps=num_env_steps_per_eval,
-        discount_rate=ppo_gamma,
-        env=env,
-    )
-    eval_off_heatmap_1 = ppo.HeatmapVisualisationEval(
-        *splay(jax.tree.map(lambda x: x[1], eval_off_levels)),
-        num_steps=num_env_steps_per_eval,
-        discount_rate=ppo_gamma,
-        env=env,
-    )
+    def make_heatmap_evals(level, name):
+        splayset = splay(level)
+        return {
+            (name+"_static_heatmap", num_cycles_per_big_eval):
+                evals.ActorCriticHeatmapVisualisationEval(
+                    *splayset,
+                    env=env,
+                ),
+            (name+"_rollout_heatmap", num_cycles_per_big_eval):
+                evals.RolloutHeatmapVisualisationEval(
+                    *splayset,
+                    env=env,
+                    discount_rate=ppo_gamma,
+                    num_steps=num_env_steps_per_eval,
+                ),
+        }
+    heatmap_evals = {
+        **make_heatmap_evals(
+            name="eval_on_0",
+            level=jax.tree.map(lambda x: x[0], eval_on_levels),
+        ),
+        **make_heatmap_evals(
+            name="eval_on_1",
+            level=jax.tree.map(lambda x: x[1], eval_on_levels),
+        ),
+        **make_heatmap_evals(
+            name="eval_off_0",
+            level=jax.tree.map(lambda x: x[0], eval_off_levels),
+        ),
+        **make_heatmap_evals(
+            name="eval_off_1",
+            level=jax.tree.map(lambda x: x[1], eval_off_levels),
+        ),
+    }
 
     ppo.run(
         rng=rng_train,
@@ -232,17 +243,15 @@ def corner(
         net=net,
         net_init_params=net_init_params,
         net_init_state=net_init_state,
-        evals={
+        # evals
+        evals_dict={
             # small evals
             ('on_dist_levels', num_cycles_per_eval): eval_on_level_set,
             ('off_dist_levels', num_cycles_per_eval): eval_off_level_set,
             # big evals
-            ('on_dist_animations', num_cycles_per_big_eval): eval_on_animation,
-            ('off_dist_animations', num_cycles_per_big_eval): eval_off_animation,
-            ('on_dist_lvl0_heatmaps', num_cycles_per_big_eval): eval_on_heatmap_0,
-            ('on_distrlvl1_heatmaps', num_cycles_per_big_eval): eval_on_heatmap_1,
-            ('off_dist_lvl0_heatmaps', num_cycles_per_big_eval): eval_off_heatmap_0,
-            ('off_dist_lvl1_heatmaps', num_cycles_per_big_eval): eval_off_heatmap_1,
+            ('on_dist_rollouts', num_cycles_per_big_eval): eval_on_rollouts,
+            ('off_dist_rollouts', num_cycles_per_big_eval): eval_off_rollouts,
+            **heatmap_evals,
         },
         # algorithm
         ppo_lr=ppo_lr,
@@ -398,7 +407,7 @@ def keys(
         rng_eval_on_levels,
         num_levels=num_eval_levels,
     )
-    eval_on_level_set = ppo.FixedLevelsEval(
+    eval_on_level_set = evals.FixedLevelsEval(
         num_levels=num_eval_levels,
         levels=eval_on_levels,
         num_steps=num_env_steps_per_eval,
@@ -421,7 +430,7 @@ def keys(
         rng_eval_off_levels,
         num_levels=num_eval_levels,
     )
-    eval_off_level_set = ppo.FixedLevelsEval(
+    eval_off_level_set = evals.FixedLevelsEval(
         num_levels=num_eval_levels,
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
@@ -430,7 +439,7 @@ def keys(
     )
     
     # gif animations from those levels
-    eval_on_animation = ppo.AnimatedRolloutsEval(
+    eval_on_animation = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
         levels=eval_on_levels,
         num_steps=env.max_steps_in_episode,
@@ -438,7 +447,7 @@ def keys(
         gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
-    eval_off_animation = ppo.AnimatedRolloutsEval(
+    eval_off_animation = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
         levels=eval_off_levels,
         num_steps=env.max_steps_in_episode,
@@ -457,7 +466,7 @@ def keys(
         net_init_params=net_init_params,
         net_init_state=net_init_state,
         # evals
-        evals={
+        evals_dict={
             ('on_dist_levels', num_cycles_per_eval): eval_on_level_set,
             ('off_dist_levels', num_cycles_per_eval): eval_off_level_set,
             ('on_dist_animations', num_cycles_per_big_eval): eval_on_animation,

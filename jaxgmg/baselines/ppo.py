@@ -32,8 +32,7 @@ from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
 from jaxgmg.environments.base import LevelGenerator # this will go to UED
 from jaxgmg.baselines.experience import Transition, Rollout
-
-Metrics = dict[str, Any]
+from jaxgmg.baselines.evals import Eval
 
 
 @struct.dataclass
@@ -43,17 +42,6 @@ class TrainLevelSet:
         rng: PRNGKey,
         num_levels_in_batch: int,
     ) -> Level: # Level[num_levels_in_batch]
-        raise NotImplementedError
-
-
-@struct.dataclass
-class Eval:
-    def eval(
-        self,
-        rng: PRNGKey,
-        train_state: TrainState,
-        net_init_state: networks.ActorCriticState,
-    ) -> Metrics:
         raise NotImplementedError
 
 
@@ -70,7 +58,7 @@ def run(
     net_init_params: networks.ActorCriticParams,
     net_init_state: networks.ActorCriticState,
     # evals
-    evals: dict[tuple[str, int]: Eval], # {(name, period): eval_obj}
+    evals_dict: dict[tuple[str, int]: Eval], # {(name, period): eval_obj}
     # PPO hyperparameters
     ppo_lr: float,                      # learning rate
     ppo_gamma: float,                   # discount rate
@@ -178,7 +166,7 @@ def run(
         rng_t, rng = jax.random.split(rng)
         log_ever = (console_log or wandb_log) 
         log_cycle = log_ever and t % num_cycles_per_log == 0
-        eval_cycle = log_ever and any(t % p == 0 for (n, p) in evals.keys())
+        eval_cycle = log_ever and any(t % p == 0 for (n, p) in evals_dict)
         metrics = collections.defaultdict(dict)
 
 
@@ -214,7 +202,7 @@ def run(
             levels=levels_t,
         )
         if log_cycle:
-            env_metrics = compute_rollout_metrics(
+            env_metrics = experience.compute_rollout_metrics(
                 rollouts=rollouts,
                 discount_rate=ppo_gamma,
                 benchmark_returns=None,
@@ -225,7 +213,7 @@ def run(
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
         if log_cycle and train_gifs:
-            frames = animate_rollouts(
+            frames = experience.animate_rollouts(
                 rollouts=rollouts,
                 grid_width=train_gif_grid_width,
                 force_lod=train_gif_level_of_detail,
@@ -261,7 +249,7 @@ def run(
 
         # periodic evaluations
         rng_evals, rng_t = jax.random.split(rng_t)
-        for (eval_name, num_cycles_per_eval), eval_obj in evals.items():
+        for (eval_name, num_cycles_per_eval), eval_obj in evals_dict.items():
             if t % num_cycles_per_eval == 0:
                 rng_eval, rng_evals = jax.random.split(rng_evals)
                 metrics['eval'][eval_name] = eval_obj.eval(
@@ -365,7 +353,7 @@ def ppo_update(
 ) -> tuple[
     TrainState,
     Array, # GAE estimates
-    Metrics,
+    dict[str, Any], # metrics
 ]:
     """
     Given a data set of rollouts, perform GAE followed by a few epochs of PPO
@@ -698,456 +686,5 @@ def eval_checkpoint(
     for key in skip_keys:
         del metrics_disk[key]
     util.save_json(metrics_disk, metrics_path + "metrics.json")
-
-
-# # # 
-# EVALUATIONS
-
-
-@struct.dataclass
-class FixedLevelsEval(Eval):
-    num_levels: int
-    num_steps: int
-    discount_rate: float
-    env: Env
-    levels: Level       # Level[num_levels]
-
-
-    def eval(
-        self,
-        rng: PRNGKey,
-        train_state: TrainState,
-        net_init_state: networks.ActorCriticState,
-    ) -> Metrics:
-        rollouts = experience.collect_rollouts(
-            rng=rng,
-            num_steps=self.num_steps,
-            train_state=train_state,
-            net_init_state=net_init_state,
-            env=self.env,
-            levels=self.levels,
-        )
-        eval_metrics = compute_rollout_metrics(
-            rollouts=rollouts,
-            discount_rate=self.discount_rate,
-            benchmark_returns=None,
-        )
-        return eval_metrics
-
-
-@struct.dataclass
-class FixedLevelsEvalWithBenchmarkReturns(Eval):
-    num_levels: int
-    num_steps: int
-    discount_rate: float
-    env: Env
-    levels: Level       # Level[num_levels]
-    benchmarks: Array   # float[num_levels]
-
-
-    def eval(
-        self,
-        rng: PRNGKey,
-        train_state: TrainState,
-        net_init_state: networks.ActorCriticState,
-    ) -> Metrics:
-        rollouts = experience.collect_rollouts(
-            rng=rng,
-            num_steps=self.num_steps,
-            train_state=train_state,
-            net_init_state=net_init_state,
-            env=self.env,
-            levels=self.levels,
-        )
-        eval_metrics = compute_rollout_metrics(
-            rollouts=rollouts,
-            discount_rate=self.discount_rate,
-            benchmark_returns=self.benchmarks,
-        )
-        return eval_metrics
-
-
-@struct.dataclass
-class AnimatedRolloutsEval(Eval):
-    num_levels: int
-    levels: Level       # Level[num_levels]
-    num_steps: int
-    gif_grid_width: int
-    gif_level_of_detail: int
-    env: Env
-
-
-    def eval(
-        self,
-        rng: PRNGKey,
-        train_state: TrainState,
-        net_init_state: networks.ActorCriticState,
-    ) -> Metrics:
-        rollouts = experience.collect_rollouts(
-            rng=rng,
-            num_steps=self.num_steps,
-            train_state=train_state,
-            net_init_state=net_init_state,
-            env=self.env,
-            levels=self.levels,
-        )
-        frames = animate_rollouts(
-            rollouts=rollouts,
-            grid_width=self.gif_grid_width,
-            force_lod=self.gif_level_of_detail,
-            env=self.env,
-        )
-        return {'rollouts_gif': frames}
-
-
-@struct.dataclass
-class HeatmapVisualisationEval(Eval):
-    levels: Level
-    num_levels: int
-    levels_pos: tuple[Array, Array]
-    grid_shape: tuple[int, int]
-    num_steps: int
-    discount_rate: float
-    env: Env
-
-
-    def eval(
-        self,
-        rng: PRNGKey,
-        train_state: TrainState,
-        net_init_state: networks.ActorCriticState,
-    ) -> Metrics:
-
-        # CHEAP EVALS FROM INIT STATE ONLY
-        obs, _ = self.env.vreset_to_level(self.levels)
-        vec_net_init_state = jax.tree.map(
-            lambda c: einops.repeat(
-                c,
-                '... -> num_levels ...',
-                num_levels=self.num_levels,
-            ),
-            net_init_state,
-        )
-        action_distr, values, _net_state = train_state.apply_fn(
-            train_state.params,
-            obs,
-            vec_net_init_state,
-            -jnp.ones(self.num_levels, dtype=int),
-        )
-        # model value -> heatmap
-        value_heatmap = generate_heatmap(
-            data=values,
-            shape=self.grid_shape,
-            pos=self.levels_pos,
-        )
-        # model policy -> diamond map
-        action_probs = action_distr.probs
-        action_diamond_plot = generate_diamond_plot(
-            data=action_probs,
-            shape=self.grid_shape,
-            pos=self.levels_pos,
-        )
-    
-        # EXPENSIVE EVALS, ROLLOUTS
-        # TODO: CONSIDER SEPARATING THESE INTO TWO DIFFERENT EVAL CLASSES
-        # model policy rollout returns -> heatmap
-        rollouts = experience.collect_rollouts(
-            rng=rng,
-            num_steps=self.num_steps,
-            train_state=train_state,
-            net_init_state=net_init_state,
-            env=self.env,
-            levels=self.levels,
-        )
-        returns = jax.vmap(compute_average_return, in_axes=(0,0,None))(
-            rollouts.transitions.reward,
-            rollouts.transitions.done,
-            self.discount_rate,
-        )
-        rollout_heatmap = generate_heatmap(
-            data=returns,
-            shape=self.grid_shape,
-            pos=self.levels_pos,
-        )
-
-        return {
-            'value_img': value_heatmap,
-            'action_probs_img': action_diamond_plot,
-            'policy_rollout_return_img': rollout_heatmap,
-        }
-    
-
-# # # 
-# Helper functions
-
-
-@jax.jit
-def compute_rollout_metrics(
-    rollouts: Rollout,                  # Rollout[num_levels]
-    discount_rate: float,
-    benchmark_returns: Array | None,    # float[num_levels]
-) -> Metrics:
-    """
-    Parameters:
-
-    * rollouts: Rollout[num_levels] (with Transition[num_steps] inside)
-            The rollouts to score.
-    * discount_rate : float
-            Used in computing the return metric.
-    * benchmark_returns : float[num_levels] | None
-            For each level, what is the benchmark (e.g. optimal) return to be
-            aiming for? If None, skip this metric.
-
-    Returns:
-
-    * metrics : {str: Any}
-            A dictionary of statistics calculated based on the collected
-            experience. Each key is prefixed with `metrics_prefix`.
-            If `compute_metrics` is False, the dictionary is empty.
-    """
-    # note: comments use shorthand L = num_levels, S = num_steps.
-
-    # compute returns
-    vmap_avg_return = jax.vmap(compute_average_return, in_axes=(0,0,None))
-    avg_returns = vmap_avg_return(
-        rollouts.transitions.reward,                # float[L (vmapped), S]
-        rollouts.transitions.done,                  # bool[L (vmapped), S]
-        discount_rate,                              # float
-    )                                               # -> float[L (vmapped)]
-
-    # compute episode lengths
-    eps_per_step = (
-        rollouts.transitions.done.mean(axis=1)      # bool[L, S] -> float[L]
-    )
-    steps_per_ep = 1 / (eps_per_step + 1e-10)
-
-    # compute average reward
-    reward_per_step = (
-        rollouts.transitions.reward.mean(axis=1)    # float[L, S] -> float[L]
-    )
-
-    metrics = {
-        # average over all levels in the batch
-        'avg_avg_return': avg_returns.mean(),
-        'avg_avg_episode_length': steps_per_ep.mean(),
-        'avg_reward_per_step': reward_per_step.mean(),
-        # histogram of values for each level in the batch
-        'lvl_avg_return_hist': avg_returns,
-        'lvl_avg_episode_length_hist': steps_per_ep,
-        'lvl_reward_per_step_hist': reward_per_step,
-    }
-
-    # compare returns to benchmark returns if provided
-    # TODO: allow a dict of different benchmarks (like proxies)
-    if benchmark_returns is not None:
-        benchmark_regret = benchmark_returns - avg_returns
-        metrics.update({
-            # average over all levels in the batch
-            'avg_benchmark_return': benchmark_returns.mean(),
-            'avg_benchmark_regret': benchmark_regret.mean(),
-            # histograms of values for each level
-            'lvl_benchmark_return_hist': benchmark_returns,
-            'lvl_benchmark_regret_hist': benchmark_regret,
-        })
-    
-    # if there are any proxy rewards, add new metrics for each
-    proxy_dict = rollouts.transitions.info.get("proxy_rewards", {})
-    for proxy_name, proxy_rewards in proxy_dict.items():
-        avg_proxy_returns = vmap_avg_return(
-            proxy_rewards,              # float[L (vmapped), S]
-            rollouts.transitions.done,  # bool[L (vmapped), S]
-            discount_rate,              # float
-        )                               # -> float[L (vmapped)]
-        proxy_reward_per_step = (
-            proxy_rewards.mean(axis=1)  # float[L, S] -> float[L]
-        )
-        metrics[proxy_name] = {
-            # average over all levels in the batch
-            'avg_avg_return': avg_proxy_returns.mean(),
-            'avg_reward_per_step': proxy_reward_per_step.mean(),
-            # histrograms of values for each level
-            'lvl_avg_return_hist': avg_proxy_returns,
-            'lvl_reward_per_step_hist': proxy_reward_per_step,
-        }
-    
-    return metrics
-
-
-@jax.jit
-def compute_average_return(
-    rewards: Array,         # float[num_steps]
-    dones: Array,           # bool[num_steps]
-    discount_rate: float,
-) -> float:
-    """
-    Given a sequence of (reward, done) pairs, compute the average return for
-    each episode represented in the sequence.
-
-    Parameters:
-
-    * rewards : float[num_steps]
-            Scalar rewards delivered at the conclusion of each timestep.
-    * dones : bool[num_steps]
-            True indicates the reward was delivered as the episode
-            terminated.
-    * discount_rate : float
-            The return is exponentially discounted sum of future rewards in
-            the episode, this is the discount rate for that discounting.
-
-    Returns:
-
-    * average_return : float
-            The average of the returns for each episode represented in the
-            sequence of (reward, done) pairs.
-    """
-    # compute per-step returns
-    def _accumulate_return(
-        next_step_return,
-        this_step_reward_and_done,
-    ):
-        reward, done = this_step_reward_and_done
-        this_step_return = reward + (1-done) * discount_rate * next_step_return
-        return this_step_return, this_step_return
-    _, per_step_returns = jax.lax.scan(
-        _accumulate_return,
-        0,
-        (rewards, dones),
-        reverse=True,
-    )
-
-    # identify start of each episode
-    first_steps = jnp.roll(dones, 1).at[0].set(True)
-    
-    # average returns at the start of each episode
-    total_first_step_returns = jnp.sum(first_steps * per_step_returns)
-    num_episodes = jnp.sum(first_steps)
-    average_return = total_first_step_returns / num_episodes
-    
-    return average_return
-
-
-@functools.partial(jax.jit, static_argnames=('shape',))
-def generate_heatmap(data, shape, pos):
-    return util.viridis(jnp.zeros(shape).at[pos].set(data))
-
-
-@functools.partial(jax.jit, static_argnames=('shape',))
-def generate_diamond_plot(data, shape, pos):
-    color_data = util.viridis(data)
-    return einops.rearrange(
-        jnp.full((5, 5, *shape, 3), 0.4)
-            .at[:, :, pos[0], pos[1], :].set(0.5)
-            .at[1, 2, pos[0], pos[1], :].set(color_data[:,0,:])
-            .at[2, 1, pos[0], pos[1], :].set(color_data[:,1,:])
-            .at[3, 2, pos[0], pos[1], :].set(color_data[:,2,:])
-            .at[2, 3, pos[0], pos[1], :].set(color_data[:,3,:]),
-        'col row h w rgb -> (h col) (w row) rgb',
-    )
-
-
-@functools.partial(jax.jit, static_argnames=('grid_width','force_lod','env'))
-def animate_rollouts(
-    rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
-    grid_width: int,
-    force_lod: int | None = None,
-    env: Env | None = None,
-) -> Array:
-    """
-    Transform a vector of rollouts into a sequence of images showing for each
-    timestep a matrix of observations.
-
-    Inputs:
-
-    * rollouts : Rollout[num_levels] (each containing Transition[num_steps])
-            The rollouts to visualise.
-    * grid_width : static int
-            How many levels to put in each row of the grid. Must exactly
-            divide num_levels (the shape of rollouts).
-    * force_lod : optional int (any valid obs_level_of_detail for env)
-            Use this level of detail (lod) for the animations.
-    * env : optional Env (mandatory if force_lod is provided)
-            The environment provides the renderer, used if the level of
-            detail is different from the level of detail the obs are already
-            encoded at.
-
-    Returns:
-
-    * frames : float[num_steps+4, img_height, img_width, channels]
-            The animation.
- 
-    Notes:
-
-    * In the output type:
-      * `num_steps+4` is for 4 frames inserted at the end of the animation to
-        mark the end.
-      * img_width = grid_width * cell_width + grid_width + 1
-      * img_height = grid_height * cell_height + grid_height + 1
-      * grid_height = num_levels / grid_width (divides exactly)
-      * cell_width and cell_height are dependent on the size of observations
-        at the given level of detail.
-      * the `+ grid_width + 1` and `+ grid_height + 1` come from 1 pixel of
-        padding that is inserted separating each observation in the grid.
-      * channels is usually 3 (rgb) but could be otherwise, it depends on the
-        shape of the observations.
-    
-    TODO:
-
-    * Currently the final result state from the rollout is not shown. We
-      could add that!
-      * It would require tweaking the rollout class to store the final obs
-        and the final env_state.
-      * It would slightly complicate the observation aseembly phase of this
-        function, see comments.
-      * It would change the first output axis to `num_steps + 1`.
-    """
-    num_levels = jax.tree.leaves(rollouts)[0].shape[0]
-    assert (num_levels % grid_width) == 0
-    assert not (force_lod is not None and env is None)
-
-    # assemble observations at desired level of detail
-    if force_lod is not None and force_lod != env.obs_level_of_detail:
-        # need to re-render the observations
-        vrender = jax.vmap(env.get_obs, in_axes=(0, None,)) # parallel envs
-        vvrender = jax.vmap(vrender, in_axes=(0, None,))    # time
-        obs = vvrender(rollouts.transitions.env_state, force_lod)
-        # TODO: first stack the final env state
-    else:
-        obs = rollouts.transitions.obs
-        # TODO: stack the final observation
-
-    # flash the screen half black for the last frame of each episode
-    done_mask = einops.rearrange(
-        rollouts.transitions.done,
-        'level step -> level step 1 1 1',
-    )
-    obs = obs * (1. - .4 * done_mask)
-    
-    # rearrange into a (padded) grid of observations
-    obs = jnp.pad(
-        obs,
-        pad_width=(
-            (0, 0), # levels
-            (0, 0), # steps
-            (0, 1), # height
-            (0, 1), # width
-            (0, 0), # channel
-        ),
-    )
-    grid = einops.rearrange(
-        obs,
-        '(level_h level_w) step h w c -> step (level_h h) (level_w w) c',
-        level_w=grid_width,
-    )
-    grid = jnp.pad(
-        grid,
-        pad_width=(
-            (0, 4), # time
-            (1, 0), # height
-            (1, 0), # width
-            (0, 0), # channel
-        ),
-    )
-
-    return grid
 
 
