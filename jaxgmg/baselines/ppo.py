@@ -64,12 +64,13 @@ class Eval:
 def run(
     rng: PRNGKey,
     env: Env,
+    train_level_set: TrainLevelSet,
+    # network
     net: networks.ActorCriticNetwork,
     net_init_params: networks.ActorCriticParams,
     net_init_state: networks.ActorCriticState,
-    train_level_set: TrainLevelSet,
-    evals_dict: dict[str, Eval],
-    big_evals_dict: dict[str, Eval],
+    # evals
+    evals: dict[tuple[str, int]: Eval], # {(name, period): eval_obj}
     # PPO hyperparameters
     ppo_lr: float,                      # learning rate
     ppo_gamma: float,                   # discount rate
@@ -85,18 +86,15 @@ def run(
     num_total_env_steps: int,
     num_env_steps_per_cycle: int,
     num_parallel_envs: int,
-    # evals dimensions
-    num_cycles_per_eval: int,
-    num_cycles_per_big_eval: int,
-    # training animation dimensions
-    train_gifs: bool,
-    train_gif_grid_width: int,
-    train_gif_level_of_detail: int,
     # logging config
     num_cycles_per_log: int,
     save_files_to: str,                 # where to log metrics to disk
     console_log: bool,                  # whether to log metrics to stdout
     wandb_log: bool,                    # whether to log metrics to wandb
+    # training animation dimensions
+    train_gifs: bool,
+    train_gif_grid_width: int,
+    train_gif_level_of_detail: int,
     # checkpointing config
     checkpointing: bool,
     keep_all_checkpoints: bool,
@@ -180,8 +178,7 @@ def run(
         rng_t, rng = jax.random.split(rng)
         log_ever = (console_log or wandb_log) 
         log_cycle = log_ever and t % num_cycles_per_log == 0
-        eval_cycle = log_ever and t % num_cycles_per_eval == 0
-        big_eval_cycle = log_ever and t % num_cycles_per_big_eval == 0
+        eval_cycle = log_ever and any(t % p == 0 for (n, p) in evals.keys())
         metrics = collections.defaultdict(dict)
 
 
@@ -263,31 +260,16 @@ def run(
         
 
         # periodic evaluations
-        if t % num_cycles_per_eval == 0:
-            rng_evals, rng_t = jax.random.split(rng_t)
-            eval_metrics = {}
-            for eval_name, eval_obj in evals_dict.items():
+        rng_evals, rng_t = jax.random.split(rng_t)
+        for (eval_name, num_cycles_per_eval), eval_obj in evals.items():
+            if t % num_cycles_per_eval == 0:
                 rng_eval, rng_evals = jax.random.split(rng_evals)
-                eval_metrics[eval_name] = eval_obj.eval(
+                metrics['eval'][eval_name] = eval_obj.eval(
                     rng=rng_eval,
                     train_state=train_state,
                     net_init_state=net_init_state,
                 )
-            metrics['eval'].update(eval_metrics)
-        
-        # periodic big evals
-        if t % num_cycles_per_big_eval == 0:
-            rng_big_evals, rng_t = jax.random.split(rng_t)
-            eval_metrics = {}
-            for eval_name, eval_obj in big_evals_dict.items():
-                rng_eval, rng_big_evals = jax.random.split(rng_big_evals)
-                eval_metrics[eval_name] = eval_obj.eval(
-                    rng=rng_eval,
-                    train_state=train_state,
-                    net_init_state=net_init_state,
-                )
-            metrics['eval'].update(eval_metrics)
-       
+
 
         # periodic logging
         if metrics:
@@ -311,7 +293,7 @@ def run(
                         metrics_wandb[key] = util.wandb_img(val)
                     wandb.log(step=t, data=metrics_wandb)
             
-            # log to disk
+            # either way, log to disk
             metrics_disk = util.flatten_dict(metrics)
             metrics_path = fileman.get_path(f"metrics/{t}/")
             progress.write(f"saving metrics to {metrics_path}...")

@@ -232,18 +232,17 @@ def corner(
         net=net,
         net_init_params=net_init_params,
         net_init_state=net_init_state,
-        # evals
-        evals_dict={
-            'on_distribution': eval_on_level_set,
-            'off_distribution': eval_off_level_set,
-        },
-        big_evals_dict={
-            'on_distribution_animations': eval_on_animation,
-            'off_distribution_animations': eval_off_animation,
-            'on_distribution_level_0_heatmaps': eval_on_heatmap_0,
-            'on_distribution_level_1_heatmaps': eval_on_heatmap_1,
-            'off_distribution_eval_level_0_heatmaps': eval_off_heatmap_0,
-            'off_distribution_eval_level_1_heatmaps': eval_off_heatmap_1,
+        evals={
+            # small evals
+            ('on_dist_levels', num_cycles_per_eval): eval_on_level_set,
+            ('off_dist_levels', num_cycles_per_eval): eval_off_level_set,
+            # big evals
+            ('on_dist_animations', num_cycles_per_big_eval): eval_on_animation,
+            ('off_dist_animations', num_cycles_per_big_eval): eval_off_animation,
+            ('on_dist_lvl0_heatmaps', num_cycles_per_big_eval): eval_on_heatmap_0,
+            ('on_distrlvl1_heatmaps', num_cycles_per_big_eval): eval_on_heatmap_1,
+            ('off_dist_lvl0_heatmaps', num_cycles_per_big_eval): eval_off_heatmap_0,
+            ('off_dist_lvl1_heatmaps', num_cycles_per_big_eval): eval_off_heatmap_1,
         },
         # algorithm
         ppo_lr=ppo_lr,
@@ -264,9 +263,6 @@ def corner(
         train_gifs=train_gifs,
         train_gif_grid_width=train_gif_grid_width,
         train_gif_level_of_detail=train_gif_level_of_detail,
-        # evals
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
         # logging
         num_cycles_per_log=num_cycles_per_log,
         save_files_to=save_files_to,
@@ -461,17 +457,12 @@ def keys(
         net_init_params=net_init_params,
         net_init_state=net_init_state,
         # evals
-        evals_dict={
-            'on_distribution': eval_on_level_set,
-            'off_distribution': eval_off_level_set,
+        evals={
+            ('on_dist_levels', num_cycles_per_eval): eval_on_level_set,
+            ('off_dist_levels', num_cycles_per_eval): eval_off_level_set,
+            ('on_dist_animations', num_cycles_per_big_eval): eval_on_animation,
+            ('off_dist_animations', num_cycles_per_big_eval): eval_off_animation,
         },
-        big_evals_dict={
-            'on_distribution_animations': eval_on_animation,
-            'off_distribution_animations': eval_off_animation,
-        },
-        # evals TODO: refactor
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
         # ppo algorithm parameters
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
