@@ -13,6 +13,7 @@ from jaxgmg.baselines import evals
 # from jaxgmg.baselines import ued
 
 from jaxgmg import util
+from typing import Tuple
 
 
 @util.wandb_run
@@ -33,6 +34,8 @@ def corner(
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
+    cheese_location: Tuple[int,int] = (2,2) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    cheese_in_center: bool = False,
     ppo_lr_annealing: bool = False,
     num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
@@ -92,6 +95,8 @@ def corner(
         width=env_size,
         maze_generator=maze_generator,
         corner_size=env_corner_size,
+        cheese_in_center = cheese_in_center,
+        cheese_location= tuple(cheese_location),
     )
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if fixed_train_levels:

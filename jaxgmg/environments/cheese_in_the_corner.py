@@ -39,6 +39,7 @@ from jaxtyping import PyTree
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
+from typing import Tuple
 
 
 @struct.dataclass
@@ -312,6 +313,8 @@ class LevelGenerator(base.LevelGenerator):
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     corner_size: int = 1
+    cheese_location: Tuple[int, int] = (1, 1)
+    cheese_in_center: bool = False
     
     def __post_init__(self):
         assert self.corner_size >= 1
@@ -358,6 +361,16 @@ class LevelGenerator(base.LevelGenerator):
             axis=0,
             p=cheese_mask,
         )
+        #in case cheese_location is set, override the random choice
+        if self.cheese_location != (1,1) and self.cheese_location is not None:
+            #check if the cheese_location is valid
+            assert self.cheese_location[0] >= 1 and self.cheese_location[0] <= self.height
+            assert self.cheese_location[1] >= 1 and self.cheese_location[1] <= self.width
+            cheese_pos = jnp.array(self.cheese_location)
+        #in case cheese_in_center is set, and the cheese_location is not set, override the random choice
+        if self.cheese_in_center:
+            cheese_pos = jnp.array([self.height//2, self.width//2])
+
         # ... in case there *was* a wall there , remove it
         wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
         
