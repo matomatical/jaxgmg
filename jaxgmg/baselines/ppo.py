@@ -31,7 +31,6 @@ from typing import Any
 from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
 from jaxgmg.environments.base import LevelGenerator # this will go to UED
-from jaxgmg.baselines.networks import ActorCriticState
 from jaxgmg.baselines.experience import Transition, Rollout
 
 Metrics = dict[str, Any]
@@ -53,7 +52,7 @@ class Eval:
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        net_init_state: ActorCriticState,
+        net_init_state: networks.ActorCriticState,
     ) -> Metrics:
         raise NotImplementedError
 
@@ -65,11 +64,12 @@ class Eval:
 def run(
     rng: PRNGKey,
     env: Env,
+    net: networks.ActorCriticNetwork,
+    net_init_params: networks.ActorCriticParams,
+    net_init_state: networks.ActorCriticState,
     train_level_set: TrainLevelSet,
     evals_dict: dict[str, Eval],
     big_evals_dict: dict[str, Eval],
-    # policy config
-    net_spec: str,
     # PPO hyperparameters
     ppo_lr: float,                      # learning rate
     ppo_gamma: float,                   # discount rate
@@ -131,22 +131,6 @@ def run(
     # TODO: define wandb axes
 
     
-    print(f"setting up agent with architecture {net_spec!r}...")
-    # select architecture
-    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
-    # initialise the network
-    rng_model_init, rng = jax.random.split(rng)
-    rng_example_level, rng = jax.random.split(rng)
-    example_level=jax.tree.map(
-        lambda x: x[0],
-        train_level_set.get_batch(rng_example_level, 1),
-    )
-    net_init_params, net_init_state = net.init_params_and_state(
-        rng=rng_model_init,
-        obs_type=env.obs_type(level=example_level),
-    )
-            
-
     # initialise the checkpointer
     checkpoint_path = fileman.get_path("checkpoints")
     checkpoint_manager = ocp.CheckpointManager(
@@ -751,7 +735,7 @@ class FixedLevelsEval(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        net_init_state: ActorCriticState,
+        net_init_state: networks.ActorCriticState,
     ) -> Metrics:
         rollouts = experience.collect_rollouts(
             rng=rng,
@@ -783,7 +767,7 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        net_init_state: ActorCriticState,
+        net_init_state: networks.ActorCriticState,
     ) -> Metrics:
         rollouts = experience.collect_rollouts(
             rng=rng,
@@ -815,7 +799,7 @@ class AnimatedRolloutsEval(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        net_init_state: ActorCriticState,
+        net_init_state: networks.ActorCriticState,
     ) -> Metrics:
         rollouts = experience.collect_rollouts(
             rng=rng,
@@ -849,7 +833,7 @@ class HeatmapVisualisationEval(Eval):
         self,
         rng: PRNGKey,
         train_state: TrainState,
-        net_init_state: ActorCriticState,
+        net_init_state: networks.ActorCriticState,
     ) -> Metrics:
 
         # CHEAP EVALS FROM INIT STATE ONLY

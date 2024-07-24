@@ -12,7 +12,19 @@ import distrax
 # Types
 
 from chex import ArrayTree
+
+
 ActorCriticState = ArrayTree
+
+
+ActorCriticParams = ArrayTree
+
+
+# TODO: is this right?
+# ActorCriticForwardPass = Callable[
+#     [ActorCriticParams, ArrayTree, ActorCriticState, int],
+#     tuple[distrax.categorical, float, ActorCriticState],
+# ]
 
 
 class ActorCriticNetwork(nn.Module):

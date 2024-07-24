@@ -8,6 +8,8 @@ from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.baselines import ppo
+from jaxgmg.baselines import networks
+# from jaxgmg.baselines import ued
 
 from jaxgmg import util
 
@@ -103,6 +105,21 @@ def corner(
         train_level_set = ppo.OnDemandTrainLevelSet(
             level_generator=train_level_generator,
         )
+    
+    print(f"setting up agent with architecture {net!r}...")
+    # select architecture
+    net = networks.get_architecture(net, num_actions=env.num_actions)
+    # initialise the network
+    rng_model_init, rng = jax.random.split(rng)
+    rng_example_level, rng = jax.random.split(rng)
+    example_level=jax.tree.map(
+        lambda x: x[0],
+        train_level_set.get_batch(rng_example_level, 1),
+    )
+    net_init_params, net_init_state = net.init_params_and_state(
+        rng=rng_model_init,
+        obs_type=env.obs_type(level=example_level),
+    )
 
     print(f"generating some eval levels with baselines...")
     level_solver = cheese_in_the_corner.LevelSolver(
@@ -211,6 +228,11 @@ def corner(
         # environment and level distributions
         env=env,
         train_level_set=train_level_set,
+        # actor critic network
+        net=net,
+        net_init_params=net_init_params,
+        net_init_state=net_init_state,
+        # evals
         evals_dict={
             'on_distribution': eval_on_level_set,
             'off_distribution': eval_off_level_set,
@@ -223,8 +245,6 @@ def corner(
             'off_distribution_eval_level_0_heatmaps': eval_off_heatmap_0,
             'off_distribution_eval_level_1_heatmaps': eval_off_heatmap_1,
         },
-        # architecture
-        net_spec=net,
         # algorithm
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
@@ -359,6 +379,21 @@ def keys(
         train_level_set = ppo.OnDemandTrainLevelSet(
             level_generator=train_level_generator,
         )
+    
+    print(f"setting up agent with architecture {net!r}...")
+    # select architecture
+    net = networks.get_architecture(net, num_actions=env.num_actions)
+    # initialise the network
+    rng_model_init, rng = jax.random.split(rng)
+    rng_example_level, rng = jax.random.split(rng)
+    example_level=jax.tree.map(
+        lambda x: x[0],
+        train_level_set.get_batch(rng_example_level, 1),
+    )
+    net_init_params, net_init_state = net.init_params_and_state(
+        rng=rng_model_init,
+        obs_type=env.obs_type(level=example_level),
+    )
 
     print(f"generating some eval levels with baselines...")
     # on distribution
@@ -421,6 +456,11 @@ def keys(
         # environment and level distributions
         env=env,
         train_level_set=train_level_set,
+        # actor critic network
+        net=net,
+        net_init_params=net_init_params,
+        net_init_state=net_init_state,
+        # evals
         evals_dict={
             'on_distribution': eval_on_level_set,
             'off_distribution': eval_off_level_set,
@@ -429,9 +469,10 @@ def keys(
             'on_distribution_animations': eval_on_animation,
             'off_distribution_animations': eval_off_animation,
         },
-        # architecture
-        net_spec=net,
-        # algorithm
+        # evals TODO: refactor
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        # ppo algorithm parameters
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -450,9 +491,6 @@ def keys(
         train_gifs=train_gifs,
         train_gif_grid_width=train_gif_grid_width,
         train_gif_level_of_detail=train_gif_level_of_detail,
-        # evals
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
         # logging
         num_cycles_per_log=num_cycles_per_log,
         save_files_to=save_files_to,
