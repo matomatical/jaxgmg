@@ -31,12 +31,12 @@ def corner(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 1,
+    num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 256,
-    num_parallel_envs: int = 32,
+    num_env_steps_per_cycle: int = 128,
+    num_parallel_envs: int = 256,
     fixed_train_levels: bool = False,
     num_train_levels: int = 2048,
     # training animation dimensions
@@ -285,12 +285,12 @@ def keys(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 1,
+    num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 256,
-    num_parallel_envs: int = 32,
+    num_env_steps_per_cycle: int = 128,
+    num_parallel_envs: int = 256,
     fixed_train_levels: bool = False,
     num_train_levels: int = 2048,
     # training animation dimensions
