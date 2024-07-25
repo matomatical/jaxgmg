@@ -74,7 +74,10 @@ class EnvState(base.EnvState):
     """
     mouse_pos: chex.Array
     got_cheese: bool
-    got_corner: bool
+    # got_corner: bool
+    got_northwest: bool
+    got_southeast: bool
+    got_center: bool
 
 
 @struct.dataclass
@@ -149,7 +152,9 @@ class Env(base.Env):
         return EnvState(
             mouse_pos=level.initial_mouse_pos,
             got_cheese=False,
-            got_corner=False,
+            got_northwest=False,
+            got_southeast=False,
+            got_center=False,
             level=level,
             steps=0,
             done=False,
@@ -189,14 +194,33 @@ class Env(base.Env):
         got_cheese_first_time = got_cheese & ~state.got_cheese
         state = state.replace(got_cheese=state.got_cheese | got_cheese)
         
-        # check if mouse got to corner
-        got_corner = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
-        got_corner_first_time = got_corner & ~state.got_corner
-        state = state.replace(got_corner=state.got_corner | got_corner)
+        # check if mouse got to various locations
+        height, width = state.level.wall_map.shape
+        got_northwest = (
+            (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
+        )
+        got_southeast = (
+            (state.mouse_pos[0] == height-2)
+            & (state.mouse_pos[1] == width-2)
+        )
+        got_center = (
+            (state.mouse_pos[0] == height//2)
+            & (state.mouse_pos[1] == width//2)
+        )
+        first_time_northwest = got_northwest & ~state.got_northwest
+        first_time_southeast = got_southeast & ~state.got_southeast
+        first_time_center = got_center & ~state.got_center
+        state = state.replace(
+            got_northwest=state.got_northwest | got_northwest,
+            got_southeast=state.got_southeast | got_southeast,
+            got_center=state.got_center | got_center,
+        )
 
         # rewards
         reward = got_cheese_first_time.astype(float)
-        proxy_reward = got_corner_first_time.astype(float)
+        proxy_northwest_reward = first_time_northwest.astype(float)
+        proxy_southeast_reward = first_time_southeast.astype(float)
+        proxy_center_reward = first_time_center.astype(float)
         
         # end of episode
         if self.terminate_after_cheese_and_corner:
@@ -210,7 +234,9 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'corner': proxy_reward,
+                    'northwest': proxy_northwest_reward,
+                    'southeast': proxy_southeast_reward,
+                    'center': proxy_center_reward,
                 },
             },
         )
@@ -315,7 +341,7 @@ class LevelGenerator(base.LevelGenerator):
     corner_size: int = 1
     cheese_location: Tuple[int, int] = (1, 1)
     cheese_in_center: bool = False
-    cheese_both_corners: bool= False
+    cheese_both_corners: bool = False
     
     def __post_init__(self):
         assert self.corner_size >= 1
@@ -373,10 +399,10 @@ class LevelGenerator(base.LevelGenerator):
         if self.cheese_both_corners:
             # cheese is either placed in top left or bottom right corner (random and equal chance)
             top_left_mask = (
-            (coords[:, 0] == 1) &
-            (coords[:, 1] == 1) 
+                (coords[:, 0] == 1) &
+                (coords[:, 1] == 1) 
             )
-            bottom_right_mask = (
+            top_right_mask = (
                 (coords[:, 0] == self.height - 2) &
                 (coords[:, 1] == self.width - 2) 
             )
