@@ -64,6 +64,7 @@ def corner(
     save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
+    wandb_entity: str = None,
     wandb_project: str = "test",
     wandb_group: str = None,
     wandb_name: str = None,
@@ -343,6 +344,7 @@ def keys(
     save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
+    wandb_entity: str = None,
     wandb_project: str = "test",
     wandb_group: str = None,
     wandb_name: str = None,
