@@ -24,8 +24,11 @@ def corner(
     env_corner_size: int = 1,
     env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    cheese_both_corners: bool = False,
+    cheese_in_center: bool = False,
     # policy config
-    net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
+    net: str = "impala:lstm",               # e.g. 'impala:ff', 'impala:lstm'
     # PPO hyperparameters
     ppo_lr: float = 0.0005,                 # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -34,9 +37,6 @@ def corner(
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
-    cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
-    cheese_both_corners: bool = False,
-    cheese_in_center: bool = False,
     ppo_lr_annealing: bool = False,
     num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
