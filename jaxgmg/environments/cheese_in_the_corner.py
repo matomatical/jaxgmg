@@ -402,73 +402,36 @@ class LevelGenerator(base.LevelGenerator):
         
         #initialize all masks 
         #creaty empty masks for all possible cheese locations, not wrt to the no wall mask
-        top_left_mask = jnp.zeros_like(self.height, self.width).flatten()
-        top_right_mask = jnp.zeros_like(self.height, self.width).flatten()
-        bottom_right_mask = jnp.zeros_like(self.height, self.width).flatten()
-        bottom_left_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_top_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_bottom_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_left_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_right_mask = jnp.zeros_like(self.height, self.width).flatten()
+        cheese_mask_temp = jnp.zeros((self.height * self.width,), dtype=bool)
 
+# Define a dictionary mapping cheese positions to their corresponding conditions
+        cheese_positions = {
+            'top_left': (self.cheese_in_top_left, lambda x, y: (x == 1) & (y == 1)),
+            'top_right': (self.cheese_in_top_right, lambda x, y: (x == 1) & (y == self.width - 2)),  # Corrected
+            'bottom_right': (self.cheese_in_bottom_right, lambda x, y: (x == self.height - 2) & (y == self.width - 2)),
+            'bottom_left': (self.cheese_in_bottom_left, lambda x, y: (x == self.height - 2) & (y == 1)),  # Corrected
+            'center': (self.cheese_in_center, lambda x, y: (x == self.height//2) & (y == self.width//2)),
+            'center_top': (self.cheese_in_center_top, lambda x, y: (x == 1) & (y == self.width//2)),
+            'center_bottom': (self.cheese_in_center_bottom, lambda x, y: (x == self.height - 2) & (y == self.width//2)),
+            'center_left': (self.cheese_in_center_left, lambda x, y: (x == self.height//2) & (y == 1)),
+            'center_right': (self.cheese_in_center_right, lambda x, y: (x == self.height//2) & (y == self.width - 2)),
+        }
 
-        if self.cheese_in_top_left:
-            top_left_mask = (
-                (coords[:, 0] == 1) &
-                (coords[:, 1] == 1)
-            )
-        if self.cheese_in_top_right:
-            top_right_mask = (
-                (coords[:, 0] == self.height - 2) &
-                (coords[:, 1] == 1)
-            )
-        if self.cheese_in_bottom_right:
-            bottom_right_mask = (
-                (coords[:, 0] == self.height - 2) &
-                (coords[:, 1] == self.width - 2)
-            )
-        if self.cheese_in_bottom_left:
-            bottom_left_mask = (
-                (coords[:, 0] == 1) &
-                (coords[:, 1] == self.width - 2)
-            )
-        if self.cheese_in_center:
-            center_mask = (
-                (coords[:, 0] == self.height//2) &
-                (coords[:, 1] == self.width//2)
-            )
-        if self.cheese_in_center_top:
-            center_top_mask = (
-                (coords[:, 0] == 1) &
-                (coords[:, 1] == self.width//2)
-            )
-        if self.cheese_in_center_bottom:
-            center_bottom_mask = (
-                (coords[:, 0] == self.height - 2) &
-                (coords[:, 1] == self.width//2)
-            )
-        if self.cheese_in_center_left:
-            center_left_mask = (
-                (coords[:, 0] == self.height//2) &
-                (coords[:, 1] == 1)
-            )
-        if self.cheese_in_center_right:
-            center_right_mask = (
-                (coords[:, 0] == self.height//2) &
-                (coords[:, 1] == self.width - 2)
-            )
-        
-        cheese_mask_temp = top_left_mask | top_right_mask | bottom_right_mask | bottom_left_mask | center_mask | center_top_mask | center_bottom_mask | center_left_mask | center_right_mask
-        cheese_mask = cheese_mask_temp & no_wall_mask
-        cheese_mask = cheese_mask | (~(cheese_mask.any()) & cheese_mask_temp)
-        rng_spawn_cheese, rng = jax.random.split(rng)
-        cheese_pos = jax.random.choice(
-            key=rng_spawn_cheese,
-            a=coords,
-            axis=0,
-            p=cheese_mask,
-        )
+        # Iterate through the cheese positions
+        for is_active, condition in cheese_positions.values():
+            if is_active:
+                # If this cheese position is active, update the mask
+                cheese_mask_temp = cheese_mask_temp | condition(coords[:, 0], coords[:, 1])
+
+                cheese_mask = cheese_mask_temp & no_wall_mask
+                cheese_mask = cheese_mask | (~(cheese_mask.any()) & cheese_mask_temp)
+                rng_spawn_cheese, rng = jax.random.split(rng)
+                cheese_pos = jax.random.choice(
+                    key=rng_spawn_cheese,
+                    a=coords,
+                    axis=0,
+                    p=cheese_mask,
+                )
 
         if self.cheese_location != (1,1) and self.cheese_location is not None:
             #check if the cheese_location is valid
@@ -498,7 +461,6 @@ class LevelGenerator(base.LevelGenerator):
             cheese_pos=cheese_pos,
             initial_mouse_pos=initial_mouse_pos,
         )
-        
 
 @struct.dataclass
 class LevelParser:
