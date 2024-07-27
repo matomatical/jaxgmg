@@ -78,6 +78,16 @@ class EnvState(base.EnvState):
     got_northwest: bool
     got_southeast: bool
     got_center: bool
+    cheese_location: Tuple[int, int] = (1, 1)
+    cheese_in_top_left: bool = False
+    cheese_in_top_right: bool = False
+    cheese_in_bottom_right: bool = False
+    cheese_in_bottom_left: bool = False
+    cheese_in_center: bool = False
+    cheese_in_center_top: bool = False
+    cheese_in_center_bottom: bool = False
+    cheese_in_center_left: bool = False
+    cheese_in_center_right: bool = False
 
 
 @struct.dataclass
@@ -196,31 +206,66 @@ class Env(base.Env):
         
         # check if mouse got to various locations
         height, width = state.level.wall_map.shape
-        got_northwest = (
-            (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
-        )
-        got_southeast = (
-            (state.mouse_pos[0] == height-2)
-            & (state.mouse_pos[1] == width-2)
-        )
-        got_center = (
-            (state.mouse_pos[0] == height//2)
-            & (state.mouse_pos[1] == width//2)
-        )
-        first_time_northwest = got_northwest & ~state.got_northwest
-        first_time_southeast = got_southeast & ~state.got_southeast
-        first_time_center = got_center & ~state.got_center
-        state = state.replace(
-            got_northwest=state.got_northwest | got_northwest,
-            got_southeast=state.got_southeast | got_southeast,
-            got_center=state.got_center | got_center,
-        )
+       
+        #I want to keep track of the mouse going to the various locatons for which the bool 'cheese_in.. was true
+        got_top_left = ((state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1) )
+        got_top_right = ((state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width-2) )
+        got_bottom_right = ((state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2) )
+        got_bottom_left = ((state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == 1) )
+        got_center = ((state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2) )
+        got_center_top = ((state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width//2) )
+        got_center_bottom = ((state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width//2) )
+        got_center_left = ((state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == 1) )
+        got_center_right = ((state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width-2) )
 
+        if state.cheese_location != (1,1) and state.cheese_location is not None:
+            got_cheese_location = ((state.mouse_pos[0] == state.cheese_location[0]) & (state.mouse_pos[1] == state.cheese_location[1]) )
+            state.cheese_location = True
+        else:
+            state.cheese_location = False
+
+
+
+        first_time_top_left = got_top_left & ~state.cheese_in_top_left
+        first_time_top_right = got_top_right & ~state.cheese_in_top_right
+        first_time_bottom_right = got_bottom_right & ~state.cheese_in_bottom_right
+        first_time_bottom_left = got_bottom_left & ~state.cheese_in_bottom_left
+        first_time_center = got_center & ~state.cheese_in_center
+        first_time_center_top = got_center_top & ~state.cheese_in_center_top
+        first_time_center_bottom = got_center_bottom & ~state.cheese_in_center_bottom
+        first_time_center_left = got_center_left & ~state.cheese_in_center_left
+        first_time_center_right = got_center_right & ~state.cheese_in_center_right
+        first_time_cheese_location = got_cheese_location & ~state.cheese_location
+
+        state = state.replace(
+            cheese_in_top_left=state.cheese_in_top_left | got_top_left,
+            cheese_in_top_right=state.cheese_in_top_right | got_top_right,
+            cheese_in_bottom_right=state.cheese_in_bottom_right | got_bottom_right,
+            cheese_in_bottom_left=state.cheese_in_bottom_left | got_bottom_left,
+            cheese_in_center=state.cheese_in_center | got_center,
+            cheese_in_center_top=state.cheese_in_center_top | got_center_top,
+            cheese_in_center_bottom=state.cheese_in_center_bottom | got_center_bottom,
+            cheese_in_center_left=state.cheese_in_center_left | got_center_left,
+            cheese_in_center_right=state.cheese_in_center_right | got_center_right,
+            cheese_location=state.cheese_location | got_cheese_location,
+        )
+        
+
+
+      
         # rewards
         reward = got_cheese_first_time.astype(float)
-        proxy_northwest_reward = first_time_northwest.astype(float)
-        proxy_southeast_reward = first_time_southeast.astype(float)
-        proxy_center_reward = first_time_center.astype(float)
+        # proxy rewards
+        proxy_top_left = first_time_top_left.astype(float)
+        proxy_top_right = first_time_top_right.astype(float)
+        proxy_bottom_right = first_time_bottom_right.astype(float)
+        proxy_bottom_left = first_time_bottom_left.astype(float)
+        proxy_center = first_time_center.astype(float)
+        proxy_center_top = first_time_center_top.astype(float)
+        proxy_center_bottom = first_time_center_bottom.astype(float)
+        proxy_center_left = first_time_center_left.astype(float)
+        proxy_center_right = first_time_center_right.astype(float)
+        proxy_cheese_location = first_time_cheese_location.astype(float)
         
         # end of episode
         if self.terminate_after_cheese_and_corner:
@@ -228,18 +273,42 @@ class Env(base.Env):
         else:
             done = state.got_cheese
 
-        return (
+
+        #give me a dict which contains a proxy only if its correspective bool was true, 
+        proxy_rewards = {}
+        if self.cheese_in_top_left:
+            proxy_rewards['top_left'] = proxy_top_left
+        if self.cheese_in_top_right:
+            proxy_rewards['top_right'] = proxy_top_right
+        if self.cheese_in_bottom_right:
+            proxy_rewards['bottom_right'] = proxy_bottom_right
+        if self.cheese_in_bottom_left:
+            proxy_rewards['bottom_left'] = proxy_bottom_left
+        if self.cheese_in_center:
+            proxy_rewards['center'] = proxy_center
+        if self.cheese_in_center_top:
+            proxy_rewards['center_top'] = proxy_center_top
+        if self.cheese_in_center_bottom:
+            proxy_rewards['center_bottom'] = proxy_center_bottom
+        if self.cheese_in_center_left:
+            proxy_rewards['center_left'] = proxy_center_left
+        if self.cheese_in_center_right:
+            proxy_rewards['center_right'] = proxy_center_right
+        if self.cheese_location != (1,1) and self.cheese_location is not None:
+            proxy_rewards['selected_location'] = proxy_cheese_location
+
+
+                
+        return ( 
             state,
             reward,
             done,
-            {
-                'proxy_rewards': {
-                    'northwest': proxy_northwest_reward,
-                    'southeast': proxy_southeast_reward,
-                    'center': proxy_center_reward,
-                },
+            { 
+                'proxy_rewards': proxy_rewards,
             },
         )
+    
+        
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
