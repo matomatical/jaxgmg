@@ -22,6 +22,7 @@ import wandb
 from jaxgmg import util
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import experience
+from jaxgmg.baselines import autocurricula
 
 
 # # # 
@@ -30,19 +31,9 @@ from jaxgmg.baselines import experience
 from typing import Any
 from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
-from jaxgmg.environments.base import LevelGenerator # this will go to UED
 from jaxgmg.baselines.experience import Transition, Rollout
 from jaxgmg.baselines.evals import Eval
-
-
-@struct.dataclass
-class TrainLevelSet:
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        raise NotImplementedError
+from jaxgmg.baselines.autocurricula import CurriculumLevelGenerator
 
 
 # # # 
@@ -52,7 +43,8 @@ class TrainLevelSet:
 def run(
     rng: PRNGKey,
     env: Env,
-    train_level_set: TrainLevelSet,
+    gen: CurriculumLevelGenerator,
+    gen_state: CurriculumLevelGenerator.State,
     # network
     net: networks.ActorCriticNetwork,
     net_init_params: networks.ActorCriticParams,
@@ -186,7 +178,11 @@ def run(
 
         # choose levels for this round
         rng_levels, rng_t = jax.random.split(rng_t)
-        levels_t = train_level_set.get_batch(rng_levels, num_parallel_envs)
+        gen_state, levels_t = gen.get_batch(
+            state=gen_state,
+            rng=rng_levels,
+            num_levels=num_parallel_envs,
+        )
     
         
         # collect experience
@@ -245,6 +241,16 @@ def run(
             metrics['perf']['ppo_updates_per_second'] = (
                 num_updates_per_cycle / ppo_elapsed_time
             )
+        
+
+        # report experience and performance to level generator
+        gen_state = gen.update(
+            state=gen_state,
+            rollouts=rollouts,
+            advantages=advantages, # shortcut: we did GAE already
+        )
+        if log_cycle:
+            metrics['ued'].update(gen.compute_metrics(gen_state))
         
 
         # periodic evaluations
@@ -550,56 +556,6 @@ def ppo_loss(
         - entropy_coeff * entropy
     )
     return total_loss, (actor_loss, critic_loss, entropy)
-
-
-# # # 
-# TRAINING LEVEL SETS
-
-
-@struct.dataclass
-class FixedTrainLevelSet(TrainLevelSet):
-    levels: Level       # Level[num_levels]
-
-
-    @functools.partial(
-        jax.jit,
-        static_argnames=['num_levels_in_batch'],
-    )
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
-        level_ids = jax.random.choice(
-            rng,
-            num_levels,
-            (num_levels_in_batch,),
-            replace=(num_levels_in_batch >= num_levels),
-        )
-        levels_batch = jax.tree.map(lambda x: x[level_ids], self.levels)
-        return levels_batch
-
-
-@struct.dataclass
-class OnDemandTrainLevelSet(TrainLevelSet):
-    level_generator: LevelGenerator
-
-
-    @functools.partial(
-        jax.jit,
-        static_argnames=['self', 'num_levels_in_batch'],
-    )
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        levels_batch = self.level_generator.vsample(
-            rng,
-            num_levels=num_levels_in_batch,
-        )
-        return levels_batch
 
 
 # # # 

@@ -10,7 +10,7 @@ from jaxgmg.environments import keys_and_chests
 from jaxgmg.baselines import ppo
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import evals
-# from jaxgmg.baselines import ued
+from jaxgmg.baselines import autocurricula
 
 from jaxgmg import util
 
@@ -76,12 +76,14 @@ def corner(
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
 
+
     print("setting up environment...")
     env = cheese_in_the_corner.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
         terminate_after_cheese_and_corner=env_terminate_after_corner,
     )
+
 
     print(f"generating training level distribution...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -99,13 +101,16 @@ def corner(
             rng_train_levels,
             num_levels=num_train_levels,
         )
-        train_level_set = ppo.FixedTrainLevelSet(
+        gen = autocurricula.FiniteDomainRandomisation()
+        gen_state = gen.init(
             levels=train_levels,
         )
     else:
-        train_level_set = ppo.OnDemandTrainLevelSet(
+        gen = autocurricula.InfiniteDomainRandomisation(
             level_generator=train_level_generator,
         )
+        gen_state = gen.init()
+
     
     print(f"setting up agent with architecture {net!r}...")
     # select architecture
@@ -113,14 +118,12 @@ def corner(
     # initialise the network
     rng_model_init, rng = jax.random.split(rng)
     rng_example_level, rng = jax.random.split(rng)
-    example_level=jax.tree.map(
-        lambda x: x[0],
-        train_level_set.get_batch(rng_example_level, 1),
-    )
+    example_level=train_level_generator.sample(rng_example_level)
     net_init_params, net_init_state = net.init_params_and_state(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
+
 
     print(f"generating some eval levels with baselines...")
     level_solver = cheese_in_the_corner.LevelSolver(
@@ -146,6 +149,7 @@ def corner(
         env=env,
     )
 
+
     # off distribution
     shift_level_generator = cheese_in_the_corner.LevelGenerator(
         height=env_size,
@@ -170,7 +174,8 @@ def corner(
         benchmarks=eval_off_benchmark_returns,
         env=env,
     )
-    
+
+
     # gif animations from those levels
     eval_on_rollouts = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
@@ -188,6 +193,7 @@ def corner(
         gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
+
 
     # splayed eval levels
     match level_splayer:
@@ -234,11 +240,14 @@ def corner(
         ),
     }
 
+
     ppo.run(
         rng=rng_train,
-        # environment and level distributions
+        # environment
         env=env,
-        train_level_set=train_level_set,
+        # level distributions
+        gen=gen,
+        gen_state=gen_state,
         # actor critic network
         net=net,
         net_init_params=net_init_params,
@@ -352,11 +361,13 @@ def keys(
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
 
+
     print("setting up environment...")
     env = keys_and_chests.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
     )
+
 
     print(f"generating training level distribution...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -373,32 +384,33 @@ def keys(
     )
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if fixed_train_levels:
-        train_levels = train_level_generator.vsample(
+        train_level_generator.vsample(
             rng_train_levels,
             num_levels=num_train_levels,
         )
-        train_level_set = ppo.FixedTrainLevelSet(
+        gen = autocurricula.FiniteDomainRandomisation()
+        gen_state = gen.init(
             levels=train_levels,
         )
     else:
-        train_level_set = ppo.OnDemandTrainLevelSet(
+        gen = autocurricula.InfiniteDomainRandomisation(
             level_generator=train_level_generator,
         )
-    
+        gen_state = gen.init()
+
+
     print(f"setting up agent with architecture {net!r}...")
     # select architecture
     net = networks.get_architecture(net, num_actions=env.num_actions)
     # initialise the network
     rng_model_init, rng = jax.random.split(rng)
     rng_example_level, rng = jax.random.split(rng)
-    example_level=jax.tree.map(
-        lambda x: x[0],
-        train_level_set.get_batch(rng_example_level, 1),
-    )
+    example_level=train_level_generator.sample(rng_example_level)
     net_init_params, net_init_state = net.init_params_and_state(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
+
 
     print(f"generating some eval levels with baselines...")
     # on distribution
@@ -414,6 +426,7 @@ def keys(
         discount_rate=ppo_gamma,
         env=env,
     )
+
 
     # off distribution
     shift_level_generator = keys_and_chests.LevelGenerator(
@@ -437,7 +450,8 @@ def keys(
         levels=eval_off_levels,
         env=env,
     )
-    
+
+
     # gif animations from those levels
     eval_on_animation = evals.AnimatedRolloutsEval(
         num_levels=num_eval_levels,
@@ -456,11 +470,14 @@ def keys(
         env=env,
     )
 
+
     ppo.run(
         rng=rng_train,
-        # environment and level distributions
+        # environment
         env=env,
-        train_level_set=train_level_set,
+        # level distributions
+        gen=gen,
+        gen_state=gen_state,
         # actor critic network
         net=net,
         net_init_params=net_init_params,
