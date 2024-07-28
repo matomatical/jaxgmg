@@ -235,7 +235,6 @@ class Env(base.Env):
         first_time_center_bottom = got_center_bottom & ~state.cheese_in_center_bottom
         first_time_center_left = got_center_left & ~state.cheese_in_center_left
         first_time_center_right = got_center_right & ~state.cheese_in_center_right
-        first_time_cheese_location = got_cheese_location & ~state.cheese_location
 
         state = state.replace(
             cheese_in_top_left=state.cheese_in_top_left | got_top_left,
@@ -250,8 +249,6 @@ class Env(base.Env):
             cheese_location=state.cheese_location | got_cheese_location,
         )
         
-
-
       
         # rewards
         reward = got_cheese_first_time.astype(float)
@@ -265,7 +262,6 @@ class Env(base.Env):
         proxy_center_bottom = first_time_center_bottom.astype(float)
         proxy_center_left = first_time_center_left.astype(float)
         proxy_center_right = first_time_center_right.astype(float)
-        proxy_cheese_location = first_time_cheese_location.astype(float)
         
         # end of episode
         if self.terminate_after_cheese_and_corner:
@@ -276,26 +272,38 @@ class Env(base.Env):
 
         #give me a dict which contains a proxy only if its correspective bool was true, 
         proxy_rewards = {}
-        if self.cheese_in_top_left:
+        #proxy_rewards['top_left'] = proxy_top_left
+        #proxy_rewards['top_right'] = proxy_top_right
+       #proxy_rewards['bottom_right'] = proxy_bottom_right
+       #proxy_rewards['bottom_left'] = proxy_bottom_left
+        #proxy_rewards['center'] = proxy_center
+        #proxy_rewards['center_top'] = proxy_center_top
+        #proxy_rewards['center_bottom'] = proxy_center_bottom
+        #proxy_rewards['center_left'] = proxy_center_left
+        #proxy_rewards['center_right'] = proxy_center_right
+
+
+
+        if state.cheese_in_top_left:
             proxy_rewards['top_left'] = proxy_top_left
-        if self.cheese_in_top_right:
+        if state.cheese_in_top_right:
             proxy_rewards['top_right'] = proxy_top_right
-        if self.cheese_in_bottom_right:
+        if state.cheese_in_bottom_right:
             proxy_rewards['bottom_right'] = proxy_bottom_right
-        if self.cheese_in_bottom_left:
+        if state.cheese_in_bottom_left:
             proxy_rewards['bottom_left'] = proxy_bottom_left
-        if self.cheese_in_center:
+        if state.cheese_in_center:
             proxy_rewards['center'] = proxy_center
-        if self.cheese_in_center_top:
+        if state.cheese_in_center_top:
             proxy_rewards['center_top'] = proxy_center_top
-        if self.cheese_in_center_bottom:
+        if state.cheese_in_center_bottom:
             proxy_rewards['center_bottom'] = proxy_center_bottom
-        if self.cheese_in_center_left:
+        if state.cheese_in_center_left:
             proxy_rewards['center_left'] = proxy_center_left
-        if self.cheese_in_center_right:
+        if state.cheese_in_center_right:
             proxy_rewards['center_right'] = proxy_center_right
-        if self.cheese_location != (1,1) and self.cheese_location is not None:
-            proxy_rewards['selected_location'] = proxy_cheese_location
+        #if state.cheese_location != (1,1) and self.cheese_location is not None:
+           # proxy_rewards['selected_location'] = proxy_cheese_location
 
 
                 
