@@ -222,15 +222,22 @@ def run(
         rng_update, rng_t = jax.random.split(rng_t)
         if log_cycle:
             ppo_start_time = time.perf_counter()
-        train_state, advantages, ppo_metrics = ppo_update(
+        # gae
+        advantages = compute_gae(
+            rollouts=rollouts,
+            gae_lambda=ppo_gae_lambda,
+            discount_rate=ppo_gamma,
+        )
+        # ppo step
+        train_state, ppo_metrics = ppo_update(
             rng=rng_update,
             train_state=train_state,
             rollouts=rollouts,
+            advantages=advantages,
             num_epochs=num_epochs_per_cycle,
             num_minibatches_per_epoch=num_minibatches_per_epoch,
             gamma=ppo_gamma,
             clip_eps=ppo_clip_eps,
-            gae_lambda=ppo_gae_lambda,
             entropy_coeff=ppo_entropy_coeff,
             critic_coeff=ppo_critic_coeff,
             compute_metrics=log_cycle,
@@ -331,6 +338,70 @@ def run(
 
 
 # # # 
+# GAE
+
+
+@jax.jit
+def compute_gae(
+    rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
+    gae_lambda: float,
+    discount_rate: float,
+) -> Array:
+    """
+    Given a data set of rollouts, perform generalised advantage estimation.
+
+    Inputs:
+    
+    * rollouts: Rollout[num_levels] (with Transition[num_steps] inside)
+            The rollouts to score.
+    * discount_rate : float
+            Used in definition of GAE.
+    * gae_lambda : float
+            Used in definition of GAE.
+
+    Returns:
+
+    * advantages : float[num_levels, num_steps]
+            The generalised advantage estimates.
+    """
+    # reverse scan through num_steps axis
+    initial_carry = (
+        jnp.zeros_like(rollouts.final_value),             # float[num_levels]
+        rollouts.final_value,                             # float[num_levels]
+    )
+    # Transitions[num_levels, num_steps] -> Transition[num_steps, num_levels]
+    stepwise_transitions = jax.tree.map(
+        lambda x: einops.rearrange(x, 'levels steps ... -> steps levels ...'),
+        rollouts.transitions,
+    )
+    def _gae_accum(carry, transition):
+        gae, next_value = carry
+        reward = transition.reward                        # float[num_levels] 
+        this_value = transition.value                     # float[num_levels]
+        done = transition.done                            # bool[num_levels]
+        gae = (
+            reward
+            - this_value
+            + (1-done) * discount_rate * (next_value + gae_lambda * gae)
+        )
+        return (gae, this_value), gae
+    _final_carry, stepwise_advantages = jax.lax.scan(
+        _gae_accum,
+        initial_carry,
+        stepwise_transitions,
+        reverse=True,
+        unroll=16, # TODO: parametrise and test this for effect on speed
+    )
+
+    # convert to desired shape
+    advantages = einops.rearrange(
+        stepwise_advantages,
+        'steps levels -> levels steps',
+    )
+    return advantages
+
+    
+# # # 
 # PPO update
 
 
@@ -346,19 +417,18 @@ def ppo_update(
     rng: PRNGKey,
     train_state: TrainState,
     rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
+    advantages: Array, # float[num_levels, num_steps]
     # ppo hyperparameters
     num_epochs: int,
     num_minibatches_per_epoch: int,
     gamma: float,
     clip_eps: float,
-    gae_lambda: float,
     entropy_coeff: float,
     critic_coeff: float,
     # metrics
     compute_metrics: bool,
 ) -> tuple[
     TrainState,
-    Array, # GAE estimates
     dict[str, Any], # metrics
 ]:
     """
@@ -367,47 +437,15 @@ def ppo_update(
 
     TODO: document inputs and outputs.
     """
-    # Generalised Advantage Estimation
-    initial_carry = (
-        jnp.zeros_like(rollouts.final_value),             # float[num_levels]
-        rollouts.final_value,                             # float[num_levels]
-    )
-    stepwise_transitions = jax.tree.map(
-        lambda x: einops.rearrange(x, 'levels steps ... -> steps levels ...'),
-        rollouts.transitions,
-    )                                  # -> Transition[num_steps, num_levels]
-    def _gae_accum(carry, transition):
-        gae, next_value = carry
-        reward = transition.reward                        # float[num_levels] 
-        this_value = transition.value                     # float[num_levels]
-        done = transition.done                            # bool[num_levels]
-        gae = (
-            reward
-            - this_value
-            + (1-done) * gamma * (next_value + gae_lambda * gae)
-        )
-        return (gae, this_value), gae
-    _final_carry, advantages = jax.lax.scan(
-        _gae_accum,
-        initial_carry,
-        stepwise_transitions,
-        reverse=True,
-        unroll=16, # TODO: parametrise and test this for effect on speed
-    )                             # advantages : float[num_steps, num_levels]
-
     
-    # value targets
-    stepwise_values = einops.rearrange(
-        rollouts.transitions.value,
-        "levels steps -> steps levels",
-    )                                       # -> float[num_steps, num_levels]
-    targets = advantages + stepwise_values  # -> float[num_steps, num_levels]
+    # value targets based on values + GAE estimates
+    targets = advantages + rollouts.transitions.value  # -> float[num_levels, num_steps]
 
     
     # compile data set
-    data = (stepwise_transitions, advantages, targets)
+    data = (rollouts.transitions, advantages, targets)
     data = jax.tree.map(
-        lambda x: einops.rearrange(x, 'steps lvls ... -> (steps lvls) ...'),
+        lambda x: einops.rearrange(x, 'lvls steps ... -> (lvls steps) ...'),
         data,
     )
     num_examples, = data[1].shape
@@ -488,7 +526,7 @@ def ppo_update(
     else:
         metrics = {}
     
-    return train_state, advantages, metrics
+    return train_state, metrics
 
 
 # # # 
