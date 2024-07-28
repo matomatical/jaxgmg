@@ -340,16 +340,8 @@ class LevelGenerator(base.LevelGenerator):
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     corner_size: int = 1
     cheese_location: Tuple[int, int] = (1, 1)
-    cheese_in_top_left: bool = False
-    cheese_in_top_right: bool = False
-    cheese_in_bottom_right: bool = False
-    cheese_in_bottom_left: bool = False
     cheese_in_center: bool = False
-    cheese_in_center_top: bool = False
-    cheese_in_center_bottom: bool = False
-    cheese_in_center_left: bool = False
-    cheese_in_center_right: bool = False
-
+    cheese_both_corners: bool = False
     
     def __post_init__(self):
         assert self.corner_size >= 1
@@ -399,82 +391,37 @@ class LevelGenerator(base.LevelGenerator):
             p=cheese_mask,
         )
         #in case cheese_location is set, override the random choice
-        
-        #initialize all masks 
-        #creaty empty masks for all possible cheese locations, not wrt to the no wall mask
-        top_left_mask = jnp.zeros_like(self.height, self.width).flatten()
-        top_right_mask = jnp.zeros_like(self.height, self.width).flatten()
-        bottom_right_mask = jnp.zeros_like(self.height, self.width).flatten()
-        bottom_left_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_top_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_bottom_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_left_mask = jnp.zeros_like(self.height, self.width).flatten()
-        center_right_mask = jnp.zeros_like(self.height, self.width).flatten()
-
-
-        if self.cheese_in_top_left:
-            top_left_mask = (
-                (coords[:, 0] == 1) &
-                (coords[:, 1] == 1)
-            )
-        if self.cheese_in_top_right:
-            top_right_mask = (
-                (coords[:, 0] == self.height - 2) &
-                (coords[:, 1] == 1)
-            )
-        if self.cheese_in_bottom_right:
-            bottom_right_mask = (
-                (coords[:, 0] == self.height - 2) &
-                (coords[:, 1] == self.width - 2)
-            )
-        if self.cheese_in_bottom_left:
-            bottom_left_mask = (
-                (coords[:, 0] == 1) &
-                (coords[:, 1] == self.width - 2)
-            )
-        if self.cheese_in_center:
-            center_mask = (
-                (coords[:, 0] == self.height//2) &
-                (coords[:, 1] == self.width//2)
-            )
-        if self.cheese_in_center_top:
-            center_top_mask = (
-                (coords[:, 0] == 1) &
-                (coords[:, 1] == self.width//2)
-            )
-        if self.cheese_in_center_bottom:
-            center_bottom_mask = (
-                (coords[:, 0] == self.height - 2) &
-                (coords[:, 1] == self.width//2)
-            )
-        if self.cheese_in_center_left:
-            center_left_mask = (
-                (coords[:, 0] == self.height//2) &
-                (coords[:, 1] == 1)
-            )
-        if self.cheese_in_center_right:
-            center_right_mask = (
-                (coords[:, 0] == self.height//2) &
-                (coords[:, 1] == self.width - 2)
-            )
-        
-        cheese_mask_temp = top_left_mask | top_right_mask | bottom_right_mask | bottom_left_mask | center_mask | center_top_mask | center_bottom_mask | center_left_mask | center_right_mask
-        cheese_mask = cheese_mask_temp & no_wall_mask
-        cheese_mask = cheese_mask | (~(cheese_mask.any()) & cheese_mask_temp)
-        rng_spawn_cheese, rng = jax.random.split(rng)
-        cheese_pos = jax.random.choice(
-            key=rng_spawn_cheese,
-            a=coords,
-            axis=0,
-            p=cheese_mask,
-        )
-
         if self.cheese_location != (1,1) and self.cheese_location is not None:
             #check if the cheese_location is valid
             assert self.cheese_location[0] >= 1 and self.cheese_location[0] <= self.height
             assert self.cheese_location[1] >= 1 and self.cheese_location[1] <= self.width
             cheese_pos = jnp.array(self.cheese_location)
+        if self.cheese_both_corners:
+            # cheese is either placed in top left or bottom right corner (random and equal chance)
+            top_left_mask = (
+                (coords[:, 0] == 1) &
+                (coords[:, 1] == 1) 
+            )
+            top_right_mask = (
+                (coords[:, 0] == self.height - 2) &
+                (coords[:, 1] == self.width - 2) 
+            )
+
+            corner_mask = top_left_mask | bottom_right_mask
+            cheese_mask = corner_mask & no_wall_mask
+            cheese_mask = cheese_mask | (~(cheese_mask.any()) & corner_mask)
+            rng_spawn_cheese, rng = jax.random.split(rng)
+
+            cheese_pos = jax.random.choice(
+                key=rng_spawn_cheese,
+                a=coords,
+                axis=0,
+                p=cheese_mask,
+            )
+
+        #in case cheese_in_center is set, and the cheese_location is not set, override the random choice
+        if self.cheese_in_center:
+            cheese_pos = jnp.array([self.height//2, self.width//2])
 
         # ... in case there *was* a wall there , remove it
         wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
@@ -498,7 +445,7 @@ class LevelGenerator(base.LevelGenerator):
             cheese_pos=cheese_pos,
             initial_mouse_pos=initial_mouse_pos,
         )
-        
+
 
 @struct.dataclass
 class LevelParser:
