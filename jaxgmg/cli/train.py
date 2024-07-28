@@ -25,8 +25,15 @@ def corner(
     env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
-    cheese_both_corners: bool = False,
+    cheese_in_top_left: bool = False,
+    cheese_in_top_right: bool = False,
+    cheese_in_bottom_right: bool = False,
+    cheese_in_bottom_left: bool = False,
     cheese_in_center: bool = False,
+    cheese_in_center_top: bool = False,
+    cheese_in_center_bottom: bool = False,
+    cheese_in_center_left: bool = False,
+    cheese_in_center_right: bool = False,
     # policy config
     net: str = "impala:lstm",               # e.g. 'impala:ff', 'impala:lstm'
     # PPO hyperparameters
@@ -99,7 +106,15 @@ def corner(
         corner_size=env_corner_size,
         cheese_in_center = cheese_in_center,
         cheese_location= tuple(cheese_location),
-        cheese_both_corners=cheese_both_corners,
+        cheese_in_top_left = cheese_in_top_left,
+        cheese_in_top_right = cheese_in_top_right,
+        cheese_in_bottom_right = cheese_in_bottom_right,
+        cheese_in_bottom_left = cheese_in_bottom_left,
+        cheese_in_center_top = cheese_in_center_top,
+        cheese_in_center_bottom = cheese_in_center_bottom,
+        cheese_in_center_left = cheese_in_center_left,
+        cheese_in_center_right = cheese_in_center_right,
+        
     )
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if fixed_train_levels:
