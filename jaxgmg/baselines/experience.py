@@ -380,6 +380,52 @@ def compute_average_return(
     return average_return
 
 
+@jax.jit
+def generalised_advantage_estimation(
+    rollout: Rollout, # Rollout (with Transition[num_steps])
+    lambda_: float,
+    discount_rate: float,
+) -> Array:
+    """
+    Given a rollouts, perform generalised advantage estimation.
+
+    Inputs:
+    
+    * rollout: Rollout (with Transition[num_steps] inside)
+            The rollout to score.
+    * lambda : float
+            Used in definition of GAE.
+    * discount_rate : float
+            Used in definition of GAE.
+
+    Returns:
+
+    * advantages : float[num_steps]
+            The generalised advantage estimates across the trajectory.
+    """
+    # reverse scan through num_steps axis
+    initial_carry = (0, rollout.final_value)
+    def _gae_accum(carry, transition):
+        gae, next_value = carry
+        reward = transition.reward
+        this_value = transition.value
+        done = transition.done
+        gae = (
+            reward
+            - this_value
+            + (1-done) * discount_rate * (next_value + lambda_ * gae)
+        )
+        return (gae, this_value), gae
+    _final_carry, advantages = jax.lax.scan(
+        _gae_accum,
+        initial_carry,
+        rollout.transitions,
+        reverse=True,
+        unroll=16, # TODO: parametrise and test this for effect on speed
+    )
+    return advantages
+
+    
 # # # 
 # Helper functions
 
