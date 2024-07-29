@@ -87,12 +87,32 @@ def corner(
 
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
+    if cheese_in_center:
+        cheese_location = 'center'
+    if cheese_in_top_left:
+        cheese_location = 'top_left'
+    if cheese_in_top_right:
+        cheese_location = 'top_right'
+    if cheese_in_bottom_right:
+        cheese_location = 'bottom_right'
+    if cheese_in_bottom_left:
+        cheese_location = 'bottom_left'
+    if cheese_in_center_top:
+        cheese_location = 'center_top'
+    if cheese_in_center_bottom:
+        cheese_location = 'center_bottom'
+    if cheese_in_center_left:
+        cheese_location = 'center_left'
+    if cheese_in_center_right:
+        cheese_location = 'center_right'
+    
 
     print("setting up environment...")
     env = cheese_in_the_corner.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
         terminate_after_cheese_and_corner=env_terminate_after_corner,
+        cheese_location=cheese_location,
     )
 
     print(f"generating training level distribution...")

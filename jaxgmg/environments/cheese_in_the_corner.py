@@ -57,6 +57,7 @@ class Level(base.Level):
     wall_map: chex.Array
     cheese_pos: chex.Array
     initial_mouse_pos: chex.Array
+    cheese_location: str
 
 
 @struct.dataclass
@@ -74,10 +75,7 @@ class EnvState(base.EnvState):
     """
     mouse_pos: chex.Array
     got_cheese: bool
-    # got_corner: bool
-    got_northwest: bool
-    got_southeast: bool
-    got_center: bool
+    got_target_location: bool 
 
 
 @struct.dataclass
@@ -103,6 +101,7 @@ class Env(base.Env):
       tile corresponds to one grid square.
     """
     terminate_after_cheese_and_corner: bool = False
+    cheese_location: str = "northwest"
 
 
     class Action(enum.IntEnum):
@@ -152,9 +151,7 @@ class Env(base.Env):
         return EnvState(
             mouse_pos=level.initial_mouse_pos,
             got_cheese=False,
-            got_northwest=False,
-            got_southeast=False,
-            got_center=False,
+            got_target_location=False,
             level=level,
             steps=0,
             done=False,
@@ -196,31 +193,43 @@ class Env(base.Env):
         
         # check if mouse got to various locations
         height, width = state.level.wall_map.shape
-        got_northwest = (
-            (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
-        )
-        got_southeast = (
-            (state.mouse_pos[0] == height-2)
-            & (state.mouse_pos[1] == width-2)
-        )
-        got_center = (
-            (state.mouse_pos[0] == height//2)
-            & (state.mouse_pos[1] == width//2)
-        )
-        first_time_northwest = got_northwest & ~state.got_northwest
-        first_time_southeast = got_southeast & ~state.got_southeast
-        first_time_center = got_center & ~state.got_center
-        state = state.replace(
-            got_northwest=state.got_northwest | got_northwest,
-            got_southeast=state.got_southeast | got_southeast,
-            got_center=state.got_center | got_center,
-        )
+        
+        
+        if state.level.cheese_location == "top_left":
+            got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
+        elif state.level.cheese_location == "top_right":
+            got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width-2)
+        elif state.level.cheese_location == "bottom_right":
+            got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2)
+        elif state.level.cheese_location == "bottom_left":
+            got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == 1)
+        elif state.level.cheese_location == "center":
+            got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2)
+        elif state.level.cheese_location == "center_top":
+            got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width//2)
+        elif state.level.cheese_location == "center_bottom":
+            got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width//2)
+        elif state.level.cheese_location == "center_left":
+            got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == 1)
+        elif state.level.cheese_location == "center_right":
+            got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width-2)
+        
+
+
+        #if state.level.cheese_location == "northwest":
+        #    got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
+        #elif state.level.cheese_location == "southeast":
+        #    got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2)
+        #elif state.level.cheese_location == "center":
+        #    got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2)
+
+
+        first_time_target_location = got_target_location & ~state.got_target_location
+        state = state.replace(got_target_location=state.got_target_location | got_target_location)
 
         # rewards
         reward = got_cheese_first_time.astype(float)
-        proxy_northwest_reward = first_time_northwest.astype(float)
-        proxy_southeast_reward = first_time_southeast.astype(float)
-        proxy_center_reward = first_time_center.astype(float)
+        proxy_reward = first_time_target_location.astype(float)
         
         # end of episode
         if self.terminate_after_cheese_and_corner:
@@ -234,10 +243,8 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'northwest': proxy_northwest_reward,
-                    'southeast': proxy_southeast_reward,
-                    'center': proxy_center_reward,
-                },
+                state.level.cheese_location: proxy_reward,
+            },
             },
         )
 
