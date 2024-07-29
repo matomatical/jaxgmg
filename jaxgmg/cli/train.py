@@ -545,9 +545,7 @@ def dish(
     # environment config
     env_size: int = 13,
     env_layout: str = 'blocks',
-    #env_corner_size_cheese: int = 1,
     env_terminate_after_dish: bool = False,
-    #env_corner_size_dish: int = 1,
     max_cheese_radius: int = 1,
     max_cheese_radius_shift: int = 6,
     env_terminate_after_corner: bool = False,
