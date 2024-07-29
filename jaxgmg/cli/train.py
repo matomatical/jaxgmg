@@ -7,12 +7,14 @@ import jax
 from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
+from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.baselines import ppo
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import evals
 # from jaxgmg.baselines import ued
 
 from jaxgmg import util
+from typing import Tuple
 
 
 @util.wandb_run
@@ -23,12 +25,22 @@ def corner(
     env_corner_size: int = 1,
     env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    #cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    cheese_in_top_left: bool = True,
+    cheese_in_top_right: bool = False,
+    cheese_in_bottom_right: bool = False,
+    cheese_in_bottom_left: bool = False,
+    cheese_in_center: bool = False,
+    cheese_in_center_top: bool = False,
+    cheese_in_center_bottom: bool = False,
+    cheese_in_center_left: bool = False,
+    cheese_in_center_right: bool = False,
     # policy config
-    net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
+    net: str = "impala:lstm",               # e.g. 'impala:ff', 'impala:lstm'
     # PPO hyperparameters
-    ppo_lr: float = 0.0005,                 # learning rate
+    ppo_lr: float = 0.00005,                 # learning rate
     ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.2,
+    ppo_clip_eps: float = 0.1,
     ppo_gae_lambda: float = 0.95,
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
@@ -37,7 +49,7 @@ def corner(
     num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
+    num_total_env_steps: int = 300_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
     fixed_train_levels: bool = False,
@@ -59,8 +71,9 @@ def corner(
     num_cycles_per_log: int = 64,
     save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
-    wandb_project: str = "test",
+    wandb_log: bool = True,                # whether to log metrics to wandb
+    wandb_entity: str = None,
+    wandb_project: str = "proxy_test",
     wandb_group: str = None,
     wandb_name: str = None,
     # checkpointing
@@ -75,12 +88,22 @@ def corner(
 
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
+    
 
     print("setting up environment...")
     env = cheese_in_the_corner.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
         terminate_after_cheese_and_corner=env_terminate_after_corner,
+        cheese_in_top_left = cheese_in_top_left,
+        cheese_in_top_right=  cheese_in_top_right,
+        cheese_in_bottom_right=cheese_in_bottom_right ,
+        cheese_in_bottom_left=  cheese_in_bottom_left,
+        cheese_in_center= cheese_in_center,
+        cheese_in_center_top=cheese_in_center_top,
+        cheese_in_center_bottom = cheese_in_center_bottom,
+        cheese_in_center_left = cheese_in_center_left,
+        cheese_in_center_right= cheese_in_center_right,
     )
 
     print(f"generating training level distribution...")
@@ -92,6 +115,16 @@ def corner(
         width=env_size,
         maze_generator=maze_generator,
         corner_size=env_corner_size,
+        cheese_in_center = cheese_in_center,
+        cheese_in_top_left = cheese_in_top_left,
+        cheese_in_top_right = cheese_in_top_right,
+        cheese_in_bottom_right = cheese_in_bottom_right,
+        cheese_in_bottom_left = cheese_in_bottom_left,
+        cheese_in_center_top = cheese_in_center_top,
+        cheese_in_center_bottom = cheese_in_center_bottom,
+        cheese_in_center_left = cheese_in_center_left,
+        cheese_in_center_right = cheese_in_center_right,
+        
     )
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if fixed_train_levels:
@@ -336,6 +369,7 @@ def keys(
     save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
+    wandb_entity: str = None,
     wandb_project: str = "test",
     wandb_group: str = None,
     wandb_name: str = None,
@@ -506,3 +540,221 @@ def keys(
     print("training run complete.")
 
 
+@util.wandb_run
+def dish(
+    # environment config
+    env_size: int = 13,
+    env_layout: str = 'blocks',
+    #env_corner_size_cheese: int = 1,
+    #env_corner_size_dish: int = 1,
+    max_cheese_radius: int = 1,
+    max_cheese_radius_shift: int = 6,
+    env_terminate_after_corner: bool = False,
+    env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    #cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    # policy config
+    net: str = "impala:lstm",               # e.g. 'impala:ff', 'impala:lstm'
+    # PPO hyperparameters
+    ppo_lr: float = 0.00005,                 # learning rate
+    ppo_gamma: float = 0.999,               # discount rate
+    ppo_clip_eps: float = 0.1,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.001,
+    ppo_critic_coeff: float = 0.5,
+    ppo_max_grad_norm: float = 0.5,
+    ppo_lr_annealing: bool = False,
+    num_minibatches_per_epoch: int = 8,
+    num_epochs_per_cycle: int = 5,
+    # training dimensions
+    num_total_env_steps: int = 300_000_000,
+    num_env_steps_per_cycle: int = 128,
+    num_parallel_envs: int = 256,
+    fixed_train_levels: bool = False,
+    num_train_levels: int = 2048,
+    # training animation dimensions
+    train_gifs: bool = True,
+    train_gif_grid_width: int = 8,
+    train_gif_level_of_detail: int = 1,
+    # evals config
+    num_cycles_per_eval: int = 64,
+    num_eval_levels: int = 256,
+    num_env_steps_per_eval: int = 512,
+    # big evals config
+    num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
+    eval_gif_grid_width: int = 16,
+    eval_gif_level_of_detail: int = 1,      # 1, 3, 4 or 8
+    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
+    # logging
+    num_cycles_per_log: int = 64,
+    save_files_to: str = "logs/",
+    console_log: bool = True,               # whether to log metrics to stdout
+    wandb_log: bool = True,                # whether to log metrics to wandb
+    wandb_entity: str = None,
+    wandb_project: str = "proxy_test_dish",
+    wandb_group: str = None,
+    wandb_name: str = None,
+    # checkpointing
+    checkpointing: bool = True,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = 512,
+    # other
+    seed: int = 42,
+):
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    rng_setup, rng_train = jax.random.split(rng)
+    
+
+    print("setting up environment...")
+    env = cheese_on_a_dish.Env(
+        obs_level_of_detail=env_level_of_detail,
+        penalize_time=False,
+        terminate_after_cheese_and_corner=env_terminate_after_corner,
+    )
+
+    print(f"generating training level distribution...")
+    maze_generator = maze_generation.get_generator_class_from_name(
+        name=env_layout,
+    )()
+    train_level_generator = cheese_on_a_dish.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        max_cheese_radius=max_cheese_radius,  
+    )
+    rng_train_levels, rng_setup = jax.random.split(rng_setup)
+    if fixed_train_levels:
+        train_levels = train_level_generator.vsample(
+            rng_train_levels,
+            num_levels=num_train_levels,
+        )
+        train_level_set = ppo.FixedTrainLevelSet(
+            levels=train_levels,
+        )
+    else:
+        train_level_set = ppo.OnDemandTrainLevelSet(
+            level_generator=train_level_generator,
+        )
+    
+    print(f"setting up agent with architecture {net!r}...")
+    # select architecture
+    net = networks.get_architecture(net, num_actions=env.num_actions)
+    # initialise the network
+    rng_model_init, rng = jax.random.split(rng)
+    rng_example_level, rng = jax.random.split(rng)
+    example_level=jax.tree.map(
+        lambda x: x[0],
+        train_level_set.get_batch(rng_example_level, 1),
+    )
+    net_init_params, net_init_state = net.init_params_and_state(
+        rng=rng_model_init,
+        obs_type=env.obs_type(level=example_level),
+    )
+
+    print(f"generating some eval levels with baselines...")
+    # on distribution
+    rng_eval_on_levels, rng_setup = jax.random.split(rng_setup)
+    eval_on_levels = train_level_generator.vsample(
+        rng_eval_on_levels,
+        num_levels=num_eval_levels,
+    )
+    eval_on_level_set = evals.FixedLevelsEval(
+        num_levels=num_eval_levels,
+        levels=eval_on_levels,
+        num_steps=num_env_steps_per_eval,
+        discount_rate=ppo_gamma,
+        env=env,
+    )
+
+    # off distribution
+    shift_level_generator = cheese_on_a_dish.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        max_cheese_radius=max_cheese_radius_shift,
+    )
+    rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
+    eval_off_levels = shift_level_generator.vsample(
+        rng_eval_off_levels,
+        num_levels=num_eval_levels,
+    )
+    eval_off_level_set = evals.FixedLevelsEval(
+        num_levels=num_eval_levels,
+        num_steps=num_env_steps_per_eval,
+        discount_rate=ppo_gamma,
+        levels=eval_off_levels,
+        env=env,
+    )
+    
+    # gif animations from those levels
+    eval_on_rollouts = evals.AnimatedRolloutsEval(
+        num_levels=num_eval_levels,
+        levels=eval_on_levels,
+        num_steps=env.max_steps_in_episode,
+        gif_grid_width=eval_gif_grid_width,
+        gif_level_of_detail=eval_gif_level_of_detail,
+        env=env,
+    )
+    eval_off_rollouts = evals.AnimatedRolloutsEval(
+        num_levels=num_eval_levels,
+        levels=eval_off_levels,
+        num_steps=env.max_steps_in_episode,
+        gif_grid_width=eval_gif_grid_width,
+        gif_level_of_detail=eval_gif_level_of_detail,
+        env=env,
+    )
+
+    # splayed eval levels
+
+    ppo.run(
+        rng=rng_train,
+        # environment and level distributions
+        env=env,
+        train_level_set=train_level_set,
+        # actor critic network
+        net=net,
+        net_init_params=net_init_params,
+        net_init_state=net_init_state,
+        # evals
+        evals_dict={
+            # small evals
+            ('on_dist_levels', num_cycles_per_eval): eval_on_level_set,
+            ('off_dist_levels', num_cycles_per_eval): eval_off_level_set,
+            # big evals
+            ('on_dist_rollouts', num_cycles_per_big_eval): eval_on_rollouts,
+            ('off_dist_rollouts', num_cycles_per_big_eval): eval_off_rollouts,
+        },
+        # algorithm
+        ppo_lr=ppo_lr,
+        ppo_gamma=ppo_gamma,
+        ppo_clip_eps=ppo_clip_eps,
+        ppo_gae_lambda=ppo_gae_lambda,
+        ppo_entropy_coeff=ppo_entropy_coeff,
+        ppo_critic_coeff=ppo_critic_coeff,
+        ppo_max_grad_norm=ppo_max_grad_norm,
+        ppo_lr_annealing=ppo_lr_annealing,
+        num_minibatches_per_epoch=num_minibatches_per_epoch,
+        num_epochs_per_cycle=num_epochs_per_cycle,
+        # training dimensions
+        num_total_env_steps=num_total_env_steps,
+        num_env_steps_per_cycle=num_env_steps_per_cycle,
+        num_parallel_envs=num_parallel_envs,
+        # training animation dimensions
+        train_gifs=train_gifs,
+        train_gif_grid_width=train_gif_grid_width,
+        train_gif_level_of_detail=train_gif_level_of_detail,
+        # logging
+        num_cycles_per_log=num_cycles_per_log,
+        save_files_to=save_files_to,
+        console_log=console_log,
+        wandb_log=wandb_log,
+        # checkpointing
+        checkpointing=checkpointing,
+        keep_all_checkpoints=keep_all_checkpoints,
+        max_num_checkpoints=max_num_checkpoints,
+        num_cycles_per_checkpoint=num_cycles_per_checkpoint,
+    )
+    # (the decorator finishes the wandb run for us, so no need to do that)
+    print("training run complete.")

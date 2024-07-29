@@ -181,21 +181,28 @@ class Env(base.Env):
 
         # check if mouse got to cheese
         got_cheese = (state.mouse_pos == state.level.cheese_pos).all()
+        got_cheese_first_time = got_cheese & ~state.got_cheese
         state = state.replace(got_cheese=state.got_cheese | got_cheese)
         
         # check if mouse got to dish
         got_dish = (state.mouse_pos == state.level.dish_pos).all()
+        got_dish_first_time = got_dish & ~state.got_dish
         state = state.replace(got_dish=state.got_dish | got_dish)
 
         # reward and done
-        reward = got_cheese.astype(float)
+        reward = got_cheese.first_time.astype(float)
+        proxy_reward = got_dish_first_time.astype(float)
         done = state.got_cheese
 
         return (
             state,
             reward,
             done,
-            {},
+            {
+                'proxy_rewards': {
+                    'dish': proxy_reward,
+                },
+            },
         )
 
     
