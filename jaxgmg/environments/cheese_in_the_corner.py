@@ -75,7 +75,6 @@ class EnvState(base.EnvState):
     got_cheese: bool
     got_target_location: bool 
 
-
 @struct.dataclass
 class Env(base.Env):
     """
@@ -201,55 +200,84 @@ class Env(base.Env):
         height, width = state.level.wall_map.shape
         
         #only for center top
+        target_locations = []
+        proxy_rewards = {}
         if self.cheese_in_top_left:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
             proxy_name = "top_left"
-        elif self.cheese_in_top_right:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+
+        if self.cheese_in_top_right:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width-2)
             proxy_name = "top_right"
-        elif self.cheese_in_bottom_right:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_bottom_right:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2)
             proxy_name = "bottom_right"
-        elif self.cheese_in_bottom_left:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_bottom_left:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == 1)
             proxy_name = "bottom_left"
-        elif self.cheese_in_center:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_center:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2)
             proxy_name = "center"
-        elif self.cheese_in_center_top:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_center_top:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width//2)
             proxy_name = "center_top"
-        elif self.cheese_in_center_bottom:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_center_bottom:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width//2)
             proxy_name = "center_bottom"
-        elif self.cheese_in_center_left:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_center_left:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == 1)
             proxy_name = "center_left"
-        elif self.cheese_in_center_right:
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
+        if self.cheese_in_center_right:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width-2)
             proxy_name = "center_right"
-        
-        
+            first_time_target_location = got_target_location & ~state.got_target_location
+            state = state.replace(got_target_location=state.got_target_location | got_target_location)
+            proxy_rewards[proxy_name] = first_time_target_location.astype(float)
+            target_locations.append(got_target_location)
 
 
-        #if state.level.cheese_location == "northwest":
-        #    got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
-        #elif state.level.cheese_location == "southeast":
-        #    got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2)
-        #elif state.level.cheese_location == "center":
-        #    got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2)
-
-
-        first_time_target_location = got_target_location & ~state.got_target_location
-        state = state.replace(got_target_location=state.got_target_location | got_target_location)
+       #first_time_target_location = got_target_location & ~state.got_target_location
+        #state = state.replace(got_target_location=state.got_target_location | got_target_location)
 
         # rewards
         reward = got_cheese_first_time.astype(float)
-        proxy_reward = first_time_target_location.astype(float)
+        #proxy_reward = first_time_target_location.astype(float)
         
         # end of episode
         if self.terminate_after_cheese_and_corner:
-            done = state.got_cheese & state.got_corner
+            done = state.got_cheese & state.got_target_location
         else:
             done = state.got_cheese
 
@@ -258,9 +286,7 @@ class Env(base.Env):
             reward,
             done,
             {
-                'proxy_rewards': {
-                    proxy_name: proxy_reward,
-            },
+                'proxy_rewards': proxy_rewards,
             },
         )
 
