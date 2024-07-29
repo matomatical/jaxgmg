@@ -57,8 +57,6 @@ class Level(base.Level):
     wall_map: chex.Array
     cheese_pos: chex.Array
     initial_mouse_pos: chex.Array
-    cheese_location: str
-
 
 @struct.dataclass
 class EnvState(base.EnvState):
@@ -101,7 +99,15 @@ class Env(base.Env):
       tile corresponds to one grid square.
     """
     terminate_after_cheese_and_corner: bool = False
-    cheese_location: str = "northwest"
+    cheese_in_top_left: bool = False,
+    cheese_in_top_right: bool = False,
+    cheese_in_bottom_right: bool = False,
+    cheese_in_bottom_left: bool = False,
+    cheese_in_center: bool = False,
+    cheese_in_center_top: bool = False,
+    cheese_in_center_bottom: bool = False,
+    cheese_in_center_left: bool = False,
+    cheese_in_center_right: bool = False,
 
 
     class Action(enum.IntEnum):
@@ -194,25 +200,35 @@ class Env(base.Env):
         # check if mouse got to various locations
         height, width = state.level.wall_map.shape
         
-        
-        if state.level.cheese_location == "top_left":
+        #only for center top
+        if self.cheese_in_top_left:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
-        elif state.level.cheese_location == "top_right":
+            proxy_name = "top_left"
+        elif self.cheese_in_top_right:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width-2)
-        elif state.level.cheese_location == "bottom_right":
+            proxy_name = "top_right"
+        elif self.cheese_in_bottom_right:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2)
-        elif state.level.cheese_location == "bottom_left":
+            proxy_name = "bottom_right"
+        elif self.cheese_in_bottom_left:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == 1)
-        elif state.level.cheese_location == "center":
+            proxy_name = "bottom_left"
+        elif self.cheese_in_center:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2)
-        elif state.level.cheese_location == "center_top":
+            proxy_name = "center"
+        elif self.cheese_in_center_top:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width//2)
-        elif state.level.cheese_location == "center_bottom":
+            proxy_name = "center_top"
+        elif self.cheese_in_center_bottom:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width//2)
-        elif state.level.cheese_location == "center_left":
+            proxy_name = "center_bottom"
+        elif self.cheese_in_center_left:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == 1)
-        elif state.level.cheese_location == "center_right":
+            proxy_name = "center_left"
+        elif self.cheese_in_center_right:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width-2)
+            proxy_name = "center_right"
+        
         
 
 
@@ -243,7 +259,7 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                state.level.cheese_location: proxy_reward,
+                    proxy_name: proxy_reward,
             },
             },
         )

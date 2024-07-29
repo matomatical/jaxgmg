@@ -24,8 +24,8 @@ def corner(
     env_corner_size: int = 1,
     env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
-    cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
-    cheese_in_top_left: bool = False,
+    #cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
+    cheese_in_top_left: bool = True,
     cheese_in_top_right: bool = False,
     cheese_in_bottom_right: bool = False,
     cheese_in_bottom_left: bool = False,
@@ -37,9 +37,9 @@ def corner(
     # policy config
     net: str = "impala:lstm",               # e.g. 'impala:ff', 'impala:lstm'
     # PPO hyperparameters
-    ppo_lr: float = 0.0005,                 # learning rate
+    ppo_lr: float = 0.00005,                 # learning rate
     ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.2,
+    ppo_clip_eps: float = 0.1,
     ppo_gae_lambda: float = 0.95,
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
@@ -48,7 +48,7 @@ def corner(
     num_minibatches_per_epoch: int = 8,
     num_epochs_per_cycle: int = 5,
     # training dimensions
-    num_total_env_steps: int = 1_000_000_000,
+    num_total_env_steps: int = 300_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
     fixed_train_levels: bool = False,
@@ -70,9 +70,9 @@ def corner(
     num_cycles_per_log: int = 64,
     save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
+    wandb_log: bool = True,                # whether to log metrics to wandb
     wandb_entity: str = None,
-    wandb_project: str = "test",
+    wandb_project: str = "proxy_test",
     wandb_group: str = None,
     wandb_name: str = None,
     # checkpointing
@@ -87,24 +87,6 @@ def corner(
 
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
-    if cheese_in_center:
-        cheese_location = 'center'
-    if cheese_in_top_left:
-        cheese_location = 'top_left'
-    if cheese_in_top_right:
-        cheese_location = 'top_right'
-    if cheese_in_bottom_right:
-        cheese_location = 'bottom_right'
-    if cheese_in_bottom_left:
-        cheese_location = 'bottom_left'
-    if cheese_in_center_top:
-        cheese_location = 'center_top'
-    if cheese_in_center_bottom:
-        cheese_location = 'center_bottom'
-    if cheese_in_center_left:
-        cheese_location = 'center_left'
-    if cheese_in_center_right:
-        cheese_location = 'center_right'
     
 
     print("setting up environment...")
@@ -112,7 +94,15 @@ def corner(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
         terminate_after_cheese_and_corner=env_terminate_after_corner,
-        cheese_location=cheese_location,
+        cheese_in_top_left = cheese_in_top_left,
+        cheese_in_top_right=  cheese_in_top_right,
+        cheese_in_bottom_right=cheese_in_bottom_right ,
+        cheese_in_bottom_left=  cheese_in_bottom_left,
+        cheese_in_center= cheese_in_center,
+        cheese_in_center_top=cheese_in_center_top,
+        cheese_in_center_bottom = cheese_in_center_bottom,
+        cheese_in_center_left = cheese_in_center_left,
+        cheese_in_center_right= cheese_in_center_right,
     )
 
     print(f"generating training level distribution...")
@@ -125,7 +115,6 @@ def corner(
         maze_generator=maze_generator,
         corner_size=env_corner_size,
         cheese_in_center = cheese_in_center,
-        cheese_location= tuple(cheese_location),
         cheese_in_top_left = cheese_in_top_left,
         cheese_in_top_right = cheese_in_top_right,
         cheese_in_bottom_right = cheese_in_bottom_right,
@@ -548,5 +537,6 @@ def keys(
     )
     # (the decorator finishes the wandb run for us, so no need to do that)
     print("training run complete.")
+
 
 
