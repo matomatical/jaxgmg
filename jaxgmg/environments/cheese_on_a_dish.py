@@ -72,7 +72,7 @@ class EnvState(base.EnvState):
     got_cheese: bool
     got_dish: bool
 
-
+@struct.dataclass
 class Env(base.Env):
     """
     Cheese on a Dish environment.
@@ -205,7 +205,7 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'dish': proxy_reward,
+                    'proxy_dish': proxy_reward,
                 },
             },
         )
