@@ -95,7 +95,7 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
-    terminate_after_cheese_and_dish:bool = False
+    terminate_after_cheese_and_dish: bool = False
 
     class Action(enum.IntEnum):
         """
@@ -192,7 +192,7 @@ class Env(base.Env):
         state = state.replace(got_dish=state.got_dish | got_dish)
 
         # reward and done
-        reward = got_cheese.first_time.astype(float)
+        reward = got_cheese_first_time.astype(float)
         proxy_reward = got_dish_first_time.astype(float)
         if self.terminate_after_cheese_and_dish:
             done = got_cheese & got_dish

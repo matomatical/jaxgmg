@@ -548,7 +548,6 @@ def dish(
     env_terminate_after_dish: bool = False,
     max_cheese_radius: int = 1,
     max_cheese_radius_shift: int = 6,
-    env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     #cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
     # policy config
@@ -610,7 +609,7 @@ def dish(
     env = cheese_on_a_dish.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
-        terminate_after_cheese_and_dish=env_terminate_after_dish,
+        terminate_after_cheese_and_dish= env_terminate_after_dish,
     )
 
     print(f"generating training level distribution...")
