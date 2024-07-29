@@ -410,23 +410,26 @@ def ppo_update(
         # process each minibatch
         def _minibatch(train_state, minibatch):
             ppo_loss_aux_and_grad = jax.value_and_grad(ppo_loss, has_aux=True)
-            (loss, loss_components), grads = ppo_loss_aux_and_grad(
+            (loss, diagnostics), grads = ppo_loss_aux_and_grad(
                 train_state.params,
                 apply_fn=train_state.apply_fn,
-                data=minibatch,
+                transitions=minibatch[0],
+                advantages=minibatch[1],
+                targets=minibatch[2],
                 clip_eps=clip_eps,
                 critic_coeff=critic_coeff,
                 entropy_coeff=entropy_coeff,
+                compute_diagnostics=compute_metrics,
             )
             train_state = train_state.apply_gradients(grads=grads)
-            return train_state, (loss, loss_components, grads)
-        train_state, (losses, losses_components, grads) = jax.lax.scan(
+            return train_state, (loss, diagnostics, grads)
+        train_state, (losses, diagnostics, grads) = jax.lax.scan(
             _minibatch,
             train_state,
             data_batched,
         )
-        return train_state, (losses, losses_components, grads)
-    train_state, (losses, losses_components, grads) = jax.lax.scan(
+        return train_state, (losses, diagnostics, grads)
+    train_state, (losses, diagnostics, grads) = jax.lax.scan(
         _epoch,
         train_state,
         jax.random.split(rng, num_epochs),
@@ -441,30 +444,22 @@ def ppo_update(
 
         metrics = {
             'avg_loss': losses.mean(),
-            'avg_loss_actor': losses_components[0].mean(),
-            'avg_loss_critic': losses_components[1].mean(),
-            'avg_loss_entropy': losses_components[2].mean(),
+            **{'avg_'+d: vs.mean() for d, vs in diagnostics.items()},
             'avg_advantage': advantages.mean(),
             'avg_grad_norm_pre_clip': grad_norms.mean(),
             'max': {
                 'max_loss': losses.max(),
-                'max_loss_actor': losses_components[0].max(),
-                'max_loss_critic': losses_components[1].max(),
-                'max_loss_entropy': losses_components[2].max(),
+                **{'max_'+d: vs.max() for d, vs in diagnostics.items()},
                 'max_advantage': advantages.max(),
                 'max_grad_norm_pre_clip': grad_norms.max(),
             },
             'std': {
                 'std_loss': losses.std(),
-                'std_loss_actor': losses_components[0].std(),
-                'std_loss_critic': losses_components[1].std(),
-                'std_loss_entropy': losses_components[2].std(),
+                **{'std_'+d: vs.std() for d, vs in diagnostics.items()},
                 'std_advantage': advantages.std(),
                 'std_grad_norm_pre_clip': grad_norms.std(),
             },
         }
-        # TODO: approx kl
-        # TODO: clip proportion
     else:
         metrics = {}
     
@@ -475,67 +470,87 @@ def ppo_update(
 # PPO loss function
 
 
-@functools.partial(jax.jit, static_argnames=('apply_fn',))
+@functools.partial(
+    jax.jit,
+    static_argnames=('apply_fn', 'compute_diagnostics'),
+)
 def ppo_loss(
     params,
     apply_fn,
-    data: tuple[Transition, Array, Array], # each vectors of length num_data
+    transitions: Transition,    # Transition[minibatch_size]
+    advantages: Array,          # float[minibatch_size]
+    targets: Array,             # float[minibatch_size]
     clip_eps: float,
     critic_coeff: float,
     entropy_coeff: float,
+    compute_diagnostics: bool,  # if True, second return value is {}
 ) -> tuple[
-    float,      # loss
-    tuple[      # breakdown of loss into three components
-        float,
-        float,
-        float,
-    ]
+    float,                      # loss
+    dict[str, float],           # loss components and other diagnostics
 ]:
-    # unpack minibatch
-    trajectories, advantages, targets = data
-
     # run network to get current value/log_prob prediction
     action_distribution, value, _net_state = apply_fn(
         params,
-        trajectories.obs,
-        trajectories.net_state,
-        trajectories.prev_action,
+        transitions.obs,
+        transitions.net_state,
+        transitions.prev_action,
     )
-    log_prob = action_distribution.log_prob(trajectories.action)
-
+    log_prob = action_distribution.log_prob(transitions.action)
 
     # actor loss
-    ratio = jnp.exp(log_prob - trajectories.log_prob)
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    logratio = log_prob - transitions.log_prob
+    ratio = jnp.exp(logratio)
+    clipped_ratio = jnp.clip(ratio, 1-clip_eps, 1+clip_eps)
+    std_advantages = (
+        (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    )
     actor_loss = -jnp.minimum(
-        advantages * ratio,
-        advantages * jnp.clip(ratio, 1-clip_eps, 1+clip_eps)
+        std_advantages * ratio,
+        std_advantages * clipped_ratio,
     ).mean()
-
+    if compute_diagnostics:
+        # fraction of clipped ratios
+        actor_clipfrac = jnp.mean(jnp.abs(ratio - 1) > clip_eps)
+        # KL estimators k1, k3 (http://joschu.net/blog/kl-approx.html)
+        actor_approxkl1 = jnp.mean(-logratio)
+        actor_approxkl3 = jnp.mean((ratio - 1) - logratio)
 
     # critic loss
-    value_diff_clipped = jnp.clip(
-        value - trajectories.value,
-        -clip_eps,
-        clip_eps,
-    )
-    value_proximal = trajectories.value + value_diff_clipped
+    value_diff = value - transitions.value
+    value_diff_clipped = jnp.clip(value_diff, -clip_eps, clip_eps)
+    value_proximal = transitions.value + value_diff_clipped
     critic_loss = jnp.maximum(
         jnp.square(value - targets),
         jnp.square(value_proximal - targets),
     ).mean() / 2
-
+    if compute_diagnostics:
+        # fraction of clipped value diffs
+        critic_clipfrac = jnp.mean(jnp.abs(value_diff) > clip_eps)
 
     # entropy regularisation term
     entropy = action_distribution.entropy().mean()
-
 
     total_loss = (
         actor_loss
         + critic_coeff * critic_loss
         - entropy_coeff * entropy
     )
-    return total_loss, (actor_loss, critic_loss, entropy)
+
+    # auxiliary information for logging
+    if compute_diagnostics:
+        diagnostics = {
+            'actor_loss': actor_loss,
+            'actor_clipfrac': actor_clipfrac,
+            'actor_approxkl1': actor_approxkl1,
+            'actor_approxkl3': actor_approxkl3,
+            'critic_loss': critic_loss,
+            'critic_clipfrac': critic_clipfrac,
+            'entropy': entropy,
+        }
+    else:
+        diagnostics = {}
+
+    return total_loss, diagnostics
 
 
 # # # 
