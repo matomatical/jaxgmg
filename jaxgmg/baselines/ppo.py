@@ -22,6 +22,7 @@ import wandb
 from jaxgmg import util
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import experience
+from jaxgmg.baselines import autocurricula
 
 
 # # # 
@@ -30,19 +31,9 @@ from jaxgmg.baselines import experience
 from typing import Any
 from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
-from jaxgmg.environments.base import LevelGenerator # this will go to UED
 from jaxgmg.baselines.experience import Transition, Rollout
 from jaxgmg.baselines.evals import Eval
-
-
-@struct.dataclass
-class TrainLevelSet:
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        raise NotImplementedError
+from jaxgmg.baselines.autocurricula import CurriculumLevelGenerator
 
 
 # # # 
@@ -52,7 +43,8 @@ class TrainLevelSet:
 def run(
     rng: PRNGKey,
     env: Env,
-    train_level_set: TrainLevelSet,
+    gen: CurriculumLevelGenerator,
+    gen_state: CurriculumLevelGenerator.State,
     # network
     net: networks.ActorCriticNetwork,
     net_init_params: networks.ActorCriticParams,
@@ -186,7 +178,11 @@ def run(
 
         # choose levels for this round
         rng_levels, rng_t = jax.random.split(rng_t)
-        levels_t = train_level_set.get_batch(rng_levels, num_parallel_envs)
+        gen_state, levels_t = gen.get_batch(
+            state=gen_state,
+            rng=rng_levels,
+            num_levels=num_parallel_envs,
+        )
     
         
         # collect experience
@@ -220,21 +216,33 @@ def run(
                 env=env,
             )
             metrics['env/train'].update({'rollouts_gif': frames})
+        
+
+        # generalised advantage estimation
+        advantages = jax.vmap(
+            experience.generalised_advantage_estimation,
+            in_axes=(0,None,None),
+        )(
+            rollouts,
+            ppo_gae_lambda,
+            ppo_gamma,
+        )
 
 
         # ppo update network on this data a few times
         rng_update, rng_t = jax.random.split(rng_t)
         if log_cycle:
             ppo_start_time = time.perf_counter()
-        train_state, advantages, ppo_metrics = ppo_update(
+        # ppo step
+        train_state, ppo_metrics = ppo_update(
             rng=rng_update,
             train_state=train_state,
             rollouts=rollouts,
+            advantages=advantages,
             num_epochs=num_epochs_per_cycle,
             num_minibatches_per_epoch=num_minibatches_per_epoch,
             gamma=ppo_gamma,
             clip_eps=ppo_clip_eps,
-            gae_lambda=ppo_gae_lambda,
             entropy_coeff=ppo_entropy_coeff,
             critic_coeff=ppo_critic_coeff,
             compute_metrics=log_cycle,
@@ -245,6 +253,16 @@ def run(
             metrics['perf']['ppo_updates_per_second'] = (
                 num_updates_per_cycle / ppo_elapsed_time
             )
+        
+
+        # report experience and performance to level generator
+        gen_state = gen.update(
+            state=gen_state,
+            rollouts=rollouts,
+            advantages=advantages, # shortcut: we did gae already
+        )
+        if log_cycle:
+            metrics['ued'].update(gen.compute_metrics(gen_state))
         
 
         # periodic evaluations
@@ -340,19 +358,18 @@ def ppo_update(
     rng: PRNGKey,
     train_state: TrainState,
     rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
+    advantages: Array, # float[num_levels, num_steps]
     # ppo hyperparameters
     num_epochs: int,
     num_minibatches_per_epoch: int,
     gamma: float,
     clip_eps: float,
-    gae_lambda: float,
     entropy_coeff: float,
     critic_coeff: float,
     # metrics
     compute_metrics: bool,
 ) -> tuple[
     TrainState,
-    Array, # GAE estimates
     dict[str, Any], # metrics
 ]:
     """
@@ -361,47 +378,15 @@ def ppo_update(
 
     TODO: document inputs and outputs.
     """
-    # Generalised Advantage Estimation
-    initial_carry = (
-        jnp.zeros_like(rollouts.final_value),             # float[num_levels]
-        rollouts.final_value,                             # float[num_levels]
-    )
-    stepwise_transitions = jax.tree.map(
-        lambda x: einops.rearrange(x, 'levels steps ... -> steps levels ...'),
-        rollouts.transitions,
-    )                                  # -> Transition[num_steps, num_levels]
-    def _gae_accum(carry, transition):
-        gae, next_value = carry
-        reward = transition.reward                        # float[num_levels] 
-        this_value = transition.value                     # float[num_levels]
-        done = transition.done                            # bool[num_levels]
-        gae = (
-            reward
-            - this_value
-            + (1-done) * gamma * (next_value + gae_lambda * gae)
-        )
-        return (gae, this_value), gae
-    _final_carry, advantages = jax.lax.scan(
-        _gae_accum,
-        initial_carry,
-        stepwise_transitions,
-        reverse=True,
-        unroll=16, # TODO: parametrise and test this for effect on speed
-    )                             # advantages : float[num_steps, num_levels]
-
     
-    # value targets
-    stepwise_values = einops.rearrange(
-        rollouts.transitions.value,
-        "levels steps -> steps levels",
-    )                                       # -> float[num_steps, num_levels]
-    targets = advantages + stepwise_values  # -> float[num_steps, num_levels]
+    # value targets based on values + GAE estimates
+    targets = advantages + rollouts.transitions.value  # -> float[num_levels, num_steps]
 
     
     # compile data set
-    data = (stepwise_transitions, advantages, targets)
+    data = (rollouts.transitions, advantages, targets)
     data = jax.tree.map(
-        lambda x: einops.rearrange(x, 'steps lvls ... -> (steps lvls) ...'),
+        lambda x: einops.rearrange(x, 'lvls steps ... -> (lvls steps) ...'),
         data,
     )
     num_examples, = data[1].shape
@@ -482,7 +467,7 @@ def ppo_update(
     else:
         metrics = {}
     
-    return train_state, advantages, metrics
+    return train_state, metrics
 
 
 # # # 
@@ -550,56 +535,6 @@ def ppo_loss(
         - entropy_coeff * entropy
     )
     return total_loss, (actor_loss, critic_loss, entropy)
-
-
-# # # 
-# TRAINING LEVEL SETS
-
-
-@struct.dataclass
-class FixedTrainLevelSet(TrainLevelSet):
-    levels: Level       # Level[num_levels]
-
-
-    @functools.partial(
-        jax.jit,
-        static_argnames=['num_levels_in_batch'],
-    )
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        num_levels = jax.tree.leaves(self.levels)[0].shape[0]
-        level_ids = jax.random.choice(
-            rng,
-            num_levels,
-            (num_levels_in_batch,),
-            replace=(num_levels_in_batch >= num_levels),
-        )
-        levels_batch = jax.tree.map(lambda x: x[level_ids], self.levels)
-        return levels_batch
-
-
-@struct.dataclass
-class OnDemandTrainLevelSet(TrainLevelSet):
-    level_generator: LevelGenerator
-
-
-    @functools.partial(
-        jax.jit,
-        static_argnames=['self', 'num_levels_in_batch'],
-    )
-    def get_batch(
-        self,
-        rng: PRNGKey,
-        num_levels_in_batch: int,
-    ) -> Level: # Level[num_levels_in_batch]
-        levels_batch = self.level_generator.vsample(
-            rng,
-            num_levels=num_levels_in_batch,
-        )
-        return levels_batch
 
 
 # # # 
