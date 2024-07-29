@@ -440,27 +440,28 @@ def ppo_update(
         grad_norms = vvgnorm(grads) # -> float[num_epochs, num_minibatches]
 
         metrics = {
-            # avg
             'avg_loss': losses.mean(),
             'avg_loss_actor': losses_components[0].mean(),
             'avg_loss_critic': losses_components[1].mean(),
             'avg_loss_entropy': losses_components[2].mean(),
             'avg_advantage': advantages.mean(),
             'avg_grad_norm_pre_clip': grad_norms.mean(),
-            # max
-            'max_loss': losses.max(),
-            'max_loss_actor': losses_components[0].max(),
-            'max_loss_critic': losses_components[1].max(),
-            'max_loss_entropy': losses_components[2].max(),
-            'max_advantage': advantages.max(),
-            'max_grad_norm_pre_clip': grad_norms.max(),
-            # std
-            'std_loss': losses.std(),
-            'std_loss_actor': losses_components[0].std(),
-            'std_loss_critic': losses_components[1].std(),
-            'std_loss_entropy': losses_components[2].std(),
-            'std_advantage': advantages.std(),
-            'std_grad_norm_pre_clip': grad_norms.std(),
+            'max': {
+                'max_loss': losses.max(),
+                'max_loss_actor': losses_components[0].max(),
+                'max_loss_critic': losses_components[1].max(),
+                'max_loss_entropy': losses_components[2].max(),
+                'max_advantage': advantages.max(),
+                'max_grad_norm_pre_clip': grad_norms.max(),
+            },
+            'std': {
+                'std_loss': losses.std(),
+                'std_loss_actor': losses_components[0].std(),
+                'std_loss_critic': losses_components[1].std(),
+                'std_loss_entropy': losses_components[2].std(),
+                'std_advantage': advantages.std(),
+                'std_grad_norm_pre_clip': grad_norms.std(),
+            },
         }
         # TODO: approx kl
         # TODO: clip proportion
