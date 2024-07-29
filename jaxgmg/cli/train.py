@@ -546,6 +546,7 @@ def dish(
     env_size: int = 13,
     env_layout: str = 'blocks',
     #env_corner_size_cheese: int = 1,
+    env_terminate_after_dish: bool = False,
     #env_corner_size_dish: int = 1,
     max_cheese_radius: int = 1,
     max_cheese_radius_shift: int = 6,
@@ -611,7 +612,7 @@ def dish(
     env = cheese_on_a_dish.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
-        terminate_after_cheese_and_corner=env_terminate_after_corner,
+        terminate_after_cheese_and_dish=env_terminate_after_dish,
     )
 
     print(f"generating training level distribution...")

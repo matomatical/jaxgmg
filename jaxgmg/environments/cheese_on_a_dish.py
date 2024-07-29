@@ -95,6 +95,8 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
+    terminate_after_cheese_and_dish:bool = False
+
     class Action(enum.IntEnum):
         """
         The environment has a discrete action space of size 4 with the following
@@ -192,7 +194,10 @@ class Env(base.Env):
         # reward and done
         reward = got_cheese.first_time.astype(float)
         proxy_reward = got_dish_first_time.astype(float)
-        done = state.got_cheese
+        if self.terminate_after_cheese_and_dish:
+            done = got_cheese & got_dish
+        else:
+            done = got_cheese
 
         return (
             state,
