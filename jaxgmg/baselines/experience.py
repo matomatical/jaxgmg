@@ -118,6 +118,11 @@ def collect_rollouts(
     * rollouts : Rollout[num_levels]
             The collected experience, one sequence of trajectories for each
             level.
+
+    TODO:
+
+    * Note that this would be simpler if it was implemented for a single
+      level and then just vmapped to the desired shape of level batches?
     """
     # reset environments to the given levels
     env_obs, env_state = env.vreset_to_level(levels=levels)
@@ -421,7 +426,7 @@ def generalised_advantage_estimation(
         initial_carry,
         rollout.transitions,
         reverse=True,
-        unroll=16, # TODO: parametrise and test this for effect on speed
+        unroll=16, # TODO: seems to have no noticable effect on speed on cpu
     )
     return advantages
 
