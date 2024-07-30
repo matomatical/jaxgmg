@@ -26,7 +26,7 @@ def corner(
     # policy config
     net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
     # PPO hyperparameters
-    ppo_lr: float = 5e-5,                   # learning rate
+    ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
     ppo_clip_eps: float = 0.1,
     ppo_gae_lambda: float = 0.95,
@@ -311,7 +311,7 @@ def keys(
     # policy config
     net: str = "relu",
     # PPO hyperparameters
-    ppo_lr: float = 5e-5,                   # learning rate
+    ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
     ppo_clip_eps: float = 0.1,
     ppo_gae_lambda: float = 0.95,
