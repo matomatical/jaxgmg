@@ -25,6 +25,16 @@ def corner(
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
+    # ued config
+    ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    # for domain randomisation
+    num_train_levels: int = 2048,
+    # for plr
+    plr_buffer_size: int = 2048,
+    plr_temperature: float = 0.1,
+    plr_staleness_coeff: float = 0.1,
+    plr_prob_replay: float = 0.5,
+    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     # PPO hyperparameters
     ppo_lr: float = 0.0005,                 # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -40,11 +50,9 @@ def corner(
     num_total_env_steps: int = 20_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    fixed_train_levels: bool = False,
-    num_train_levels: int = 2048,
     # training animation dimensions
     train_gifs: bool = True,
-    train_gif_grid_width: int = 8,
+    train_gif_grid_width: int = 16,
     train_gif_level_of_detail: int = 1,
     # evals config
     num_cycles_per_eval: int = 64,
@@ -61,6 +69,7 @@ def corner(
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
     wandb_project: str = "test",
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
     # checkpointing
@@ -96,7 +105,12 @@ def corner(
         corner_size=env_corner_size,
     )
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
-    if fixed_train_levels:
+    if ued == "dr":
+        gen = autocurricula.InfiniteDomainRandomisation(
+            level_generator=train_level_generator,
+        )
+        gen_state = gen.init()
+    elif ued == "dr-finite":
         train_levels = train_level_generator.vsample(
             rng_train_levels,
             num_levels=num_train_levels,
@@ -105,11 +119,19 @@ def corner(
         gen_state = gen.init(
             levels=train_levels,
         )
-    else:
-        gen = autocurricula.InfiniteDomainRandomisation(
+    elif ued == "plr":
+        gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            prob_replay=plr_prob_replay,
+            regret_estimator=plr_regret_estimator,
         )
-        gen_state = gen.init()
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
 
     
     print(f"setting up agent with architecture {net!r}...")
@@ -310,6 +332,16 @@ def keys(
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "relu",
+    # ued config
+    ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    # for domain randomisation
+    num_train_levels: int = 2048,
+    # for plr
+    plr_buffer_size: int = 2048,
+    plr_temperature: float = 0.1,
+    plr_staleness_coeff: float = 0.1,
+    plr_prob_replay: float = 0.5,
+    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     # PPO hyperparameters
     ppo_lr: float = 0.0005,                 # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -325,11 +357,9 @@ def keys(
     num_total_env_steps: int = 20_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    fixed_train_levels: bool = False,
-    num_train_levels: int = 2048,
     # training animation dimensions
     train_gifs: bool = True,
-    train_gif_grid_width: int = 8,
+    train_gif_grid_width: int = 16,
     train_gif_level_of_detail: int = 1,
     # evals config
     num_cycles_per_eval: int = 64,
@@ -346,6 +376,7 @@ def keys(
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
     wandb_project: str = "test",
+    wandb_entity: str = None,
     wandb_group: str = None,
     wandb_name: str = None,
     # checkpointing
@@ -382,9 +413,13 @@ def keys(
         num_chests_min=env_num_chests_min,
         num_chests_max=env_num_chests_max,
     )
-    rng_train_levels, rng_setup = jax.random.split(rng_setup)
-    if fixed_train_levels:
-        train_level_generator.vsample(
+    if ued == "dr":
+        gen = autocurricula.InfiniteDomainRandomisation(
+            level_generator=train_level_generator,
+        )
+        gen_state = gen.init()
+    elif ued == "dr-finite":
+        train_levels = train_level_generator.vsample(
             rng_train_levels,
             num_levels=num_train_levels,
         )
@@ -392,11 +427,19 @@ def keys(
         gen_state = gen.init(
             levels=train_levels,
         )
-    else:
-        gen = autocurricula.InfiniteDomainRandomisation(
+    elif ued == "plr":
+        gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            prob_replay=plr_prob_replay,
+            regret_estimator=plr_regret_estimator,
         )
-        gen_state = gen.init()
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
 
 
     print(f"setting up agent with architecture {net!r}...")

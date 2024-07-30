@@ -258,6 +258,7 @@ def run(
         # report experience and performance to level generator
         gen_state = gen.update(
             state=gen_state,
+            levels=levels_t,
             rollouts=rollouts,
             advantages=advantages, # shortcut: we did gae already
         )

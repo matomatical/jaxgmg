@@ -152,14 +152,15 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     temperature: float
     staleness_coeff: float
     prob_replay: float
+    regret_estimator: str       # "absGAE", "PVL", "maxMC"
     
     
     @struct.dataclass
     class State(CurriculumLevelGenerator.State):
         level_buffer: Level                 # Level[buffer_size]
         last_scores: Array                  # float[buffer_size]
-        last_visit_time: Array                 # int[buffer_size]
-        first_visit_time: Array                # int[buffer_size]
+        last_visit_time: Array              # int[buffer_size]
+        first_visit_time: Array             # int[buffer_size]
         num_replay_batches: int
         prev_batch_was_replay: bool
         prev_batch_level_ids: Array         # int[num_levels]
@@ -169,8 +170,13 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     #   computation during update and to facilitate logging these metrics
 
 
-    @functools.partial(jax.jit, static_argnames=['self'])
-    def init(self, rng: PRNGKey, default_score: float = 0.0):
+    @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
+    def init(
+        self,
+        rng: PRNGKey,
+        default_score: float = 0.0,
+        batch_size_hint: int = 0,
+    ):
         # seed the level buffer with random levels with some default score.
         # initially we replay these in lieu of levels we have actual scores
         # for, but over time we replace them with real replay levels.
@@ -184,7 +190,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             first_visit_time=jnp.zeros(self.buffer_size, dtype=int),
             num_replay_batches=0,
             prev_batch_was_replay=False,
-            prev_batch_level_ids=jnp.arange(0), # size changes to batch size
+            prev_batch_level_ids=jnp.arange(batch_size_hint),
         )
 
 
@@ -207,9 +213,9 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         
         # spawn a batch of replay levels
         rng_replay, rng = jax.random.split(rng)
-        assert num_levels <= self.buffer_size,
+        assert num_levels <= self.buffer_size
         replay_level_ids = jax.random.choice(
-            rng=rng_replay,
+            key=rng_replay,
             a=self.buffer_size,
             shape=(num_levels,),
             p=self._P_replay(state),
@@ -227,18 +233,18 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             p=self.prob_replay,
         )
         # select those levels
-        chosen_next_state, chosen_levels = jax.tree.map(
+        chosen_levels = jax.tree.map(
             lambda r, n: jnp.where(replay_choice, r, n),
             replay_levels,
             new_levels,
         )
 
         # record information required for update in the state
-        next_state_new = state.replace(
-            prev_state_was_replay=replay_choice,
+        next_state = state.replace(
+            prev_batch_was_replay=replay_choice,
             prev_batch_level_ids=replay_level_ids,
         )
-        return chosen_next_state, chosen_levels
+        return next_state, chosen_levels
 
 
     def _P_replay(self, state: State) -> Array: # float[self.buffer_size]
@@ -274,7 +280,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         advantages: Array,  # float[num_levels, num_steps]
     ) -> State:
         # estimate scores of these levels from the rollouts
-        batch_scores = self._scores(rollouts, advantages)
+        scores = self._compute_scores(rollouts, advantages)
     
         # perform both a replay-type update and a new-type update
         replay_next_state = self._replay_update(state, scores)
@@ -288,15 +294,20 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         return next_state
 
         
-    def _score(
+    def _compute_scores(
         self,
         rollouts: Rollout,  # Rollout[num_levels] with Transition[num_steps]
         advantages: Array,  # float[num_levels, num_steps]
     ) -> Array:             # float[num_levels]
-        # L1 ppo value loss or something
-        scores = jnp.abs(advantages).mean(axis=1)
-        # TODO: test other scoring functions like maxmc
-        return scores
+        match self.regret_estimator.lower():
+            case "absgae":
+                return jnp.abs(advantages).mean(axis=1)
+            case "pvl":
+                return jnp.maximum(advantages, 0).mean(axis=1)
+            case "maxmc":
+                raise NotImplementedError # TODO
+            case _:
+                raise ValueError("Invalid return estimator.")
 
 
     def _replay_update(
@@ -346,12 +357,12 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             candidate_last_visit_time,
             candidate_first_visit_time,
         ) = jax.tree.map(
-            lambda l, r: jnp.concatenate((l, r), axis=0),
+            lambda l, r: jnp.concatenate((l[worst_level_ids], r), axis=0),
             (
-                state.level_buffer[worst_level_ids],
-                state.last_scores[worst_level_ids],
-                state.last_visit_time[worst_level_ids],
-                state.first_visit_time[worst_level_ids],
+                state.level_buffer,
+                state.last_scores,
+                state.last_visit_time,
+                state.first_visit_time,
             ),
             (levels, scores, time_now, time_now),
         )
@@ -360,10 +371,12 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         _, best_level_ids = jax.lax.top_k(candidate_scores, k=num_levels)
         
         # use those levels to replace the lowest-potential levels
-        return state.replace
-            level_buffer=state.level_buffer
-                .at[worst_level_ids]
-                .set(candidate_levels[best_level_ids]),
+        return state.replace(
+            level_buffer=jax.tree.map(
+                lambda l, r: l.at[worst_level_ids].set(r[best_level_ids]),
+                state.level_buffer,
+                candidate_levels,
+            ),
             last_scores=state.last_scores
                 .at[worst_level_ids]
                 .set(candidate_scores[best_level_ids]),
@@ -379,13 +392,13 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     @functools.partial(jax.jit, static_argnames=['self'])
     def compute_metrics(self, state: State) -> dict[str, Any]:
         # TODO: more sophisticated level complexity metrics that also work
-        # for levels without this particular variable.
+        # for levels without this particular variable...
         initial_mouse_pos_x = state.level_buffer.initial_mouse_pos[:, 0]
         initial_mouse_pos_y = state.level_buffer.initial_mouse_pos[:, 1]
         return {
             'scoring': {
-                'avg_scores': state.last_score.mean(),
-                'scores_hist': state.last_score,
+                'avg_scores': state.last_scores.mean(),
+                'scores_hist': state.last_scores,
             },
             'visit_patterns': {
                 'num_replay_batches': state.num_replay_batches,
