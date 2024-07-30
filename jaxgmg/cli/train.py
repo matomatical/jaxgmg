@@ -36,9 +36,9 @@ def corner(
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     # PPO hyperparameters
-    ppo_lr: float = 0.0005,                 # learning rate
+    ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.2,
+    ppo_clip_eps: float = 0.1,
     ppo_gae_lambda: float = 0.95,
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
@@ -343,9 +343,9 @@ def keys(
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     # PPO hyperparameters
-    ppo_lr: float = 0.0005,                 # learning rate
+    ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.2,
+    ppo_clip_eps: float = 0.1,
     ppo_gae_lambda: float = 0.95,
     ppo_entropy_coeff: float = 0.001,
     ppo_critic_coeff: float = 0.5,
