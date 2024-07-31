@@ -27,6 +27,8 @@ Classes:
 
 import enum
 import functools
+from functools import reduce
+import operator
 
 import jax
 import jax.numpy as jnp
@@ -97,7 +99,7 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
-    terminate_after_cheese_and_proxies: bool = False
+    terminate_after_end: bool = False
     cheese_in_top_left: bool = False,
     cheese_in_top_right: bool = False,
     cheese_in_bottom_right: bool = False,
@@ -208,64 +210,64 @@ class Env(base.Env):
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
-
+            target_locations.append(state.got_target_location)
         if self.cheese_in_top_right:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width-2)
             proxy_name = "top_right"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_bottom_right:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width-2)
             proxy_name = "bottom_right"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_bottom_left:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == 1)
             proxy_name = "bottom_left"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_center:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width//2)
             proxy_name = "center"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_center_top:
             got_target_location = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == width//2)
             proxy_name = "center_top"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_center_bottom:
             got_target_location = (state.mouse_pos[0] == height-2) & (state.mouse_pos[1] == width//2)
             proxy_name = "center_bottom"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_center_left:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == 1)
             proxy_name = "center_left"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
         if self.cheese_in_center_right:
             got_target_location = (state.mouse_pos[0] == height//2) & (state.mouse_pos[1] == width-2)
             proxy_name = "center_right"
             first_time_target_location = got_target_location & ~state.got_target_location
             state = state.replace(got_target_location=state.got_target_location | got_target_location)
             proxy_rewards[proxy_name] = first_time_target_location.astype(float)
-            target_locations.append(got_target_location)
+            target_locations.append(state.got_target_location)
+
 
 
        #first_time_target_location = got_target_location & ~state.got_target_location
@@ -276,9 +278,8 @@ class Env(base.Env):
         #proxy_reward = first_time_target_location.astype(float)
         
         # end of episode
-        if self.terminate_after_proxies: #iterate over all target locations, and be done when they are all done. but you should call state.got_target_location for each target location
-            done = ((state.x & getattr(state, k) for k in target_locations))
-            #done = state.got_cheese & state.got_target_location
+        if self.terminate_after_end:
+            done= False
         else:
             done = state.got_cheese
 

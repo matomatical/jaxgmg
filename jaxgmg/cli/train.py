@@ -22,7 +22,7 @@ def corner(
     env_size: int = 13,
     env_layout: str = 'blocks',
     env_corner_size: int = 1,
-    env_terminate_after_proxies: bool = False,
+    env_terminate_after_end: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     #cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
     cheese_in_top_left: bool = False,
@@ -93,7 +93,7 @@ def corner(
     env = cheese_in_the_corner.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
-        terminate_after_cheese_and_proxies=env_terminate_after_proxies,
+        terminate_after_end=env_terminate_after_end,
         cheese_in_top_left = cheese_in_top_left,
         cheese_in_top_right=  cheese_in_top_right,
         cheese_in_bottom_right=cheese_in_bottom_right ,
