@@ -152,7 +152,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     temperature: float
     staleness_coeff: float
     prob_replay: float
-    regret_estimator: str       # "absGAE", "PVL", "maxMC"
+    regret_estimator: str       # "absGAE", "PVL", todo: "maxMC"
     
     
     @struct.dataclass
@@ -162,12 +162,11 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         last_visit_time: Array              # int[buffer_size]
         first_visit_time: Array             # int[buffer_size]
         num_replay_batches: int
+        prev_P_replay: Array                # float[buffer_size]
         prev_batch_was_replay: bool
         prev_batch_level_ids: Array         # int[num_levels]
     # TODO:
     # * consider wrapping first four into an inner TaggedLevel struct...
-    # * add the prev P_replay distribution, and its components, to save
-    #   computation during update and to facilitate logging these metrics
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -188,6 +187,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             last_scores=jnp.ones(self.buffer_size) * default_score,
             last_visit_time=jnp.zeros(self.buffer_size, dtype=int),
             first_visit_time=jnp.zeros(self.buffer_size, dtype=int),
+            prev_P_replay=jnp.zeros(self.buffer_size),
             num_replay_batches=0,
             prev_batch_was_replay=False,
             prev_batch_level_ids=jnp.arange(batch_size_hint),
@@ -213,12 +213,13 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         
         # spawn a batch of replay levels
         rng_replay, rng = jax.random.split(rng)
+        P_replay = self._compute_P_replay(state)
         assert num_levels <= self.buffer_size
         replay_level_ids = jax.random.choice(
             key=rng_replay,
             a=self.buffer_size,
             shape=(num_levels,),
-            p=self._P_replay(state),
+            p=P_replay,
             replace=False, # increase diversity, easier updating
         )
         replay_levels = jax.tree.map(
@@ -241,13 +242,14 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
 
         # record information required for update in the state
         next_state = state.replace(
+            prev_P_replay=P_replay,
             prev_batch_was_replay=replay_choice,
             prev_batch_level_ids=replay_level_ids,
         )
         return next_state, chosen_levels
 
 
-    def _P_replay(self, state: State) -> Array: # float[self.buffer_size]
+    def _compute_P_replay(self, state: State) -> Array: # float[buffer_size]
         """
         Conditional on sampling from the replay buffer, compute the
         probability of sampling each level in the replay buffer?
@@ -345,8 +347,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         num_levels, = scores.shape
 
         # identify the num_levels levels with lowest replay potential
-        P_replay = self._P_replay(state)
-        _, worst_level_ids = jax.lax.top_k(-P_replay, k=num_levels)
+        _, worst_level_ids = jax.lax.top_k(-state.prev_P_replay, k=num_levels)
 
         # concatenate the low-potential levels + their last score and timing
         # data with the new levels + their new scores and the time now
@@ -411,6 +412,8 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             'level_buffer_contents': {
                 'avg_mouse_spawn_x': initial_mouse_pos_x.mean(),
                 'avg_mouse_spawn_y': initial_mouse_pos_y.mean(),
+                'wavg_mouse_spawn_x': state.prev_P_replay @ initial_mouse_pos_x,
+                'wavg_mouse_spawn_y': state.prev_P_replay @ initial_mouse_pos_y,
                 'mouse_spawn_x_hist': initial_mouse_pos_x,
                 'mouse_spawn_y_hist': initial_mouse_pos_y,
             }
