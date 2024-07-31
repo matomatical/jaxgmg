@@ -120,8 +120,10 @@ def corner(
             levels=train_levels,
         )
     elif ued == "plr":
+        level_solver = cheese_in_the_corner.LevelSolver(env, ppo_gamma)
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
+            level_solver=level_solver,
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -430,6 +432,7 @@ def keys(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
+            level_solver=None, # TODO: implement one for keys...
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,

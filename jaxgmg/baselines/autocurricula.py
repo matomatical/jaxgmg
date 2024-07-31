@@ -46,6 +46,7 @@ class CurriculumLevelGenerator:
         State,
         Level, # Level[num_levels]
     ]:
+        # TODO: optionally return a benchmark dict for evals?
         raise NotImplementedError
 
 
@@ -146,9 +147,6 @@ class InfiniteDomainRandomisation(CurriculumLevelGenerator):
 # PRIORITISED LEVEL REPLAY
 
     
-from typing import Self
-
-    
 @struct.dataclass
 class PrioritisedLevelReplay(CurriculumLevelGenerator):
     level_generator: LevelGenerator
@@ -156,7 +154,8 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     temperature: float
     staleness_coeff: float
     prob_replay: float
-    regret_estimator: str       # "absGAE", "PVL", todo: "maxMC"
+    regret_estimator: str                   # "absGAE", "PVL", todo: "maxMC"
+    level_solver: None | LevelSolver        # note: only used for metrics
 
 
     @struct.dataclass
@@ -166,12 +165,13 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             level: Level
             last_score: float
             last_visit_time: int
-            first_visit_time: int
-        buffer: AnnotatedLevel          # AnnotatedLevel[buffer_size]
+            solution: None | LevelSolution  # note: only used for metrics
+            first_visit_time: int           # note: only used for metrics
+        buffer: AnnotatedLevel              # AnnotatedLevel[buffer_size]
         num_replay_batches: int
-        prev_P_replay: Array            # float[buffer_size]
+        prev_P_replay: Array                # float[buffer_size]
         prev_batch_was_replay: bool
-        prev_batch_level_ids: Array     # int[num_levels]
+        prev_batch_level_ids: Array         # int[num_levels]
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -181,18 +181,32 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         default_score: float = 0.0,
         batch_size_hint: int = 0,
     ):
-        # seed the level buffer with random levels with some default score.
+        # seed the level buffer with random levels with a default score.
         # initially we replay these in lieu of levels we have actual scores
         # for, but over time we replace them with real replay levels.
+        initial_levels = self.level_generator.vsample(
+            rng=rng,
+            num_levels=self.buffer_size,
+        )
+        initial_scores = jnp.ones(self.buffer_size) * default_score
+        initial_time = jnp.zeros(self.buffer_size, dtype=int)
+        # if solution method is given, solve the levels for metrics
+        if self.level_solver is not None:
+            initial_level_solutions = self.level_solver.vmap_solve(
+                levels=initial_levels,
+            )
+        else:
+            initial_level_solutions = None
+        # initialise the state with the above information in the level buffer
+        # and additional information needed to maintain the state of the PLR
+        # algorithm
         return self.State(
             buffer=self.State.AnnotatedLevel(
-                level=self.level_generator.vsample(
-                    rng=rng,
-                    num_levels=self.buffer_size,
-                ),
-                last_score=jnp.ones(self.buffer_size) * default_score,
-                last_visit_time=jnp.zeros(self.buffer_size, dtype=int),
-                first_visit_time=jnp.zeros(self.buffer_size, dtype=int),
+                level=initial_levels,
+                solution=initial_level_solutions,
+                last_score=initial_scores,
+                last_visit_time=initial_time,
+                first_visit_time=initial_time,
             ),
             num_replay_batches=0,
             prev_P_replay=jnp.zeros(self.buffer_size),
@@ -362,22 +376,27 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             k=num_levels,
         )
 
-        # extract these low potential levels and concatenate them with the
-        # new levels we're considering adding to the buffer
-        # (together with required score and timing data)
+        # annotate the levels we're trying to add to the buffer
         time_now = jnp.full(num_levels, state.num_replay_batches, dtype=int)
+        # (if solutions are enabled, solve the levels too)
+        if self.level_solver is not None:
+            level_solutions = self.level_solver.vmap_solve(levels)
+        else:
+            level_solutions = None
         challengers = self.State.AnnotatedLevel(
             level=levels,
+            solution=level_solutions,
             last_score=scores,
             last_visit_time=time_now,
             first_visit_time=time_now,
         )
+
+        # concatenate the low-potential levels and the challenger levels
         candidate_buffer = jax.tree.map(
             lambda b, c: jnp.concatenate((b[worst_level_ids], c), axis=0),
             state.buffer,
             challengers,
         )
-
         # of these 2*num_levels levels, which num_levels have highest scores?
         _, best_level_ids = jax.lax.top_k(
             candidate_buffer.last_score,
@@ -396,11 +415,8 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
 
     @functools.partial(jax.jit, static_argnames=['self'])
     def compute_metrics(self, state: State) -> dict[str, Any]:
-        # TODO: more sophisticated level complexity metrics that also work
-        # for levels without this particular variable...
-        initial_mouse_pos_x = state.buffer.level.initial_mouse_pos[:, 0]
-        initial_mouse_pos_y = state.buffer.level.initial_mouse_pos[:, 1]
-        return {
+        # basic PLR diagnostic metrics
+        metrics = {
             'scoring': {
                 'avg_scores': state.buffer.last_score.mean(),
                 'scores_hist': state.buffer.last_score,
@@ -413,14 +429,33 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
                 'first_visit_time_hist': state.buffer.first_visit_time,
                 'prev_batch_level_ids_hist': state.prev_batch_level_ids,
             },
-            'level_buffer_contents': {
-                'avg_mouse_spawn_x': initial_mouse_pos_x.mean(),
-                'avg_mouse_spawn_y': initial_mouse_pos_y.mean(),
-                'wavg_mouse_spawn_x': state.prev_P_replay @ initial_mouse_pos_x,
-                'wavg_mouse_spawn_y': state.prev_P_replay @ initial_mouse_pos_y,
-                'mouse_spawn_x_hist': initial_mouse_pos_x,
-                'mouse_spawn_y_hist': initial_mouse_pos_y,
-            }
         }
+        # TODO: enable arbitrary domain specific complexity measures such as
+        # shortest path length, number of blocks, etc... solutions is not the
+        # right abstraction?
+        if self.level_solver is not None:
+            optimal_values = self.level_solver.vmap_level_value(
+                solns=state.buffer.solution,
+                levels=state.buffer.level,
+            )
+            metrics['buffer_contents'] = {
+                'avg_optimal_values': optimal_values.mean(),
+                'wavg_optimal_values': state.prev_P_replay @ optimal_values,
+                'optimal_values_hist': optimal_values,
+            }
+        # TODO: remove these metrics in favor of more sophisticated level
+        # complexity metrics that also work for levels without this
+        # particular variable...
+        initial_mouse_pos_x = state.buffer.level.initial_mouse_pos[:, 0]
+        initial_mouse_pos_y = state.buffer.level.initial_mouse_pos[:, 1]
+        metrics['level_buffer_contents'] = {
+            'avg_mouse_spawn_x': initial_mouse_pos_x.mean(),
+            'avg_mouse_spawn_y': initial_mouse_pos_y.mean(),
+            'wavg_mouse_spawn_x': state.prev_P_replay @ initial_mouse_pos_x,
+            'wavg_mouse_spawn_y': state.prev_P_replay @ initial_mouse_pos_y,
+            'mouse_spawn_x_hist': initial_mouse_pos_x,
+            'mouse_spawn_y_hist': initial_mouse_pos_y,
+        }
+        return metrics
 
 
