@@ -193,9 +193,24 @@ class Env(base.Env):
 
         # reward and done
         reward = got_cheese_first_time.astype(float)
-        proxy_reward = got_dish_first_time.astype(float)
+        proxy_reward_dish = got_dish_first_time.astype(float)
+
+        got_dish_before_cheese = state.got_dish & ~state.got_cheese
+        got_cheese_before_dish = state.got_cheese & ~state.got_dish
+
+        #got_dish_after_cheese = state.got_dish & state.got_cheese
+        #got_cheese_after_dish = state.got_cheese & state.got_dish
+
+        #proxy_cheese_second = reward * got_dish_after_cheese
+        #proxy_dish_second = proxy_reward_dish * got_cheese_after_dish
+        
+        proxy_cheese_first = reward * got_cheese_before_dish
+        proxy_dish_first = proxy_reward_dish * got_dish_before_cheese
+        
+
+
         if self.terminate_after_cheese_and_dish:
-            done = got_cheese & got_dish
+            done = state.got_cheese & state.got_dish
         else:
             done = got_cheese
 
@@ -205,7 +220,11 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'proxy_dish': proxy_reward,
+                    'proxy_dish': proxy_reward_dish,
+                    'proxy_first_dish': proxy_dish_first,
+                    'proxy_cheese_first': proxy_cheese_first,
+                     #'proxy_cheese_second': proxy_cheese_second,
+                     #'proxy_dish_second': proxy_dish_second,
                 },
             },
         )
