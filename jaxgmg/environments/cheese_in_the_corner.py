@@ -97,7 +97,7 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
-    terminate_after_cheese_and_corner: bool = False
+    terminate_after_cheese_and_proxies: bool = False
     cheese_in_top_left: bool = False,
     cheese_in_top_right: bool = False,
     cheese_in_bottom_right: bool = False,
