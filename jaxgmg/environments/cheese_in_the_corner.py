@@ -276,8 +276,9 @@ class Env(base.Env):
         #proxy_reward = first_time_target_location.astype(float)
         
         # end of episode
-        if self.terminate_after_cheese_and_corner:
-            done = state.got_cheese & state.got_target_location
+        if self.terminate_after_proxies: #iterate over all target locations, and be done when they are all done. but you should call state.got_target_location for each target location
+            done = ((state.x & getattr(state, k) for k in target_locations))
+            #done = state.got_cheese & state.got_target_location
         else:
             done = state.got_cheese
 
