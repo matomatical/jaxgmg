@@ -12,7 +12,6 @@ from flax import struct
 from chex import PRNGKey, Array
 
 from jaxgmg.environments.base import Level, LevelGenerator
-from jaxgmg.environments.base import LevelSolver, LevelSolution
 
 from jaxgmg.baselines.experience import Rollout
 
@@ -144,9 +143,6 @@ class InfiniteDomainRandomisation(CurriculumLevelGenerator):
 
 # # # 
 # PRIORITISED LEVEL REPLAY
-
-    
-from typing import Self
 
     
 @struct.dataclass
