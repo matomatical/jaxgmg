@@ -12,6 +12,7 @@ from flax import struct
 from chex import PRNGKey, Array
 
 from jaxgmg.environments.base import Level, LevelGenerator
+from jaxgmg.environments.base import LevelSolver, LevelSolution
 
 from jaxgmg.baselines.experience import Rollout
 
@@ -144,7 +145,10 @@ class InfiniteDomainRandomisation(CurriculumLevelGenerator):
 # # # 
 # PRIORITISED LEVEL REPLAY
 
+    
+from typing import Self
 
+    
 @struct.dataclass
 class PrioritisedLevelReplay(CurriculumLevelGenerator):
     level_generator: LevelGenerator
@@ -153,20 +157,21 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     staleness_coeff: float
     prob_replay: float
     regret_estimator: str       # "absGAE", "PVL", todo: "maxMC"
-    
-    
+
+
     @struct.dataclass
     class State(CurriculumLevelGenerator.State):
-        level_buffer: Level                 # Level[buffer_size]
-        last_scores: Array                  # float[buffer_size]
-        last_visit_time: Array              # int[buffer_size]
-        first_visit_time: Array             # int[buffer_size]
+        @struct.dataclass
+        class AnnotatedLevel:
+            level: Level
+            last_score: float
+            last_visit_time: int
+            first_visit_time: int
+        buffer: AnnotatedLevel          # AnnotatedLevel[buffer_size]
         num_replay_batches: int
-        prev_P_replay: Array                # float[buffer_size]
+        prev_P_replay: Array            # float[buffer_size]
         prev_batch_was_replay: bool
-        prev_batch_level_ids: Array         # int[num_levels]
-    # TODO:
-    # * consider wrapping first four into an inner TaggedLevel struct...
+        prev_batch_level_ids: Array     # int[num_levels]
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -180,15 +185,17 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         # initially we replay these in lieu of levels we have actual scores
         # for, but over time we replace them with real replay levels.
         return self.State(
-            level_buffer=self.level_generator.vsample(
-                rng=rng,
-                num_levels=self.buffer_size,
+            buffer=self.State.AnnotatedLevel(
+                level=self.level_generator.vsample(
+                    rng=rng,
+                    num_levels=self.buffer_size,
+                ),
+                last_score=jnp.ones(self.buffer_size) * default_score,
+                last_visit_time=jnp.zeros(self.buffer_size, dtype=int),
+                first_visit_time=jnp.zeros(self.buffer_size, dtype=int),
             ),
-            last_scores=jnp.ones(self.buffer_size) * default_score,
-            last_visit_time=jnp.zeros(self.buffer_size, dtype=int),
-            first_visit_time=jnp.zeros(self.buffer_size, dtype=int),
-            prev_P_replay=jnp.zeros(self.buffer_size),
             num_replay_batches=0,
+            prev_P_replay=jnp.zeros(self.buffer_size),
             prev_batch_was_replay=False,
             prev_batch_level_ids=jnp.arange(batch_size_hint),
         )
@@ -224,7 +231,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         )
         replay_levels = jax.tree.map(
             lambda x: x[replay_level_ids],
-            state.level_buffer,
+            state.buffer.level,
         )
 
         # decide which batch to use by flipping a biased coin
@@ -255,15 +262,16 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         probability of sampling each level in the replay buffer?
         """
         # ordinal score-based prioritisation
+        scores = state.buffer.last_score
         ranks = (
             jnp.empty(self.buffer_size)
-                .at[jnp.argsort(state.last_scores, descending=True)]
+                .at[jnp.argsort(scores, descending=True)]
                 .set(jnp.arange(1, self.buffer_size+1))
         )
         tempered_hvals = jnp.pow(1 / ranks, 1 / self.temperature)
         
         # staleness-aware prioritisation
-        staleness = 1 + state.num_replay_batches - state.last_visit_time
+        staleness = 1 + state.num_replay_batches - state.buffer.last_visit_time
 
         # probability of replaying each level is a mixture of these
         P_replay = (
@@ -324,12 +332,14 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         # replace the scores of the replayed level ids with the new scores
         # and mark those levels as just visited
         return state.replace(
-            last_scores=state.last_scores
-                .at[state.prev_batch_level_ids]
-                .set(scores),
-            last_visit_time=state.last_visit_time
-                .at[state.prev_batch_level_ids]
-                .set(state.num_replay_batches + 1),
+            buffer=state.buffer.replace(
+                last_score=state.buffer.last_score
+                    .at[state.prev_batch_level_ids]
+                    .set(scores),
+                last_visit_time=state.buffer.last_visit_time
+                    .at[state.prev_batch_level_ids]
+                    .set(state.num_replay_batches + 1),
+            ),
             num_replay_batches=state.num_replay_batches + 1,
         )
 
@@ -347,46 +357,40 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         num_levels, = scores.shape
 
         # identify the num_levels levels with lowest replay potential
-        _, worst_level_ids = jax.lax.top_k(-state.prev_P_replay, k=num_levels)
+        _, worst_level_ids = jax.lax.top_k(
+            -state.prev_P_replay,
+            k=num_levels,
+        )
 
-        # concatenate the low-potential levels + their last score and timing
-        # data with the new levels + their new scores and the time now
+        # extract these low potential levels and concatenate them with the
+        # new levels we're considering adding to the buffer
+        # (together with required score and timing data)
         time_now = jnp.full(num_levels, state.num_replay_batches, dtype=int)
-        (
-            candidate_levels,
-            candidate_scores,
-            candidate_last_visit_time,
-            candidate_first_visit_time,
-        ) = jax.tree.map(
-            lambda l, r: jnp.concatenate((l[worst_level_ids], r), axis=0),
-            (
-                state.level_buffer,
-                state.last_scores,
-                state.last_visit_time,
-                state.first_visit_time,
-            ),
-            (levels, scores, time_now, time_now),
+        challengers = self.State.AnnotatedLevel(
+            level=levels,
+            last_score=scores,
+            last_visit_time=time_now,
+            first_visit_time=time_now,
+        )
+        candidate_buffer = jax.tree.map(
+            lambda b, c: jnp.concatenate((b[worst_level_ids], c), axis=0),
+            state.buffer,
+            challengers,
         )
 
         # of these 2*num_levels levels, which num_levels have highest scores?
-        _, best_level_ids = jax.lax.top_k(candidate_scores, k=num_levels)
+        _, best_level_ids = jax.lax.top_k(
+            candidate_buffer.last_score,
+            k=num_levels,
+        )
         
         # use those levels to replace the lowest-potential levels
         return state.replace(
-            level_buffer=jax.tree.map(
-                lambda l, r: l.at[worst_level_ids].set(r[best_level_ids]),
-                state.level_buffer,
-                candidate_levels,
+            buffer=jax.tree.map(
+                lambda b, c: b.at[worst_level_ids].set(c[best_level_ids]),
+                state.buffer,
+                candidate_buffer,
             ),
-            last_scores=state.last_scores
-                .at[worst_level_ids]
-                .set(candidate_scores[best_level_ids]),
-            last_visit_time=state.last_visit_time
-                .at[worst_level_ids]
-                .set(candidate_last_visit_time[best_level_ids]),
-            first_visit_time=state.first_visit_time
-                .at[worst_level_ids]
-                .set(candidate_first_visit_time[best_level_ids]),
         )
 
 
@@ -394,19 +398,19 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     def compute_metrics(self, state: State) -> dict[str, Any]:
         # TODO: more sophisticated level complexity metrics that also work
         # for levels without this particular variable...
-        initial_mouse_pos_x = state.level_buffer.initial_mouse_pos[:, 0]
-        initial_mouse_pos_y = state.level_buffer.initial_mouse_pos[:, 1]
+        initial_mouse_pos_x = state.buffer.level.initial_mouse_pos[:, 0]
+        initial_mouse_pos_y = state.buffer.level.initial_mouse_pos[:, 1]
         return {
             'scoring': {
-                'avg_scores': state.last_scores.mean(),
-                'scores_hist': state.last_scores,
+                'avg_scores': state.buffer.last_score.mean(),
+                'scores_hist': state.buffer.last_score,
             },
             'visit_patterns': {
                 'num_replay_batches': state.num_replay_batches,
-                'avg_last_visit_time': state.last_visit_time.mean(),
-                'avg_first_visit_time': state.first_visit_time.mean(),
-                'last_visit_time_hist': state.last_visit_time,
-                'first_visit_time_hist': state.first_visit_time,
+                'avg_last_visit_time': state.buffer.last_visit_time.mean(),
+                'avg_first_visit_time': state.buffer.first_visit_time.mean(),
+                'last_visit_time_hist': state.buffer.last_visit_time,
+                'first_visit_time_hist': state.buffer.first_visit_time,
                 'prev_batch_level_ids_hist': state.prev_batch_level_ids,
             },
             'level_buffer_contents': {
