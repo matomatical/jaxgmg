@@ -141,6 +141,10 @@ def corner(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
+            level_metrics=cheese_in_the_corner.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -426,6 +430,9 @@ def keys(
         num_chests_min=env_num_chests_min,
         num_chests_max=env_num_chests_max,
     )
+    
+    print("configuring ued level distributions...")
+    rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
         gen = autocurricula.InfiniteDomainRandomisation(
             level_generator=train_level_generator,
@@ -443,6 +450,11 @@ def keys(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
+            level_metrics=None,
+            # level_metrics=keys_and_chests.LevelMetrics( # TODO: define
+            #     env=env,
+            #     discount_rate=ppo_gamma,
+            # ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,

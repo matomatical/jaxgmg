@@ -3,6 +3,7 @@ Abstract base classes for jaxgmg environment.
 """
 
 import functools
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -450,5 +451,20 @@ class LevelSolver:
             self.level_value,
         )
         return vectorised_level_value(solns, levels)
+
+
+# # # 
+# Level complexity metrics
+
+
+@struct.dataclass
+class LevelMetrics:
+    env: Env
+    discount_rate: float
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def compute_metrics(self, levels: Level) -> dict[str, Any]:
+        raise NotImplementedError
 
 

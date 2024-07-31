@@ -131,10 +131,68 @@ for i in 6 7 8 9 10; do
 done
 
 
-# DO NOT FORGET TO SHUT DOWN POD https://www.runpod.io/console/pods
+# did: solve levels to get good baselines...
+# -> it's slow and they don't make good metrics
+    
+
+# try plr on mixture distributions
+# 0% shift
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner0-dr   --ued dr  --prob-shift 0.00;
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner0-plr  --ued plr --prob-shift 0.00;
+# 1% shift
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner1-dr   --ued dr  --prob-shift 0.01;
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner1-plr  --ued plr --prob-shift 0.01;
+# 3% shift
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner3-dr  --ued dr  --prob-shift 0.03;
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner3-plr --ued plr --prob-shift 0.03;
+# 10% shift
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner10-dr  --ued dr  --prob-shift 0.10;
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner10-plr --ued plr --prob-shift 0.10;
+# 50% shift
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner50-dr  --ued dr  --prob-shift 0.50;
+jaxgmg train corner \
+    --no-console-log --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg \
+    --env-size 17 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 10000 --train-gifs \
+    --wandb-name corner50-plr --ued plr --prob-shift 0.50;
+
 
 # todo:
-# * solve levels to get good baselines and 
-# * try plr on mixture distributions
 # * implement robust plr / parallel plr
 # * have a go at formalism
