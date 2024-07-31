@@ -5,6 +5,7 @@ Launcher for training runs.
 import jax
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.baselines import ppo
@@ -27,6 +28,7 @@ def corner(
     net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
     # ued config
     ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
@@ -98,12 +100,29 @@ def corner(
     maze_generator = maze_generation.get_generator_class_from_name(
         name=env_layout,
     )()
-    train_level_generator = cheese_in_the_corner.LevelGenerator(
+    orig_level_generator = cheese_in_the_corner.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
         corner_size=env_corner_size,
     )
+    shift_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        corner_size=env_size-2,
+    )
+    if prob_shift > 0.0:
+        train_level_generator = base.MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+
+
+    print("configuring ued level distributions...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
         gen = autocurricula.InfiniteDomainRandomisation(
@@ -154,7 +173,7 @@ def corner(
     )
     # on distribution
     rng_eval_on_levels, rng_setup = jax.random.split(rng_setup)
-    eval_on_levels = train_level_generator.vsample(
+    eval_on_levels = orig_level_generator.vsample(
         rng_eval_on_levels,
         num_levels=num_eval_levels,
     )
@@ -173,12 +192,6 @@ def corner(
 
 
     # off distribution
-    shift_level_generator = cheese_in_the_corner.LevelGenerator(
-        height=env_size,
-        width=env_size,
-        maze_generator=maze_generator,
-        corner_size=env_size-2,
-    )
     rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
     eval_off_levels = shift_level_generator.vsample(
         rng_eval_off_levels,

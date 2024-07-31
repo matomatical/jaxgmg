@@ -396,10 +396,13 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
 
     @functools.partial(jax.jit, static_argnames=['self'])
     def compute_metrics(self, state: State) -> dict[str, Any]:
-        # TODO: more sophisticated level complexity metrics that also work
-        # for levels without this particular variable...
-        initial_mouse_pos_x = state.buffer.level.initial_mouse_pos[:, 0]
-        initial_mouse_pos_y = state.buffer.level.initial_mouse_pos[:, 1]
+        # TODO: level complexity measurer can look over the buffer and report
+        # metrics...! solvability! num blocks! shortest path length! cheese
+        # location! number of keys/chests! etc..!
+        mouse_pos_x = state.buffer.level.initial_mouse_pos[:, 0]
+        mouse_pos_y = state.buffer.level.initial_mouse_pos[:, 1]
+        cheese_pos_x = state.buffer.level.cheese_pos[:, 0]
+        cheese_pos_y = state.buffer.level.cheese_pos[:, 1]
         return {
             'scoring': {
                 'avg_scores': state.buffer.last_score.mean(),
@@ -414,12 +417,21 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
                 'prev_batch_level_ids_hist': state.prev_batch_level_ids,
             },
             'level_buffer_contents': {
-                'avg_mouse_spawn_x': initial_mouse_pos_x.mean(),
-                'avg_mouse_spawn_y': initial_mouse_pos_y.mean(),
-                'wavg_mouse_spawn_x': state.prev_P_replay @ initial_mouse_pos_x,
-                'wavg_mouse_spawn_y': state.prev_P_replay @ initial_mouse_pos_y,
-                'mouse_spawn_x_hist': initial_mouse_pos_x,
-                'mouse_spawn_y_hist': initial_mouse_pos_y,
+                # averages
+                'avg_mouse_spawn_x': mouse_pos_x.mean(),
+                'avg_mouse_spawn_y': mouse_pos_y.mean(),
+                'avg_cheese_spawn_x': cheese_pos_x.mean(),
+                'avg_cheese_spawn_y': cheese_pos_y.mean(),
+                # weighted averages
+                'wavg_mouse_spawn_x': state.prev_P_replay @ mouse_pos_x,
+                'wavg_mouse_spawn_y': state.prev_P_replay @ mouse_pos_y,
+                'wavg_cheese_spawn_x': state.prev_P_replay @ cheese_pos_x,
+                'wavg_cheese_spawn_y': state.prev_P_replay @ cheese_pos_y,
+                # histograms
+                'mouse_spawn_x_hist': mouse_pos_x,
+                'mouse_spawn_y_hist': mouse_pos_y,
+                'cheese_spawn_x_hist': cheese_pos_x,
+                'cheese_spawn_y_hist': cheese_pos_y,
             }
         }
 
