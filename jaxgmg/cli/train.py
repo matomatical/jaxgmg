@@ -155,6 +155,24 @@ def corner(
             rng=rng_train_levels,
             batch_size_hint=num_parallel_envs,
         )
+    elif ued == "plr-parallel":
+        gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
+            level_generator=train_level_generator,
+            level_metrics=cheese_in_the_corner.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            regret_estimator=plr_regret_estimator,
+        )
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
+    else:
+        raise ValueError(f"unknown UED algorithm: {ued!r}")
 
     
     print(f"setting up agent with architecture {net!r}...")
@@ -465,6 +483,24 @@ def keys(
             rng=rng_train_levels,
             batch_size_hint=num_parallel_envs,
         )
+    elif ued == "plr-parallel":
+        gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
+            level_generator=train_level_generator,
+            level_metrics=cheese_in_the_corner.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            regret_estimator=plr_regret_estimator,
+        )
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
+    else:
+        raise ValueError(f"unknown UED algorithm: {ued!r}")
 
 
     print(f"setting up agent with architecture {net!r}...")

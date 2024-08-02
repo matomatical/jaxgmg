@@ -215,6 +215,8 @@ def run(
             metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
+            # TODO: steps per second is now wrong, doesn't account for actual
+            # levels generated and simulated... use size of rollouts
             # TODO: split up each kind of rollouts/metrics?
         if log_cycle and train_gifs:
             frames = experience.animate_rollouts(
