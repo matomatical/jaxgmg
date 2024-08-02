@@ -135,7 +135,7 @@ def run(
 
     # init train state
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
+        apply_fn=net.apply,
         params=net_init_params,
         tx=optax.chain(
             optax.clip_by_global_norm(ppo_max_grad_norm),
@@ -192,7 +192,8 @@ def run(
         rollouts = experience.collect_rollouts(
             rng=rng_env,
             num_steps=num_env_steps_per_cycle,
-            train_state=train_state,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
             net_init_state=net_init_state,
             env=env,
             levels=levels_t,
@@ -490,7 +491,10 @@ def ppo_loss(
     dict[str, float],           # loss components and other diagnostics
 ]:
     # run network to get current value/log_prob prediction
-    action_distribution, value, _net_state = apply_fn(
+    action_distribution, value, _net_state = jax.vmap(
+        apply_fn,
+        in_axes=(None, 0, 0, 0),
+    )(
         params,
         transitions.obs,
         transitions.net_state,
@@ -591,7 +595,7 @@ def eval_checkpoint(
 
     # reload checkpoint of interest
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
+        apply_fn=net.apply,
         params=net_init_params,
         tx=optax.sgd(0), # dummy, will be overridden
     )

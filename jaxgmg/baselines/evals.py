@@ -57,7 +57,8 @@ class FixedLevelsEval(Eval):
         rollouts = experience.collect_rollouts(
             rng=rng,
             num_steps=self.num_steps,
-            train_state=train_state,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
             net_init_state=net_init_state,
             env=self.env,
             levels=self.levels,
@@ -89,7 +90,8 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
         rollouts = experience.collect_rollouts(
             rng=rng,
             num_steps=self.num_steps,
-            train_state=train_state,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
             net_init_state=net_init_state,
             env=self.env,
             levels=self.levels,
@@ -121,7 +123,8 @@ class AnimatedRolloutsEval(Eval):
         rollouts = experience.collect_rollouts(
             rng=rng,
             num_steps=self.num_steps,
-            train_state=train_state,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
             net_init_state=net_init_state,
             env=self.env,
             levels=self.levels,
@@ -159,7 +162,10 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             ),
             net_init_state,
         )
-        action_distr, values, _net_state = train_state.apply_fn(
+        action_distr, values, _net_state = jax.vmap(
+            train_state.apply_fn,
+            in_axes=(None, 0, 0, 0),
+        )(
             train_state.params,
             obs,
             vec_net_init_state,
@@ -207,7 +213,8 @@ class RolloutHeatmapVisualisationEval(Eval):
         rollouts = experience.collect_rollouts(
             rng=rng,
             num_steps=self.num_steps,
-            train_state=train_state,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
             net_init_state=net_init_state,
             env=self.env,
             levels=self.levels,

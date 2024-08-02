@@ -12,9 +12,9 @@ import jax.numpy as jnp
 # typing
 from chex import Array, PRNGKey
 from flax import struct
-from flax.training.train_state import TrainState # TODO: remove
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
-from jaxgmg.baselines.networks import ActorCriticState
+from jaxgmg.baselines.networks import ActorCriticState, ActorCriticParams
+from jaxgmg.baselines.networks import ActorCriticForwardPass
 
 
 # # # 
@@ -77,18 +77,19 @@ class Rollout:
 
 
 # # # 
-# Vectorised experience collection
+# Experience collection
 
 
-@functools.partial(jax.jit, static_argnames=('env', 'num_steps'))
-def collect_rollouts(
+@functools.partial(jax.jit, static_argnames=('net_apply', 'env', 'num_steps'))
+def collect_rollout(
     rng: PRNGKey,
     num_steps: int,
-    train_state: TrainState,            # TODO: change to a function
+    net_apply: ActorCriticForwardPass,
+    net_params: ActorCriticParams,
     net_init_state: ActorCriticState,
     env: Env,
-    levels: Level,                      # Level[num_levels]
-) -> Rollout:                           # Rollout[num_levels]
+    level: Level,
+) -> Rollout:
     """
     Reset an environment to `levels` and rollout a policy in these levels for
     `env_steps` steps.
@@ -99,51 +100,34 @@ def collect_rollouts(
             Random state (consumed)
     * num_steps : static int
             The environments will run forward for this many steps.
-    * train_state : TrainState
-            A flax trainstate object, including the policy parameter
-            (`.params`) and application function (`.apply_fn`).
-            The policy apply function should take params and an observation
-            and return an action distribution and value prediction.
+    * net_apply : ActorCriticForwardPass
+            The apply function should take params and an observation and
+            return an action distribution and value prediction.
+    * net_params : ActorCriticParams
+            Policy parameter.
     * net_init_state : ActorCriticState
             An initial carry for the network.
     * env : static jaxgmg.environments.base.Env
-            Provides functions `reset` and `step` (actually, vectorised
-            versions `vreset` and `vstep`).
-    * levels : jaxgmg.environments.base.Level[num_levels]
-            Vector of Level structs. This many environments will be run in
-            parallel.
+            Provides functions `reset_to_level` and `step`.
+    * level : jaxgmg.environments.base.Level
+            Level struct.
 
     Returns:
 
-    * rollouts : Rollout[num_levels]
-            The collected experience, one sequence of trajectories for each
-            level.
-
-    TODO:
-
-    * Note that this would be simpler if it was implemented for a single
-      level and then just vmapped to the desired shape of level batches?
+    * rollout : Rollout
+            The collected experience, a sequence of transitions.
     """
     # reset environments to the given levels
-    env_obs, env_state = env.vreset_to_level(levels=levels)
-    num_levels = jax.tree.leaves(levels)[0].shape[0]
+    env_obs, env_state = env.reset_to_level(level=level)
     # reset the net inputs to blank
-    vec_net_init_state = jax.tree.map(
-        lambda c: einops.repeat(
-            c,
-            '... -> num_levels ...',
-            num_levels=num_levels,
-        ),
-        net_init_state,
-    )
-    vec_default_prev_action = -jnp.ones(num_levels, dtype=int)
+    default_prev_action = jnp.int32(-1)
 
     # scan the steps of the rollout
     initial_carry = (
         env_state,
         env_obs,
-        vec_net_init_state,
-        vec_default_prev_action,
+        net_init_state,
+        default_prev_action,
     )
     input_rngs = jax.random.split(rng, num_steps)
 
@@ -156,8 +140,8 @@ def collect_rollouts(
             action_distribution,
             critic_value,
             next_net_state,
-        ) = train_state.apply_fn(
-            train_state.params,
+        ) = net_apply(
+            net_params,
             obs,
             net_state,
             prev_action,
@@ -167,26 +151,21 @@ def collect_rollouts(
 
         # step env
         rng_step, rng = jax.random.split(rng)
-        next_obs, next_env_state, reward, done, info = env.vstep(
+        next_obs, next_env_state, reward, done, info = env.step(
             rng_step,
             env_state,
             action,
         )
 
-        # reset to net_init_state and prev_action in the parallel envs that are done
+        # reset to net_init_state and prev_action when done
         next_net_state = jax.tree.map(
-            lambda r, s: jnp.where(
-                # reverse broadcast to shape of r (= shape of s)
-                done.reshape(-1, *([1] * (len(r.shape)-1))),
-                r,
-                s,
-            ),
-            vec_net_init_state,
+            lambda r, s: jnp.where(done, r, s),
+            net_init_state,
             next_net_state,
         )
         next_prev_action = jnp.where(
             done, 
-            vec_default_prev_action,
+            default_prev_action,
             action,
         )
         
@@ -207,20 +186,15 @@ def collect_rollouts(
         )
         return carry, transition
 
-    final_carry, stepwise_transitions = jax.lax.scan(
+    final_carry, transitions = jax.lax.scan(
         _env_step,
         initial_carry,
         input_rngs,
     )
-    # reshape Transn[num_steps, num_levels] -> Transn[num_levels, num_steps]
-    transitions = jax.tree.map(
-        lambda x: einops.rearrange(x, 'steps levels ... -> levels steps ...'),
-        stepwise_transitions,
-    )
     # compute final value
     (fin_env_state, fin_obs, fin_net_state, fin_prev_action) = final_carry
-    _fin_pi, fin_value, _fin_next_net_state = train_state.apply_fn(
-        train_state.params,
+    _fin_pi, fin_value, _fin_next_net_state = net_apply(
+        net_params,
         fin_obs,
         fin_net_state,
         fin_prev_action,
@@ -234,6 +208,64 @@ def collect_rollouts(
         # final_prev_action=fin_prev_action,
         final_value=fin_value,
     )
+
+
+@functools.partial(jax.jit, static_argnames=('net_apply', 'env', 'num_steps'))
+def collect_rollouts(
+    rng: PRNGKey,
+    num_steps: int,
+    net_apply: ActorCriticForwardPass,
+    net_params: ActorCriticParams,
+    net_init_state: ActorCriticState,
+    env: Env,
+    levels: Level,                      # Level[num_levels]
+) -> Rollout:                           # Rollout[num_levels]
+    """
+    Reset an environment to `levels` and rollout a policy in these levels for
+    `env_steps` steps.
+
+    Parameters:
+
+    * rng : PRNGKey
+            Random state (consumed)
+    * num_steps : static int
+            The environments will run forward for this many steps.
+    * net_apply : ActorCriticForwardPass
+            The apply function should take params and an observation and
+            return an action distribution and value prediction.
+    * net_params : ActorCriticParams
+            Policy parameter.
+    * net_init_state : ActorCriticState
+            An initial carry for the network.
+    * env : static jaxgmg.environments.base.Env
+            Provides functions `reset_to_level` and `step`.
+    * levels : jaxgmg.environments.base.Level[num_levels]
+            Vector of Level structs. This many environments will be run in
+            parallel.
+
+    Returns:
+
+    * rollouts : Rollout[num_levels]
+            The collected experience, one sequence of trajectories for each
+            level.
+    """
+    vectorised_collect_rollout = jax.vmap(
+        collect_rollout,
+        in_axes=(0,None,None,None,None,None,0),
+        out_axes=0,
+    )
+    num_levels = jax.tree.leaves(levels)[0].shape[0]
+    rng_levels = jax.random.split(rng, num_levels)
+    rollouts = vectorised_collect_rollout(
+        rng_levels,
+        num_steps,
+        net_apply,
+        net_params,
+        net_init_state,
+        env,
+        levels,
+    )
+    return rollouts
 
 
 # # # 
