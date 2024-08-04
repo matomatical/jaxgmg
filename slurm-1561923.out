@@ -1,0 +1,1904 @@
+
+CondaError: Run 'conda init' before 'conda activate'
+
+2024-07-31 16:28:18.242090: W external/xla/xla/service/gpu/nvptx_compiler.cc:836] The NVIDIA driver's CUDA version is 12.3 which is older than the PTX compiler version (12.5.82). Because the driver is older than the PTX compiler version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
+wandb: Currently logged in as: karim-abdelsadekk (krueger-lab-cambridge). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.17.5
+wandb: Run data is saved locally in /data/karim_abdel_sadek/jaxgmg/wandb/run-20240731_162821-qm6t2q3g
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run cheese-in-center/bottom-right-top-150M_clip0.1_lr5e-5-bothgoals
+wandb: ⭐️ View project at https://wandb.ai/krueger-lab-cambridge/cheese-in-corner
+wandb: 🚀 View run at https://wandb.ai/krueger-lab-cambridge/cheese-in-corner/runs/qm6t2q3g
+  env_size                      : 13
+  env_layout                    : blocks
+  env_corner_size               : 1
+  env_terminate_after_end       : False
+  env_level_of_detail           : 0
+  cheese_in_top_left            : False
+  cheese_in_top_right           : False
+  cheese_in_bottom_right        : True
+  cheese_in_bottom_left         : False
+  cheese_in_center              : False
+  cheese_in_center_top          : True
+  cheese_in_center_bottom       : False
+  cheese_in_center_left         : False
+  cheese_in_center_right        : False
+  net                           : impala:lstm
+  ppo_lr                        : 5e-05
+  ppo_clip_eps                  : 0.1
+  ppo_gae_lambda                : 0.95
+  ppo_entropy_coeff             : 0.001
+  ppo_critic_coeff              : 0.5
+  ppo_max_grad_norm             : 0.5
+  ppo_lr_annealing              : False
+  num_minibatches_per_epoch     : 8
+  num_epochs_per_cycle          : 5
+  num_total_env_steps           : 300000000
+  num_env_steps_per_cycle       : 128
+  num_parallel_envs             : 256
+  fixed_train_levels            : False
+  num_train_levels              : 2048
+  train_gifs                    : True
+  train_gif_grid_width          : 8
+  train_gif_level_of_detail     : 1
+  num_cycles_per_eval           : 64
+  num_eval_levels               : 256
+  eval_gif_grid_width           : 16
+  eval_gif_level_of_detail      : 1
+  level_splayer                 : mouse
+  num_cycles_per_log            : 64
+  save_files_to                 : logs/
+  console_log                   : True
+  wandb_log                     : True
+  wandb_entity                  : krueger-lab-cambridge
+  wandb_project                 : cheese-in-corner
+  wandb_group                   : moving_goal
+  wandb_name                    : cheese-in-center/bottom-right-top-150M_clip0.1_lr5e-5-bothgoals
+  checkpointing                 : True
+  keep_all_checkpoints          : False
+  max_num_checkpoints           : 1
+  num_cycles_per_checkpoint     : 512
+  seed                          : 42
+  num_cycles_per_big_eval       : 1024
+  num_env_steps_per_eval        : 512
+  ppo_gamma                     : 0.999
+setting up environment...
+generating training level distribution...
+setting up agent with architecture 'impala:lstm'...
+generating some eval levels with baselines...
+initialising run file manager
+  run folder: /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38
+setting up optimiser...
+begin training loop!
+(note: first two cycles are slow due to compilation)
+  0%|[35m          [0m| 0.00/300M [00:00<?, ? env steps/s]                                                     0%|[35m          [0m| 0.00/300M [01:44<?, ? env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+wandb: WARNING Serializing object of type ndarray that is 80190160 bytes
+                                                     0%|[35m          [0m| 0.00/300M [02:12<?, ? env steps/s]                                                     0%|[35m          [0m| 0.00/300M [02:14<?, ? env steps/s]  0%|[35m          [0m| 32.8k/300M [02:14<342:12:40, 243 env steps/s]  0%|[35m          [0m| 65.5k/300M [02:19<148:27:06, 561 env steps/s]  0%|[35m          [0m| 98.3k/300M [02:19<80:58:58, 1.03k env steps/s]  0%|[35m          [0m| 131k/300M [02:20<49:17:29, 1.69k env steps/s]   0%|[35m          [0m| 164k/300M [02:20<31:46:23, 2.62k env steps/s]  0%|[35m          [0m| 197k/300M [02:20<21:12:46, 3.93k env steps/s]  0%|[35m          [0m| 229k/300M [02:21<14:30:43, 5.74k env steps/s]  0%|[35m          [0m| 262k/300M [02:21<10:07:15, 8.23k env steps/s]  0%|[35m          [0m| 295k/300M [02:21<7:10:54, 11.6k env steps/s]   0%|[35m          [0m| 328k/300M [02:21<5:11:12, 16.0k env steps/s]  0%|[35m          [0m| 360k/300M [02:22<3:49:10, 21.8k env steps/s]  0%|[35m          [0m| 393k/300M [02:22<2:52:37, 28.9k env steps/s]  0%|[35m          [0m| 426k/300M [02:22<2:13:25, 37.4k env steps/s]  0%|[35m          [0m| 459k/300M [02:23<1:46:12, 47.0k env steps/s]  0%|[35m          [0m| 492k/300M [02:23<1:27:13, 57.2k env steps/s]  0%|[35m          [0m| 524k/300M [02:23<1:13:59, 67.5k env steps/s]  0%|[35m          [0m| 557k/300M [02:23<1:04:44, 77.1k env steps/s]  0%|[35m          [0m| 590k/300M [02:24<58:15, 85.7k env steps/s]    0%|[35m          [0m| 623k/300M [02:24<53:44, 92.8k env steps/s]  0%|[35m          [0m| 655k/300M [02:24<50:36, 98.6k env steps/s]  0%|[35m          [0m| 688k/300M [02:25<48:21, 103k env steps/s]   0%|[35m          [0m| 721k/300M [02:25<46:49, 107k env steps/s]  0%|[35m          [0m| 754k/300M [02:25<45:44, 109k env steps/s]  0%|[35m          [0m| 786k/300M [02:25<44:59, 111k env steps/s]  0%|[35m          [0m| 819k/300M [02:26<44:29, 112k env steps/s]  0%|[35m          [0m| 852k/300M [02:26<44:06, 113k env steps/s]  0%|[35m          [0m| 885k/300M [02:26<43:48, 114k env steps/s]  0%|[35m          [0m| 918k/300M [02:27<43:36, 114k env steps/s]  0%|[35m          [0m| 950k/300M [02:27<43:28, 115k env steps/s]  0%|[35m          [0m| 983k/300M [02:27<43:24, 115k env steps/s]  0%|[35m          [0m| 1.02M/300M [02:27<43:19, 115k env steps/s]  0%|[35m          [0m| 1.05M/300M [02:28<43:17, 115k env steps/s]  0%|[35m          [0m| 1.08M/300M [02:28<43:14, 115k env steps/s]  0%|[35m          [0m| 1.11M/300M [02:28<43:12, 115k env steps/s]  0%|[35m          [0m| 1.15M/300M [02:28<43:12, 115k env steps/s]  0%|[35m          [0m| 1.18M/300M [02:29<43:11, 115k env steps/s]  0%|[35m          [0m| 1.21M/300M [02:29<43:09, 115k env steps/s]  0%|[35m          [0m| 1.25M/300M [02:29<43:10, 115k env steps/s]  0%|[35m          [0m| 1.28M/300M [02:30<43:09, 115k env steps/s]  0%|[35m          [0m| 1.31M/300M [02:30<43:10, 115k env steps/s]  0%|[35m          [0m| 1.34M/300M [02:30<43:09, 115k env steps/s]  0%|[35m          [0m| 1.38M/300M [02:30<43:08, 115k env steps/s]  0%|[35m          [0m| 1.41M/300M [02:31<43:08, 115k env steps/s]  0%|[35m          [0m| 1.44M/300M [02:31<43:07, 115k env steps/s]  0%|[35m          [0m| 1.47M/300M [02:31<43:07, 115k env steps/s]  1%|[35m          [0m| 1.51M/300M [02:32<43:06, 115k env steps/s]  1%|[35m          [0m| 1.54M/300M [02:32<43:05, 115k env steps/s]  1%|[35m          [0m| 1.57M/300M [02:32<43:05, 115k env steps/s]  1%|[35m          [0m| 1.61M/300M [02:32<43:05, 115k env steps/s]  1%|[35m          [0m| 1.64M/300M [02:33<43:04, 115k env steps/s]  1%|[35m          [0m| 1.67M/300M [02:33<43:04, 115k env steps/s]  1%|[35m          [0m| 1.70M/300M [02:33<43:04, 115k env steps/s]  1%|[35m          [0m| 1.74M/300M [02:34<43:04, 115k env steps/s]  1%|[35m          [0m| 1.77M/300M [02:34<43:04, 115k env steps/s]  1%|[35m          [0m| 1.80M/300M [02:34<43:04, 115k env steps/s]  1%|[35m          [0m| 1.84M/300M [02:34<43:03, 115k env steps/s]  1%|[35m          [0m| 1.87M/300M [02:35<43:03, 115k env steps/s]  1%|[35m          [0m| 1.90M/300M [02:35<43:03, 115k env steps/s]  1%|[35m          [0m| 1.93M/300M [02:35<43:03, 115k env steps/s]  1%|[35m          [0m| 1.97M/300M [02:36<43:03, 115k env steps/s]  1%|[35m          [0m| 2.00M/300M [02:36<43:02, 115k env steps/s]  1%|[35m          [0m| 2.03M/300M [02:36<43:03, 115k env steps/s]  1%|[35m          [0m| 2.06M/300M [02:36<43:02, 115k env steps/s]  1%|[35m          [0m| 2.10M/300M [02:37<43:02, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 0
+    env-step:                                   0
+    ppo-update-ater:                            40
+    env-step-after:                             32768
+  env/train:                                    
+    avg_avg_episode_length:                     121.53851
+    avg_avg_return:                             0.12583144
+    avg_reward_per_step:                        0.0034484863
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.080515265
+      avg_reward_per_step:                      0.0020446777
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.13229817
+      avg_reward_per_step:                      0.0021972656
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       2547.775663196128
+    ppo_updates_per_second:                     2.1280076105623036
+  ppo:                                          
+    avg_advantage:                              0.027850278
+    avg_grad_norm_pre_clip:                     0.10297441
+    avg_loss:                                   0.0014231954
+    avg_loss_actor:                             -0.0024111145
+    avg_loss_critic:                            0.010437871
+    avg_loss_entropy:                           1.384626
+    max_advantage:                              1.0364428
+    max_grad_norm_pre_clip:                     0.22659734
+    max_loss:                                   0.0036921098
+    max_loss_actor:                             -6.6286884e-07
+    max_loss_critic:                            0.012180555
+    max_loss_entropy:                           1.3855482
+    std_advantage:                              0.14531562
+    std_grad_norm_pre_clip:                     0.04708085
+    std_loss:                                   0.0012431558
+    std_loss_actor:                             0.0012102284
+    std_loss_critic:                            0.00067804236
+    std_loss_entropy:                           0.00034170478
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   114.4811
+      avg_avg_return:                           0.19009727
+      avg_benchmark_regret:                     0.668504
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.0038452148
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.10590336
+        avg_reward_per_step:                    0.002090454
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.19871974
+        avg_reward_per_step:                    0.0027618408
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   112.61985
+      avg_avg_return:                           0.21184537
+      avg_benchmark_regret:                     0.69877106
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.0041885376
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.08750057
+        avg_reward_per_step:                    0.0008087158
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.15835801
+        avg_reward_per_step:                    0.0015945435
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    on_dist_rollouts:                           
+      rollouts_gif:                             float32(132, 225, 225, 3)
+    off_dist_rollouts:                          
+      rollouts_gif:                             float32(132, 225, 225, 3)
+    eval_on_0_static_heatmap:                   
+      action_probs_img:                         float32(65, 65, 3)
+      value_img:                                float32(13, 13, 3)
+    eval_on_0_rollout_heatmap:                  
+      policy_rollout_return_img:                float32(13, 13, 3)
+    eval_on_1_static_heatmap:                   
+      action_probs_img:                         float32(65, 65, 3)
+      value_img:                                float32(13, 13, 3)
+    eval_on_1_rollout_heatmap:                  
+      policy_rollout_return_img:                float32(13, 13, 3)
+    eval_off_0_static_heatmap:                  
+      action_probs_img:                         float32(65, 65, 3)
+      value_img:                                float32(13, 13, 3)
+    eval_off_0_rollout_heatmap:                 
+      policy_rollout_return_img:                float32(13, 13, 3)
+    eval_off_1_static_heatmap:                  
+      action_probs_img:                         float32(65, 65, 3)
+      value_img:                                float32(13, 13, 3)
+    eval_off_1_rollout_heatmap:                 
+      policy_rollout_return_img:                float32(13, 13, 3)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/0/...
+saving checkpoint to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/checkpoints/0...
+  1%|[35m          [0m| 2.10M/300M [02:38<43:02, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             1%|[35m          [0m| 2.10M/300M [02:41<43:02, 115k env steps/s]  1%|[35m          [0m| 2.13M/300M [02:42<4:15:42, 19.4k env steps/s]  1%|[35m          [0m| 2.16M/300M [02:42<3:12:48, 25.7k env steps/s]  1%|[35m          [0m| 2.20M/300M [02:42<2:27:51, 33.6k env steps/s]  1%|[35m          [0m| 2.23M/300M [02:43<1:56:23, 42.6k env steps/s]  1%|[35m          [0m| 2.26M/300M [02:43<1:34:22, 52.6k env steps/s]  1%|[35m          [0m| 2.29M/300M [02:43<1:18:56, 62.8k env steps/s]  1%|[35m          [0m| 2.33M/300M [02:43<1:08:10, 72.8k env steps/s]  1%|[35m          [0m| 2.36M/300M [02:44<1:00:36, 81.8k env steps/s]  1%|[35m          [0m| 2.39M/300M [02:44<55:18, 89.7k env steps/s]    1%|[35m          [0m| 2.42M/300M [02:44<51:36, 96.1k env steps/s]  1%|[35m          [0m| 2.46M/300M [02:45<49:00, 101k env steps/s]   1%|[35m          [0m| 2.49M/300M [02:45<47:11, 105k env steps/s]  1%|[35m          [0m| 2.52M/300M [02:45<45:55, 108k env steps/s]  1%|[35m          [0m| 2.56M/300M [02:45<45:01, 110k env steps/s]  1%|[35m          [0m| 2.59M/300M [02:46<44:23, 112k env steps/s]  1%|[35m          [0m| 2.62M/300M [02:46<43:57, 113k env steps/s]  1%|[35m          [0m| 2.65M/300M [02:46<43:38, 114k env steps/s]  1%|[35m          [0m| 2.69M/300M [02:47<43:27, 114k env steps/s]  1%|[35m          [0m| 2.72M/300M [02:47<43:17, 114k env steps/s]  1%|[35m          [0m| 2.75M/300M [02:47<43:09, 115k env steps/s]  1%|[35m          [0m| 2.79M/300M [02:47<43:04, 115k env steps/s]  1%|[35m          [0m| 2.82M/300M [02:48<43:02, 115k env steps/s]  1%|[35m          [0m| 2.85M/300M [02:48<42:59, 115k env steps/s]  1%|[35m          [0m| 2.88M/300M [02:48<42:57, 115k env steps/s]  1%|[35m          [0m| 2.92M/300M [02:49<42:57, 115k env steps/s]  1%|[35m          [0m| 2.95M/300M [02:49<42:55, 115k env steps/s]  1%|[35m          [0m| 2.98M/300M [02:49<42:55, 115k env steps/s]  1%|[35m          [0m| 3.01M/300M [02:49<42:54, 115k env steps/s]  1%|[35m          [0m| 3.05M/300M [02:50<42:53, 115k env steps/s]  1%|[35m          [0m| 3.08M/300M [02:50<42:53, 115k env steps/s]  1%|[35m          [0m| 3.11M/300M [02:50<42:53, 115k env steps/s]  1%|[35m          [0m| 3.15M/300M [02:51<42:53, 115k env steps/s]  1%|[35m          [0m| 3.18M/300M [02:51<42:52, 115k env steps/s]  1%|[35m          [0m| 3.21M/300M [02:51<42:51, 115k env steps/s]  1%|[35m          [0m| 3.24M/300M [02:51<42:51, 115k env steps/s]  1%|[35m          [0m| 3.28M/300M [02:52<42:50, 115k env steps/s]  1%|[35m          [0m| 3.31M/300M [02:52<42:51, 115k env steps/s]  1%|[35m          [0m| 3.34M/300M [02:52<42:50, 115k env steps/s]  1%|[35m          [0m| 3.38M/300M [02:53<42:50, 115k env steps/s]  1%|[35m          [0m| 3.41M/300M [02:53<42:50, 115k env steps/s]  1%|[35m          [0m| 3.44M/300M [02:53<42:50, 115k env steps/s]  1%|[35m          [0m| 3.47M/300M [02:53<42:50, 115k env steps/s]  1%|[35m          [0m| 3.51M/300M [02:54<42:50, 115k env steps/s]  1%|[35m          [0m| 3.54M/300M [02:54<42:49, 115k env steps/s]  1%|[35m          [0m| 3.57M/300M [02:54<42:49, 115k env steps/s]  1%|[35m          [0m| 3.60M/300M [02:54<42:48, 115k env steps/s]  1%|[35m          [0m| 3.64M/300M [02:55<42:49, 115k env steps/s]  1%|[35m          [0m| 3.67M/300M [02:55<42:49, 115k env steps/s]  1%|[35m          [0m| 3.70M/300M [02:55<42:48, 115k env steps/s]  1%|[35m          [0m| 3.74M/300M [02:56<42:48, 115k env steps/s]  1%|[35m▏         [0m| 3.77M/300M [02:56<42:47, 115k env steps/s]  1%|[35m▏         [0m| 3.80M/300M [02:56<42:47, 115k env steps/s]  1%|[35m▏         [0m| 3.83M/300M [02:56<42:46, 115k env steps/s]  1%|[35m▏         [0m| 3.87M/300M [02:57<42:46, 115k env steps/s]  1%|[35m▏         [0m| 3.90M/300M [02:57<42:46, 115k env steps/s]  1%|[35m▏         [0m| 3.93M/300M [02:57<42:47, 115k env steps/s]  1%|[35m▏         [0m| 3.96M/300M [02:58<42:48, 115k env steps/s]  1%|[35m▏         [0m| 4.00M/300M [02:58<42:47, 115k env steps/s]  1%|[35m▏         [0m| 4.03M/300M [02:58<42:46, 115k env steps/s]  1%|[35m▏         [0m| 4.06M/300M [02:58<42:45, 115k env steps/s]  1%|[35m▏         [0m| 4.10M/300M [02:59<42:45, 115k env steps/s]  1%|[35m▏         [0m| 4.13M/300M [02:59<42:43, 115k env steps/s]  1%|[35m▏         [0m| 4.16M/300M [02:59<42:42, 115k env steps/s]  1%|[35m▏         [0m| 4.19M/300M [03:00<42:42, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 2560
+    env-step:                                   2097152
+    ppo-update-ater:                            2600
+    env-step-after:                             2129920
+  env/train:                                    
+    avg_avg_episode_length:                     73.79968
+    avg_avg_return:                             0.4952329
+    avg_reward_per_step:                        0.053588867
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.25029373
+      avg_reward_per_step:                      0.020263672
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.2824412
+      avg_reward_per_step:                      0.03366089
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       428538.8260527122
+    ppo_updates_per_second:                     180.61514412029183
+  ppo:                                          
+    avg_advantage:                              0.0011087963
+    avg_grad_norm_pre_clip:                     0.53226846
+    avg_loss:                                   0.0037795913
+    avg_loss_actor:                             -0.0007941976
+    avg_loss_critic:                            0.01085174
+    avg_loss_entropy:                           0.8520811
+    max_advantage:                              0.7393493
+    max_grad_norm_pre_clip:                     1.3180426
+    max_loss:                                   0.006592924
+    max_loss_actor:                             0.0019271593
+    max_loss_critic:                            0.0123004485
+    max_loss_entropy:                           0.8637806
+    std_advantage:                              0.15076496
+    std_grad_norm_pre_clip:                     0.31357774
+    std_loss:                                   0.0013254524
+    std_loss_actor:                             0.0011465304
+    std_loss_critic:                            0.00053789397
+    std_loss_entropy:                           0.0050596027
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   67.928955
+      avg_avg_return:                           0.5658921
+      avg_benchmark_regret:                     0.2927092
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.055541992
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.26888597
+        avg_reward_per_step:                    0.026733398
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.31488448
+        avg_reward_per_step:                    0.028968811
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   116.888626
+      avg_avg_return:                           0.11546163
+      avg_benchmark_regret:                     0.7951547
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.0053710938
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.04975158
+        avg_reward_per_step:                    0.0011444092
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.40140313
+        avg_reward_per_step:                    0.0039520264
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/64/...
+  1%|[35m▏         [0m| 4.19M/300M [03:00<42:42, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             1%|[35m▏         [0m| 4.19M/300M [03:04<42:42, 115k env steps/s]  1%|[35m▏         [0m| 4.23M/300M [03:05<4:14:01, 19.4k env steps/s]  1%|[35m▏         [0m| 4.26M/300M [03:05<3:10:29, 25.9k env steps/s]  1%|[35m▏         [0m| 4.29M/300M [03:05<2:26:08, 33.7k env steps/s]  1%|[35m▏         [0m| 4.33M/300M [03:05<1:55:06, 42.8k env steps/s]  1%|[35m▏         [0m| 4.36M/300M [03:06<1:33:23, 52.8k env steps/s]  1%|[35m▏         [0m| 4.39M/300M [03:06<1:18:11, 63.0k env steps/s]  1%|[35m▏         [0m| 4.42M/300M [03:06<1:07:33, 72.9k env steps/s]  1%|[35m▏         [0m| 4.46M/300M [03:07<1:00:06, 82.0k env steps/s]  1%|[35m▏         [0m| 4.49M/300M [03:07<54:53, 89.7k env steps/s]    2%|[35m▏         [0m| 4.52M/300M [03:07<51:14, 96.1k env steps/s]  2%|[35m▏         [0m| 4.55M/300M [03:07<48:40, 101k env steps/s]   2%|[35m▏         [0m| 4.59M/300M [03:08<46:52, 105k env steps/s]  2%|[35m▏         [0m| 4.62M/300M [03:08<45:37, 108k env steps/s]  2%|[35m▏         [0m| 4.65M/300M [03:08<44:45, 110k env steps/s]  2%|[35m▏         [0m| 4.69M/300M [03:09<44:07, 112k env steps/s]  2%|[35m▏         [0m| 4.72M/300M [03:09<43:41, 113k env steps/s]  2%|[35m▏         [0m| 4.75M/300M [03:09<43:23, 113k env steps/s]  2%|[35m▏         [0m| 4.78M/300M [03:09<43:10, 114k env steps/s]  2%|[35m▏         [0m| 4.82M/300M [03:10<43:01, 114k env steps/s]  2%|[35m▏         [0m| 4.85M/300M [03:10<42:54, 115k env steps/s]  2%|[35m▏         [0m| 4.88M/300M [03:10<42:50, 115k env steps/s]  2%|[35m▏         [0m| 4.92M/300M [03:11<42:47, 115k env steps/s]  2%|[35m▏         [0m| 4.95M/300M [03:11<42:45, 115k env steps/s]  2%|[35m▏         [0m| 4.98M/300M [03:11<42:43, 115k env steps/s]  2%|[35m▏         [0m| 5.01M/300M [03:11<42:41, 115k env steps/s]  2%|[35m▏         [0m| 5.05M/300M [03:12<42:40, 115k env steps/s]  2%|[35m▏         [0m| 5.08M/300M [03:12<42:39, 115k env steps/s]  2%|[35m▏         [0m| 5.11M/300M [03:12<42:39, 115k env steps/s]  2%|[35m▏         [0m| 5.14M/300M [03:13<42:39, 115k env steps/s]  2%|[35m▏         [0m| 5.18M/300M [03:13<42:38, 115k env steps/s]  2%|[35m▏         [0m| 5.21M/300M [03:13<42:38, 115k env steps/s]  2%|[35m▏         [0m| 5.24M/300M [03:13<42:38, 115k env steps/s]  2%|[35m▏         [0m| 5.28M/300M [03:14<42:38, 115k env steps/s]  2%|[35m▏         [0m| 5.31M/300M [03:14<42:38, 115k env steps/s]  2%|[35m▏         [0m| 5.34M/300M [03:14<42:37, 115k env steps/s]  2%|[35m▏         [0m| 5.37M/300M [03:15<42:35, 115k env steps/s]  2%|[35m▏         [0m| 5.41M/300M [03:15<42:36, 115k env steps/s]  2%|[35m▏         [0m| 5.44M/300M [03:15<42:35, 115k env steps/s]  2%|[35m▏         [0m| 5.47M/300M [03:15<42:35, 115k env steps/s]  2%|[35m▏         [0m| 5.51M/300M [03:16<42:35, 115k env steps/s]  2%|[35m▏         [0m| 5.54M/300M [03:16<42:34, 115k env steps/s]  2%|[35m▏         [0m| 5.57M/300M [03:16<42:34, 115k env steps/s]  2%|[35m▏         [0m| 5.60M/300M [03:17<42:33, 115k env steps/s]  2%|[35m▏         [0m| 5.64M/300M [03:17<42:33, 115k env steps/s]  2%|[35m▏         [0m| 5.67M/300M [03:17<42:33, 115k env steps/s]  2%|[35m▏         [0m| 5.70M/300M [03:17<42:33, 115k env steps/s]  2%|[35m▏         [0m| 5.73M/300M [03:18<42:32, 115k env steps/s]  2%|[35m▏         [0m| 5.77M/300M [03:18<42:31, 115k env steps/s]  2%|[35m▏         [0m| 5.80M/300M [03:18<42:31, 115k env steps/s]  2%|[35m▏         [0m| 5.83M/300M [03:19<42:32, 115k env steps/s]  2%|[35m▏         [0m| 5.87M/300M [03:19<42:31, 115k env steps/s]  2%|[35m▏         [0m| 5.90M/300M [03:19<42:30, 115k env steps/s]  2%|[35m▏         [0m| 5.93M/300M [03:19<42:30, 115k env steps/s]  2%|[35m▏         [0m| 5.96M/300M [03:20<42:30, 115k env steps/s]  2%|[35m▏         [0m| 6.00M/300M [03:20<42:30, 115k env steps/s]  2%|[35m▏         [0m| 6.03M/300M [03:20<42:29, 115k env steps/s]  2%|[35m▏         [0m| 6.06M/300M [03:20<42:28, 115k env steps/s]  2%|[35m▏         [0m| 6.09M/300M [03:21<42:27, 115k env steps/s]  2%|[35m▏         [0m| 6.13M/300M [03:21<42:26, 115k env steps/s]  2%|[35m▏         [0m| 6.16M/300M [03:21<42:26, 115k env steps/s]  2%|[35m▏         [0m| 6.19M/300M [03:22<42:25, 115k env steps/s]  2%|[35m▏         [0m| 6.23M/300M [03:22<42:25, 115k env steps/s]  2%|[35m▏         [0m| 6.26M/300M [03:22<42:25, 115k env steps/s]  2%|[35m▏         [0m| 6.29M/300M [03:22<42:24, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 5120
+    env-step:                                   4194304
+    ppo-update-ater:                            5160
+    env-step-after:                             4227072
+  env/train:                                    
+    avg_avg_episode_length:                     71.914375
+    avg_avg_return:                             0.5073582
+    avg_reward_per_step:                        0.05065918
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.2545722
+      avg_reward_per_step:                      0.022857666
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.26071012
+      avg_reward_per_step:                      0.027923584
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       430465.60299858503
+    ppo_updates_per_second:                     189.59758530914505
+  ppo:                                          
+    avg_advantage:                              -0.0063502993
+    avg_grad_norm_pre_clip:                     1.0860023
+    avg_loss:                                   0.0036205386
+    avg_loss_actor:                             -0.0001423728
+    avg_loss_critic:                            0.009136752
+    avg_loss_entropy:                           0.80546486
+    max_advantage:                              0.7132337
+    max_grad_norm_pre_clip:                     3.7546444
+    max_loss:                                   0.011364792
+    max_loss_actor:                             0.0075465273
+    max_loss_critic:                            0.010019146
+    max_loss_entropy:                           0.8185822
+    std_advantage:                              0.13826726
+    std_grad_norm_pre_clip:                     0.96235365
+    std_loss:                                   0.0025106478
+    std_loss_actor:                             0.0024030227
+    std_loss_critic:                            0.00043237093
+    std_loss_entropy:                           0.0074017146
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   59.198257
+      avg_avg_return:                           0.6230854
+      avg_benchmark_regret:                     0.23551589
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.071006775
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.29672062
+        avg_reward_per_step:                    0.03466034
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.335902
+        avg_reward_per_step:                    0.03643036
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   115.76707
+      avg_avg_return:                           0.11728217
+      avg_benchmark_regret:                     0.79333425
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.009338379
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.026798224
+        avg_reward_per_step:                    0.0011291504
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.41704035
+        avg_reward_per_step:                    0.0044555664
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/128/...
+  2%|[35m▏         [0m| 6.29M/300M [03:23<42:24, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             2%|[35m▏         [0m| 6.29M/300M [03:27<42:24, 115k env steps/s]  2%|[35m▏         [0m| 6.32M/300M [03:28<4:15:01, 19.2k env steps/s]  2%|[35m▏         [0m| 6.36M/300M [03:28<3:11:04, 25.6k env steps/s]  2%|[35m▏         [0m| 6.39M/300M [03:28<2:26:27, 33.4k env steps/s]  2%|[35m▏         [0m| 6.42M/300M [03:28<1:55:13, 42.5k env steps/s]  2%|[35m▏         [0m| 6.46M/300M [03:29<1:33:22, 52.4k env steps/s]  2%|[35m▏         [0m| 6.49M/300M [03:29<1:18:04, 62.7k env steps/s]  2%|[35m▏         [0m| 6.52M/300M [03:29<1:07:22, 72.6k env steps/s]  2%|[35m▏         [0m| 6.55M/300M [03:29<59:52, 81.7k env steps/s]    2%|[35m▏         [0m| 6.59M/300M [03:30<54:37, 89.5k env steps/s]  2%|[35m▏         [0m| 6.62M/300M [03:30<50:57, 96.0k env steps/s]  2%|[35m▏         [0m| 6.65M/300M [03:30<48:22, 101k env steps/s]   2%|[35m▏         [0m| 6.68M/300M [03:31<46:34, 105k env steps/s]  2%|[35m▏         [0m| 6.72M/300M [03:31<45:18, 108k env steps/s]  2%|[35m▏         [0m| 6.75M/300M [03:31<44:25, 110k env steps/s]  2%|[35m▏         [0m| 6.78M/300M [03:31<43:48, 112k env steps/s]  2%|[35m▏         [0m| 6.82M/300M [03:32<43:22, 113k env steps/s]  2%|[35m▏         [0m| 6.85M/300M [03:32<43:04, 113k env steps/s]  2%|[35m▏         [0m| 6.88M/300M [03:32<42:51, 114k env steps/s]  2%|[35m▏         [0m| 6.91M/300M [03:33<42:41, 114k env steps/s]  2%|[35m▏         [0m| 6.95M/300M [03:33<42:35, 115k env steps/s]  2%|[35m▏         [0m| 6.98M/300M [03:33<42:30, 115k env steps/s]  2%|[35m▏         [0m| 7.01M/300M [03:33<42:28, 115k env steps/s]  2%|[35m▏         [0m| 7.05M/300M [03:34<42:24, 115k env steps/s]  2%|[35m▏         [0m| 7.08M/300M [03:34<42:21, 115k env steps/s]  2%|[35m▏         [0m| 7.11M/300M [03:34<42:19, 115k env steps/s]  2%|[35m▏         [0m| 7.14M/300M [03:35<42:18, 115k env steps/s]  2%|[35m▏         [0m| 7.18M/300M [03:35<42:16, 115k env steps/s]  2%|[35m▏         [0m| 7.21M/300M [03:35<42:15, 115k env steps/s]  2%|[35m▏         [0m| 7.24M/300M [03:35<42:14, 115k env steps/s]  2%|[35m▏         [0m| 7.27M/300M [03:36<42:12, 116k env steps/s]  2%|[35m▏         [0m| 7.31M/300M [03:36<42:12, 116k env steps/s]  2%|[35m▏         [0m| 7.34M/300M [03:36<42:12, 116k env steps/s]  2%|[35m▏         [0m| 7.37M/300M [03:37<42:13, 116k env steps/s]  2%|[35m▏         [0m| 7.41M/300M [03:37<42:13, 116k env steps/s]  2%|[35m▏         [0m| 7.44M/300M [03:37<42:13, 115k env steps/s]  2%|[35m▏         [0m| 7.47M/300M [03:37<42:12, 116k env steps/s]  3%|[35m▎         [0m| 7.50M/300M [03:38<42:12, 116k env steps/s]  3%|[35m▎         [0m| 7.54M/300M [03:38<42:12, 115k env steps/s]  3%|[35m▎         [0m| 7.57M/300M [03:38<42:11, 116k env steps/s]  3%|[35m▎         [0m| 7.60M/300M [03:39<42:10, 116k env steps/s]  3%|[35m▎         [0m| 7.63M/300M [03:39<42:10, 116k env steps/s]  3%|[35m▎         [0m| 7.67M/300M [03:39<42:10, 116k env steps/s]  3%|[35m▎         [0m| 7.70M/300M [03:39<42:10, 116k env steps/s]  3%|[35m▎         [0m| 7.73M/300M [03:40<42:10, 115k env steps/s]  3%|[35m▎         [0m| 7.77M/300M [03:40<42:10, 115k env steps/s]  3%|[35m▎         [0m| 7.80M/300M [03:40<42:10, 115k env steps/s]  3%|[35m▎         [0m| 7.83M/300M [03:41<42:09, 115k env steps/s]  3%|[35m▎         [0m| 7.86M/300M [03:41<42:09, 115k env steps/s]  3%|[35m▎         [0m| 7.90M/300M [03:41<42:08, 116k env steps/s]  3%|[35m▎         [0m| 7.93M/300M [03:41<42:09, 115k env steps/s]  3%|[35m▎         [0m| 7.96M/300M [03:42<42:09, 115k env steps/s]  3%|[35m▎         [0m| 8.00M/300M [03:42<42:09, 115k env steps/s]  3%|[35m▎         [0m| 8.03M/300M [03:42<42:10, 115k env steps/s]  3%|[35m▎         [0m| 8.06M/300M [03:43<42:09, 115k env steps/s]  3%|[35m▎         [0m| 8.09M/300M [03:43<42:08, 115k env steps/s]  3%|[35m▎         [0m| 8.13M/300M [03:43<42:10, 115k env steps/s]  3%|[35m▎         [0m| 8.16M/300M [03:43<42:09, 115k env steps/s]  3%|[35m▎         [0m| 8.19M/300M [03:44<42:08, 115k env steps/s]  3%|[35m▎         [0m| 8.22M/300M [03:44<42:07, 115k env steps/s]  3%|[35m▎         [0m| 8.26M/300M [03:44<42:07, 115k env steps/s]  3%|[35m▎         [0m| 8.29M/300M [03:45<42:06, 115k env steps/s]  3%|[35m▎         [0m| 8.32M/300M [03:45<42:05, 115k env steps/s]  3%|[35m▎         [0m| 8.36M/300M [03:45<42:05, 115k env steps/s]  3%|[35m▎         [0m| 8.39M/300M [03:45<42:05, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 7680
+    env-step:                                   6291456
+    ppo-update-ater:                            7720
+    env-step-after:                             6324224
+  env/train:                                    
+    avg_avg_episode_length:                     59.14873
+    avg_avg_return:                             0.58385694
+    avg_reward_per_step:                        0.06942749
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.24283387
+      avg_reward_per_step:                      0.02746582
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.34604627
+      avg_reward_per_step:                      0.042022705
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429516.1710790327
+    ppo_updates_per_second:                     189.6727039425461
+  ppo:                                          
+    avg_advantage:                              -0.0066007916
+    avg_grad_norm_pre_clip:                     0.9973143
+    avg_loss:                                   0.002590902
+    avg_loss_actor:                             -0.001148552
+    avg_loss_critic:                            0.0090044355
+    avg_loss_entropy:                           0.7627634
+    max_advantage:                              0.84471166
+    max_grad_norm_pre_clip:                     2.6850657
+    max_loss:                                   0.0054592537
+    max_loss_actor:                             0.0015810402
+    max_loss_critic:                            0.009647362
+    max_loss_entropy:                           0.77270234
+    std_advantage:                              0.1360616
+    std_grad_norm_pre_clip:                     0.49090248
+    std_loss:                                   0.00122092
+    std_loss_actor:                             0.0011677501
+    std_loss_critic:                            0.00031754872
+    std_loss_entropy:                           0.004835344
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   56.320724
+      avg_avg_return:                           0.64363796
+      avg_benchmark_regret:                     0.21496329
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.07836151
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.2980974
+        avg_reward_per_step:                    0.03668213
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.3554917
+        avg_reward_per_step:                    0.041770935
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   115.71007
+      avg_avg_return:                           0.11689564
+      avg_benchmark_regret:                     0.7937207
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.013206482
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.02199528
+        avg_reward_per_step:                    0.0011672974
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.4521647
+        avg_reward_per_step:                    0.0049438477
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/192/...
+  3%|[35m▎         [0m| 8.39M/300M [03:46<42:05, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             3%|[35m▎         [0m| 8.39M/300M [03:50<42:05, 115k env steps/s]  3%|[35m▎         [0m| 8.42M/300M [03:50<4:11:12, 19.3k env steps/s]  3%|[35m▎         [0m| 8.45M/300M [03:51<3:08:45, 25.7k env steps/s]  3%|[35m▎         [0m| 8.49M/300M [03:51<2:24:45, 33.6k env steps/s]  3%|[35m▎         [0m| 8.52M/300M [03:51<1:53:56, 42.6k env steps/s]  3%|[35m▎         [0m| 8.55M/300M [03:52<1:32:22, 52.6k env steps/s]  3%|[35m▎         [0m| 8.59M/300M [03:52<1:17:16, 62.9k env steps/s]  3%|[35m▎         [0m| 8.62M/300M [03:52<1:06:42, 72.8k env steps/s]  3%|[35m▎         [0m| 8.65M/300M [03:52<59:19, 81.9k env steps/s]    3%|[35m▎         [0m| 8.68M/300M [03:53<54:08, 89.7k env steps/s]  3%|[35m▎         [0m| 8.72M/300M [03:53<50:31, 96.1k env steps/s]  3%|[35m▎         [0m| 8.75M/300M [03:53<47:58, 101k env steps/s]   3%|[35m▎         [0m| 8.78M/300M [03:54<46:11, 105k env steps/s]  3%|[35m▎         [0m| 8.81M/300M [03:54<44:56, 108k env steps/s]  3%|[35m▎         [0m| 8.85M/300M [03:54<44:02, 110k env steps/s]  3%|[35m▎         [0m| 8.88M/300M [03:54<43:26, 112k env steps/s]  3%|[35m▎         [0m| 8.91M/300M [03:55<42:59, 113k env steps/s]  3%|[35m▎         [0m| 8.95M/300M [03:55<42:40, 114k env steps/s]  3%|[35m▎         [0m| 8.98M/300M [03:55<42:28, 114k env steps/s]  3%|[35m▎         [0m| 9.01M/300M [03:55<42:19, 115k env steps/s]  3%|[35m▎         [0m| 9.04M/300M [03:56<42:12, 115k env steps/s]  3%|[35m▎         [0m| 9.08M/300M [03:56<42:09, 115k env steps/s]  3%|[35m▎         [0m| 9.11M/300M [03:56<42:05, 115k env steps/s]  3%|[35m▎         [0m| 9.14M/300M [03:57<42:03, 115k env steps/s]  3%|[35m▎         [0m| 9.18M/300M [03:57<42:01, 115k env steps/s]  3%|[35m▎         [0m| 9.21M/300M [03:57<42:00, 115k env steps/s]  3%|[35m▎         [0m| 9.24M/300M [03:57<41:59, 115k env steps/s]  3%|[35m▎         [0m| 9.27M/300M [03:58<41:58, 115k env steps/s]  3%|[35m▎         [0m| 9.31M/300M [03:58<41:57, 115k env steps/s]  3%|[35m▎         [0m| 9.34M/300M [03:58<41:56, 115k env steps/s]  3%|[35m▎         [0m| 9.37M/300M [03:59<41:57, 115k env steps/s]  3%|[35m▎         [0m| 9.40M/300M [03:59<41:56, 115k env steps/s]  3%|[35m▎         [0m| 9.44M/300M [03:59<41:56, 115k env steps/s]  3%|[35m▎         [0m| 9.47M/300M [03:59<41:56, 115k env steps/s]  3%|[35m▎         [0m| 9.50M/300M [04:00<41:55, 115k env steps/s]  3%|[35m▎         [0m| 9.54M/300M [04:00<41:55, 115k env steps/s]  3%|[35m▎         [0m| 9.57M/300M [04:00<41:54, 115k env steps/s]  3%|[35m▎         [0m| 9.60M/300M [04:01<41:54, 115k env steps/s]  3%|[35m▎         [0m| 9.63M/300M [04:01<41:53, 116k env steps/s]  3%|[35m▎         [0m| 9.67M/300M [04:01<41:53, 115k env steps/s]  3%|[35m▎         [0m| 9.70M/300M [04:01<41:53, 116k env steps/s]  3%|[35m▎         [0m| 9.73M/300M [04:02<41:53, 115k env steps/s]  3%|[35m▎         [0m| 9.76M/300M [04:02<41:53, 115k env steps/s]  3%|[35m▎         [0m| 9.80M/300M [04:02<41:52, 115k env steps/s]  3%|[35m▎         [0m| 9.83M/300M [04:03<41:52, 115k env steps/s]  3%|[35m▎         [0m| 9.86M/300M [04:03<41:52, 115k env steps/s]  3%|[35m▎         [0m| 9.90M/300M [04:03<41:51, 115k env steps/s]  3%|[35m▎         [0m| 9.93M/300M [04:03<41:50, 116k env steps/s]  3%|[35m▎         [0m| 9.96M/300M [04:04<41:50, 116k env steps/s]  3%|[35m▎         [0m| 9.99M/300M [04:04<41:50, 116k env steps/s]  3%|[35m▎         [0m| 10.0M/300M [04:04<41:50, 116k env steps/s]  3%|[35m▎         [0m| 10.1M/300M [04:05<41:50, 116k env steps/s]  3%|[35m▎         [0m| 10.1M/300M [04:05<41:49, 116k env steps/s]  3%|[35m▎         [0m| 10.1M/300M [04:05<41:49, 116k env steps/s]  3%|[35m▎         [0m| 10.2M/300M [04:05<41:49, 116k env steps/s]  3%|[35m▎         [0m| 10.2M/300M [04:06<41:49, 116k env steps/s]  3%|[35m▎         [0m| 10.2M/300M [04:06<41:49, 115k env steps/s]  3%|[35m▎         [0m| 10.3M/300M [04:06<41:49, 115k env steps/s]  3%|[35m▎         [0m| 10.3M/300M [04:07<41:49, 115k env steps/s]  3%|[35m▎         [0m| 10.3M/300M [04:07<41:49, 115k env steps/s]  3%|[35m▎         [0m| 10.4M/300M [04:07<41:49, 115k env steps/s]  3%|[35m▎         [0m| 10.4M/300M [04:07<41:48, 115k env steps/s]  3%|[35m▎         [0m| 10.4M/300M [04:08<41:48, 115k env steps/s]  3%|[35m▎         [0m| 10.5M/300M [04:08<41:48, 115k env steps/s]  3%|[35m▎         [0m| 10.5M/300M [04:08<41:47, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 10240
+    env-step:                                   8388608
+    ppo-update-ater:                            10280
+    env-step-after:                             8421376
+  env/train:                                    
+    avg_avg_episode_length:                     56.218826
+    avg_avg_return:                             0.5946213
+    avg_reward_per_step:                        0.073150635
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.24337289
+      avg_reward_per_step:                      0.023162842
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.36782104
+      avg_reward_per_step:                      0.05014038
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       430049.2105450217
+    ppo_updates_per_second:                     189.57442103133718
+  ppo:                                          
+    avg_advantage:                              -0.0010271915
+    avg_grad_norm_pre_clip:                     1.0642452
+    avg_loss:                                   0.0022799869
+    avg_loss_actor:                             -0.0014002166
+    avg_loss_critic:                            0.008729015
+    avg_loss_entropy:                           0.684304
+    max_advantage:                              0.85073805
+    max_grad_norm_pre_clip:                     2.4349341
+    max_loss:                                   0.0070615364
+    max_loss_actor:                             0.003284419
+    max_loss_critic:                            0.010057405
+    max_loss_entropy:                           0.6957959
+    std_advantage:                              0.13529964
+    std_grad_norm_pre_clip:                     0.45293787
+    std_loss:                                   0.0017341317
+    std_loss_actor:                             0.0016146607
+    std_loss_critic:                            0.00043261645
+    std_loss_entropy:                           0.0048706885
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   51.500183
+      avg_avg_return:                           0.68546665
+      avg_benchmark_regret:                     0.1731346
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.08747101
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.31931788
+        avg_reward_per_step:                    0.038742065
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.375902
+        avg_reward_per_step:                    0.048812866
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   113.62814
+      avg_avg_return:                           0.14155887
+      avg_benchmark_regret:                     0.7690575
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.016738892
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.01984635
+        avg_reward_per_step:                    0.0013656616
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.47005802
+        avg_reward_per_step:                    0.0055236816
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/256/...
+  3%|[35m▎         [0m| 10.5M/300M [04:09<41:47, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             3%|[35m▎         [0m| 10.5M/300M [04:13<41:47, 115k env steps/s]  4%|[35m▎         [0m| 10.5M/300M [04:13<4:09:16, 19.4k env steps/s]  4%|[35m▎         [0m| 10.6M/300M [04:14<3:07:43, 25.7k env steps/s]  4%|[35m▎         [0m| 10.6M/300M [04:14<2:23:56, 33.5k env steps/s]  4%|[35m▎         [0m| 10.6M/300M [04:14<1:53:17, 42.6k env steps/s]  4%|[35m▎         [0m| 10.6M/300M [04:14<1:31:50, 52.5k env steps/s]  4%|[35m▎         [0m| 10.7M/300M [04:15<1:16:49, 62.8k env steps/s]  4%|[35m▎         [0m| 10.7M/300M [04:15<1:06:17, 72.7k env steps/s]  4%|[35m▎         [0m| 10.7M/300M [04:15<58:55, 81.8k env steps/s]    4%|[35m▎         [0m| 10.8M/300M [04:16<53:46, 89.6k env steps/s]  4%|[35m▎         [0m| 10.8M/300M [04:16<50:10, 96.1k env steps/s]  4%|[35m▎         [0m| 10.8M/300M [04:16<47:38, 101k env steps/s]   4%|[35m▎         [0m| 10.9M/300M [04:16<45:53, 105k env steps/s]  4%|[35m▎         [0m| 10.9M/300M [04:17<44:39, 108k env steps/s]  4%|[35m▎         [0m| 10.9M/300M [04:17<43:47, 110k env steps/s]  4%|[35m▎         [0m| 11.0M/300M [04:17<43:10, 112k env steps/s]  4%|[35m▎         [0m| 11.0M/300M [04:18<42:45, 113k env steps/s]  4%|[35m▎         [0m| 11.0M/300M [04:18<42:27, 113k env steps/s]  4%|[35m▎         [0m| 11.1M/300M [04:18<42:15, 114k env steps/s]  4%|[35m▎         [0m| 11.1M/300M [04:18<42:06, 114k env steps/s]  4%|[35m▎         [0m| 11.1M/300M [04:19<41:59, 115k env steps/s]  4%|[35m▎         [0m| 11.2M/300M [04:19<41:54, 115k env steps/s]  4%|[35m▎         [0m| 11.2M/300M [04:19<41:50, 115k env steps/s]  4%|[35m▎         [0m| 11.2M/300M [04:20<41:47, 115k env steps/s]  4%|[35m▍         [0m| 11.3M/300M [04:20<41:45, 115k env steps/s]  4%|[35m▍         [0m| 11.3M/300M [04:20<41:43, 115k env steps/s]  4%|[35m▍         [0m| 11.3M/300M [04:20<41:42, 115k env steps/s]  4%|[35m▍         [0m| 11.4M/300M [04:21<41:41, 115k env steps/s]  4%|[35m▍         [0m| 11.4M/300M [04:21<41:40, 115k env steps/s]  4%|[35m▍         [0m| 11.4M/300M [04:21<41:39, 115k env steps/s]  4%|[35m▍         [0m| 11.5M/300M [04:21<41:39, 115k env steps/s]  4%|[35m▍         [0m| 11.5M/300M [04:22<41:38, 115k env steps/s]  4%|[35m▍         [0m| 11.5M/300M [04:22<41:38, 115k env steps/s]  4%|[35m▍         [0m| 11.6M/300M [04:22<41:37, 115k env steps/s]  4%|[35m▍         [0m| 11.6M/300M [04:23<41:39, 115k env steps/s]  4%|[35m▍         [0m| 11.6M/300M [04:23<41:38, 115k env steps/s]  4%|[35m▍         [0m| 11.7M/300M [04:23<41:39, 115k env steps/s]  4%|[35m▍         [0m| 11.7M/300M [04:23<41:38, 115k env steps/s]  4%|[35m▍         [0m| 11.7M/300M [04:24<41:37, 115k env steps/s]  4%|[35m▍         [0m| 11.8M/300M [04:24<41:35, 115k env steps/s]  4%|[35m▍         [0m| 11.8M/300M [04:24<41:35, 115k env steps/s]  4%|[35m▍         [0m| 11.8M/300M [04:25<41:35, 115k env steps/s]  4%|[35m▍         [0m| 11.9M/300M [04:25<41:35, 115k env steps/s]  4%|[35m▍         [0m| 11.9M/300M [04:25<41:34, 115k env steps/s]  4%|[35m▍         [0m| 11.9M/300M [04:25<41:34, 115k env steps/s]  4%|[35m▍         [0m| 12.0M/300M [04:26<41:34, 115k env steps/s]  4%|[35m▍         [0m| 12.0M/300M [04:26<41:34, 115k env steps/s]  4%|[35m▍         [0m| 12.0M/300M [04:26<41:34, 115k env steps/s]  4%|[35m▍         [0m| 12.1M/300M [04:27<41:33, 115k env steps/s]  4%|[35m▍         [0m| 12.1M/300M [04:27<41:33, 115k env steps/s]  4%|[35m▍         [0m| 12.1M/300M [04:27<41:33, 115k env steps/s]  4%|[35m▍         [0m| 12.2M/300M [04:27<41:33, 115k env steps/s]  4%|[35m▍         [0m| 12.2M/300M [04:28<41:33, 115k env steps/s]  4%|[35m▍         [0m| 12.2M/300M [04:28<41:32, 115k env steps/s]  4%|[35m▍         [0m| 12.3M/300M [04:28<41:32, 115k env steps/s]  4%|[35m▍         [0m| 12.3M/300M [04:29<41:32, 115k env steps/s]  4%|[35m▍         [0m| 12.3M/300M [04:29<41:32, 115k env steps/s]  4%|[35m▍         [0m| 12.4M/300M [04:29<41:31, 115k env steps/s]  4%|[35m▍         [0m| 12.4M/300M [04:29<41:31, 115k env steps/s]  4%|[35m▍         [0m| 12.4M/300M [04:30<41:30, 115k env steps/s]  4%|[35m▍         [0m| 12.5M/300M [04:30<41:30, 115k env steps/s]  4%|[35m▍         [0m| 12.5M/300M [04:30<41:30, 115k env steps/s]  4%|[35m▍         [0m| 12.5M/300M [04:31<41:29, 115k env steps/s]  4%|[35m▍         [0m| 12.6M/300M [04:31<41:29, 115k env steps/s]  4%|[35m▍         [0m| 12.6M/300M [04:31<41:29, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 12800
+    env-step:                                   10485760
+    ppo-update-ater:                            12840
+    env-step-after:                             10518528
+  env/train:                                    
+    avg_avg_episode_length:                     54.498726
+    avg_avg_return:                             0.6197653
+    avg_reward_per_step:                        0.069122314
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.32089698
+      avg_reward_per_step:                      0.031463623
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.3231481
+      avg_reward_per_step:                      0.037902832
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       427393.351203298
+    ppo_updates_per_second:                     189.67256824733732
+  ppo:                                          
+    avg_advantage:                              0.011423932
+    avg_grad_norm_pre_clip:                     1.2357513
+    avg_loss:                                   0.0024634113
+    avg_loss_actor:                             -0.001727004
+    avg_loss_critic:                            0.009716327
+    avg_loss_entropy:                           0.6677484
+    max_advantage:                              0.8749285
+    max_grad_norm_pre_clip:                     2.9269075
+    max_loss:                                   0.0060382118
+    max_loss_actor:                             0.0015280945
+    max_loss_critic:                            0.010595645
+    max_loss_entropy:                           0.6804137
+    std_advantage:                              0.14264789
+    std_grad_norm_pre_clip:                     0.6180125
+    std_loss:                                   0.0017457536
+    std_loss_actor:                             0.0016324109
+    std_loss_critic:                            0.00038615984
+    std_loss_entropy:                           0.005660086
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   50.452522
+      avg_avg_return:                           0.68792653
+      avg_benchmark_regret:                     0.17067474
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.0921402
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.32725686
+        avg_reward_per_step:                    0.040481567
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.36448446
+        avg_reward_per_step:                    0.051704407
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   112.7485
+      avg_avg_return:                           0.14709839
+      avg_benchmark_regret:                     0.763518
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.022216797
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.027337555
+        avg_reward_per_step:                    0.0013656616
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.48320246
+        avg_reward_per_step:                    0.005584717
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/320/...
+  4%|[35m▍         [0m| 12.6M/300M [04:32<41:29, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             4%|[35m▍         [0m| 12.6M/300M [04:36<41:29, 115k env steps/s]  4%|[35m▍         [0m| 12.6M/300M [04:36<4:05:50, 19.5k env steps/s]  4%|[35m▍         [0m| 12.6M/300M [04:36<3:04:23, 26.0k env steps/s]  4%|[35m▍         [0m| 12.7M/300M [04:37<2:21:30, 33.8k env steps/s]  4%|[35m▍         [0m| 12.7M/300M [04:37<1:51:30, 42.9k env steps/s]  4%|[35m▍         [0m| 12.7M/300M [04:37<1:30:29, 52.9k env steps/s]  4%|[35m▍         [0m| 12.8M/300M [04:38<1:15:47, 63.2k env steps/s]  4%|[35m▍         [0m| 12.8M/300M [04:38<1:05:30, 73.1k env steps/s]  4%|[35m▍         [0m| 12.8M/300M [04:38<58:17, 82.1k env steps/s]    4%|[35m▍         [0m| 12.9M/300M [04:38<53:14, 89.9k env steps/s]  4%|[35m▍         [0m| 12.9M/300M [04:39<49:41, 96.3k env steps/s]  4%|[35m▍         [0m| 12.9M/300M [04:39<47:13, 101k env steps/s]   4%|[35m▍         [0m| 13.0M/300M [04:39<45:29, 105k env steps/s]  4%|[35m▍         [0m| 13.0M/300M [04:39<44:16, 108k env steps/s]  4%|[35m▍         [0m| 13.0M/300M [04:40<43:25, 110k env steps/s]  4%|[35m▍         [0m| 13.1M/300M [04:40<42:50, 112k env steps/s]  4%|[35m▍         [0m| 13.1M/300M [04:40<42:24, 113k env steps/s]  4%|[35m▍         [0m| 13.1M/300M [04:41<42:07, 114k env steps/s]  4%|[35m▍         [0m| 13.2M/300M [04:41<41:54, 114k env steps/s]  4%|[35m▍         [0m| 13.2M/300M [04:41<41:45, 114k env steps/s]  4%|[35m▍         [0m| 13.2M/300M [04:41<41:39, 115k env steps/s]  4%|[35m▍         [0m| 13.3M/300M [04:42<41:35, 115k env steps/s]  4%|[35m▍         [0m| 13.3M/300M [04:42<41:32, 115k env steps/s]  4%|[35m▍         [0m| 13.3M/300M [04:42<41:30, 115k env steps/s]  4%|[35m▍         [0m| 13.4M/300M [04:43<41:28, 115k env steps/s]  4%|[35m▍         [0m| 13.4M/300M [04:43<41:27, 115k env steps/s]  4%|[35m▍         [0m| 13.4M/300M [04:43<41:25, 115k env steps/s]  4%|[35m▍         [0m| 13.5M/300M [04:43<41:25, 115k env steps/s]  5%|[35m▍         [0m| 13.5M/300M [04:44<41:24, 115k env steps/s]  5%|[35m▍         [0m| 13.5M/300M [04:44<41:23, 115k env steps/s]  5%|[35m▍         [0m| 13.6M/300M [04:44<41:22, 115k env steps/s]  5%|[35m▍         [0m| 13.6M/300M [04:45<41:23, 115k env steps/s]  5%|[35m▍         [0m| 13.6M/300M [04:45<41:22, 115k env steps/s]  5%|[35m▍         [0m| 13.7M/300M [04:45<41:21, 115k env steps/s]  5%|[35m▍         [0m| 13.7M/300M [04:45<41:20, 115k env steps/s]  5%|[35m▍         [0m| 13.7M/300M [04:46<41:19, 115k env steps/s]  5%|[35m▍         [0m| 13.8M/300M [04:46<41:19, 115k env steps/s]  5%|[35m▍         [0m| 13.8M/300M [04:46<41:20, 115k env steps/s]  5%|[35m▍         [0m| 13.8M/300M [04:47<41:19, 115k env steps/s]  5%|[35m▍         [0m| 13.9M/300M [04:47<41:19, 115k env steps/s]  5%|[35m▍         [0m| 13.9M/300M [04:47<41:19, 115k env steps/s]  5%|[35m▍         [0m| 13.9M/300M [04:47<41:19, 115k env steps/s]  5%|[35m▍         [0m| 14.0M/300M [04:48<41:19, 115k env steps/s]  5%|[35m▍         [0m| 14.0M/300M [04:48<41:18, 115k env steps/s]  5%|[35m▍         [0m| 14.0M/300M [04:48<41:18, 115k env steps/s]  5%|[35m▍         [0m| 14.1M/300M [04:49<41:18, 115k env steps/s]  5%|[35m▍         [0m| 14.1M/300M [04:49<41:17, 115k env steps/s]  5%|[35m▍         [0m| 14.1M/300M [04:49<41:17, 115k env steps/s]  5%|[35m▍         [0m| 14.2M/300M [04:49<41:17, 115k env steps/s]  5%|[35m▍         [0m| 14.2M/300M [04:50<41:16, 115k env steps/s]  5%|[35m▍         [0m| 14.2M/300M [04:50<41:16, 115k env steps/s]  5%|[35m▍         [0m| 14.3M/300M [04:50<41:16, 115k env steps/s]  5%|[35m▍         [0m| 14.3M/300M [04:51<41:16, 115k env steps/s]  5%|[35m▍         [0m| 14.3M/300M [04:51<41:16, 115k env steps/s]  5%|[35m▍         [0m| 14.4M/300M [04:51<41:15, 115k env steps/s]  5%|[35m▍         [0m| 14.4M/300M [04:51<41:15, 115k env steps/s]  5%|[35m▍         [0m| 14.4M/300M [04:52<41:17, 115k env steps/s]  5%|[35m▍         [0m| 14.5M/300M [04:52<41:15, 115k env steps/s]  5%|[35m▍         [0m| 14.5M/300M [04:52<41:15, 115k env steps/s]  5%|[35m▍         [0m| 14.5M/300M [04:53<41:14, 115k env steps/s]  5%|[35m▍         [0m| 14.5M/300M [04:53<41:14, 115k env steps/s]  5%|[35m▍         [0m| 14.6M/300M [04:53<41:14, 115k env steps/s]  5%|[35m▍         [0m| 14.6M/300M [04:53<41:13, 115k env steps/s]  5%|[35m▍         [0m| 14.6M/300M [04:54<41:13, 115k env steps/s]  5%|[35m▍         [0m| 14.7M/300M [04:54<41:13, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 15360
+    env-step:                                   12582912
+    ppo-update-ater:                            15400
+    env-step-after:                             12615680
+  env/train:                                    
+    avg_avg_episode_length:                     55.95874
+    avg_avg_return:                             0.62447774
+    avg_reward_per_step:                        0.06707764
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.2828331
+      avg_reward_per_step:                      0.026153564
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.35653758
+      avg_reward_per_step:                      0.041137695
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429709.2657331662
+    ppo_updates_per_second:                     189.76141811099768
+  ppo:                                          
+    avg_advantage:                              0.009625943
+    avg_grad_norm_pre_clip:                     1.659377
+    avg_loss:                                   0.0020379142
+    avg_loss_actor:                             -0.0018199518
+    avg_loss_critic:                            0.009072586
+    avg_loss_entropy:                           0.67842644
+    max_advantage:                              0.80033123
+    max_grad_norm_pre_clip:                     3.8748221
+    max_loss:                                   0.0064549716
+    max_loss_actor:                             0.0024117264
+    max_loss_critic:                            0.00995733
+    max_loss_entropy:                           0.6902298
+    std_advantage:                              0.13694005
+    std_grad_norm_pre_clip:                     0.7941421
+    std_loss:                                   0.0017452104
+    std_loss_actor:                             0.001664961
+    std_loss_critic:                            0.0003524987
+    std_loss_entropy:                           0.005085017
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   51.828255
+      avg_avg_return:                           0.6811062
+      avg_benchmark_regret:                     0.17749503
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.09348297
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.31836218
+        avg_reward_per_step:                    0.0434494
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.37326512
+        avg_reward_per_step:                    0.050125122
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   112.17001
+      avg_avg_return:                           0.15283573
+      avg_benchmark_regret:                     0.7577807
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.023384094
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.013393099
+        avg_reward_per_step:                    0.0013961792
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.45101026
+        avg_reward_per_step:                    0.0052108765
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/384/...
+  5%|[35m▍         [0m| 14.7M/300M [04:55<41:13, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             5%|[35m▍         [0m| 14.7M/300M [04:58<41:13, 115k env steps/s]  5%|[35m▍         [0m| 14.7M/300M [04:59<4:06:59, 19.3k env steps/s]  5%|[35m▍         [0m| 14.7M/300M [04:59<3:05:18, 25.7k env steps/s]  5%|[35m▍         [0m| 14.8M/300M [05:00<2:22:03, 33.5k env steps/s]  5%|[35m▍         [0m| 14.8M/300M [05:00<1:51:47, 42.5k env steps/s]  5%|[35m▍         [0m| 14.8M/300M [05:00<1:30:35, 52.5k env steps/s]  5%|[35m▍         [0m| 14.9M/300M [05:00<1:15:46, 62.7k env steps/s]  5%|[35m▍         [0m| 14.9M/300M [05:01<1:05:23, 72.7k env steps/s]  5%|[35m▍         [0m| 14.9M/300M [05:01<58:06, 81.8k env steps/s]    5%|[35m▍         [0m| 15.0M/300M [05:01<53:01, 89.6k env steps/s]  5%|[35m▌         [0m| 15.0M/300M [05:02<49:28, 96.0k env steps/s]  5%|[35m▌         [0m| 15.0M/300M [05:02<46:59, 101k env steps/s]   5%|[35m▌         [0m| 15.1M/300M [05:02<45:13, 105k env steps/s]  5%|[35m▌         [0m| 15.1M/300M [05:02<44:01, 108k env steps/s]  5%|[35m▌         [0m| 15.1M/300M [05:03<43:09, 110k env steps/s]  5%|[35m▌         [0m| 15.2M/300M [05:03<42:33, 112k env steps/s]  5%|[35m▌         [0m| 15.2M/300M [05:03<42:07, 113k env steps/s]  5%|[35m▌         [0m| 15.2M/300M [05:04<41:50, 113k env steps/s]  5%|[35m▌         [0m| 15.3M/300M [05:04<41:37, 114k env steps/s]  5%|[35m▌         [0m| 15.3M/300M [05:04<41:28, 114k env steps/s]  5%|[35m▌         [0m| 15.3M/300M [05:04<41:21, 115k env steps/s]  5%|[35m▌         [0m| 15.4M/300M [05:05<41:17, 115k env steps/s]  5%|[35m▌         [0m| 15.4M/300M [05:05<41:14, 115k env steps/s]  5%|[35m▌         [0m| 15.4M/300M [05:05<41:11, 115k env steps/s]  5%|[35m▌         [0m| 15.5M/300M [05:06<41:09, 115k env steps/s]  5%|[35m▌         [0m| 15.5M/300M [05:06<41:08, 115k env steps/s]  5%|[35m▌         [0m| 15.5M/300M [05:06<41:07, 115k env steps/s]  5%|[35m▌         [0m| 15.6M/300M [05:06<41:06, 115k env steps/s]  5%|[35m▌         [0m| 15.6M/300M [05:07<41:05, 115k env steps/s]  5%|[35m▌         [0m| 15.6M/300M [05:07<41:05, 115k env steps/s]  5%|[35m▌         [0m| 15.7M/300M [05:07<41:07, 115k env steps/s]  5%|[35m▌         [0m| 15.7M/300M [05:08<41:06, 115k env steps/s]  5%|[35m▌         [0m| 15.7M/300M [05:08<41:05, 115k env steps/s]  5%|[35m▌         [0m| 15.8M/300M [05:08<41:05, 115k env steps/s]  5%|[35m▌         [0m| 15.8M/300M [05:08<41:04, 115k env steps/s]  5%|[35m▌         [0m| 15.8M/300M [05:09<41:03, 115k env steps/s]  5%|[35m▌         [0m| 15.9M/300M [05:09<41:04, 115k env steps/s]  5%|[35m▌         [0m| 15.9M/300M [05:09<41:03, 115k env steps/s]  5%|[35m▌         [0m| 15.9M/300M [05:09<41:02, 115k env steps/s]  5%|[35m▌         [0m| 16.0M/300M [05:10<41:02, 115k env steps/s]  5%|[35m▌         [0m| 16.0M/300M [05:10<41:01, 115k env steps/s]  5%|[35m▌         [0m| 16.0M/300M [05:10<41:01, 115k env steps/s]  5%|[35m▌         [0m| 16.1M/300M [05:11<41:01, 115k env steps/s]  5%|[35m▌         [0m| 16.1M/300M [05:11<41:00, 115k env steps/s]  5%|[35m▌         [0m| 16.1M/300M [05:11<41:00, 115k env steps/s]  5%|[35m▌         [0m| 16.2M/300M [05:11<41:00, 115k env steps/s]  5%|[35m▌         [0m| 16.2M/300M [05:12<41:00, 115k env steps/s]  5%|[35m▌         [0m| 16.2M/300M [05:12<40:59, 115k env steps/s]  5%|[35m▌         [0m| 16.3M/300M [05:12<40:59, 115k env steps/s]  5%|[35m▌         [0m| 16.3M/300M [05:13<40:59, 115k env steps/s]  5%|[35m▌         [0m| 16.3M/300M [05:13<40:58, 115k env steps/s]  5%|[35m▌         [0m| 16.4M/300M [05:13<40:58, 115k env steps/s]  5%|[35m▌         [0m| 16.4M/300M [05:13<40:57, 115k env steps/s]  5%|[35m▌         [0m| 16.4M/300M [05:14<40:57, 115k env steps/s]  5%|[35m▌         [0m| 16.4M/300M [05:14<40:57, 115k env steps/s]  5%|[35m▌         [0m| 16.5M/300M [05:14<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.5M/300M [05:15<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.5M/300M [05:15<40:56, 115k env steps/s]  6%|[35m▌         [0m| 16.6M/300M [05:15<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.6M/300M [05:15<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.6M/300M [05:16<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.7M/300M [05:16<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.7M/300M [05:16<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.7M/300M [05:17<40:55, 115k env steps/s]  6%|[35m▌         [0m| 16.8M/300M [05:17<40:54, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 17920
+    env-step:                                   14680064
+    ppo-update-ater:                            17960
+    env-step-after:                             14712832
+  env/train:                                    
+    avg_avg_episode_length:                     50.478554
+    avg_avg_return:                             0.6549301
+    avg_reward_per_step:                        0.09515381
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.29461974
+      avg_reward_per_step:                      0.042053223
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.37364665
+      avg_reward_per_step:                      0.053222656
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429104.7210658798
+    ppo_updates_per_second:                     189.3552033689488
+  ppo:                                          
+    avg_advantage:                              0.0046867942
+    avg_grad_norm_pre_clip:                     1.8220701
+    avg_loss:                                   0.0024174515
+    avg_loss_actor:                             -0.00094610866
+    avg_loss_critic:                            0.007870409
+    avg_loss_entropy:                           0.5716443
+    max_advantage:                              0.8752146
+    max_grad_norm_pre_clip:                     5.2528048
+    max_loss:                                   0.011172464
+    max_loss_actor:                             0.007514485
+    max_loss_critic:                            0.00879363
+    max_loss_entropy:                           0.5831889
+    std_advantage:                              0.12783936
+    std_grad_norm_pre_clip:                     0.97879285
+    std_loss:                                   0.0025890733
+    std_loss_actor:                             0.0024985804
+    std_loss_critic:                            0.0003658437
+    std_loss_entropy:                           0.0064832657
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   46.759853
+      avg_avg_return:                           0.7135986
+      avg_benchmark_regret:                     0.14500263
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.104156494
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.34197193
+        avg_reward_per_step:                    0.047416687
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.38514978
+        avg_reward_per_step:                    0.056861877
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   109.96787
+      avg_avg_return:                           0.17717373
+      avg_benchmark_regret:                     0.73344266
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.021400452
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.03224473
+        avg_reward_per_step:                    0.001625061
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.47717372
+        avg_reward_per_step:                    0.006248474
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/448/...
+  6%|[35m▌         [0m| 16.8M/300M [05:18<40:54, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             6%|[35m▌         [0m| 16.8M/300M [05:21<40:54, 115k env steps/s]                                                             6%|[35m▌         [0m| 16.8M/300M [05:22<40:54, 115k env steps/s]  6%|[35m▌         [0m| 16.8M/300M [05:22<4:11:11, 18.8k env steps/s]  6%|[35m▌         [0m| 16.8M/300M [05:22<3:08:40, 25.0k env steps/s]  6%|[35m▌         [0m| 16.9M/300M [05:23<2:24:16, 32.7k env steps/s]  6%|[35m▌         [0m| 16.9M/300M [05:23<1:53:14, 41.7k env steps/s]  6%|[35m▌         [0m| 16.9M/300M [05:23<1:31:32, 51.5k env steps/s]  6%|[35m▌         [0m| 17.0M/300M [05:23<1:16:18, 61.8k env steps/s]  6%|[35m▌         [0m| 17.0M/300M [05:24<1:05:39, 71.8k env steps/s]  6%|[35m▌         [0m| 17.0M/300M [05:24<58:13, 81.0k env steps/s]    6%|[35m▌         [0m| 17.1M/300M [05:24<53:00, 89.0k env steps/s]  6%|[35m▌         [0m| 17.1M/300M [05:25<49:21, 95.5k env steps/s]  6%|[35m▌         [0m| 17.1M/300M [05:25<46:47, 101k env steps/s]   6%|[35m▌         [0m| 17.2M/300M [05:25<45:00, 105k env steps/s]  6%|[35m▌         [0m| 17.2M/300M [05:25<43:45, 108k env steps/s]  6%|[35m▌         [0m| 17.2M/300M [05:26<42:52, 110k env steps/s]  6%|[35m▌         [0m| 17.3M/300M [05:26<42:18, 111k env steps/s]  6%|[35m▌         [0m| 17.3M/300M [05:26<41:50, 113k env steps/s]  6%|[35m▌         [0m| 17.3M/300M [05:27<41:32, 113k env steps/s]  6%|[35m▌         [0m| 17.4M/300M [05:27<41:18, 114k env steps/s]  6%|[35m▌         [0m| 17.4M/300M [05:27<41:08, 114k env steps/s]  6%|[35m▌         [0m| 17.4M/300M [05:27<41:02, 115k env steps/s]  6%|[35m▌         [0m| 17.5M/300M [05:28<40:58, 115k env steps/s]  6%|[35m▌         [0m| 17.5M/300M [05:28<40:55, 115k env steps/s]  6%|[35m▌         [0m| 17.5M/300M [05:28<40:53, 115k env steps/s]  6%|[35m▌         [0m| 17.6M/300M [05:29<40:50, 115k env steps/s]  6%|[35m▌         [0m| 17.6M/300M [05:29<40:49, 115k env steps/s]  6%|[35m▌         [0m| 17.6M/300M [05:29<40:48, 115k env steps/s]  6%|[35m▌         [0m| 17.7M/300M [05:29<40:47, 115k env steps/s]  6%|[35m▌         [0m| 17.7M/300M [05:30<40:47, 115k env steps/s]  6%|[35m▌         [0m| 17.7M/300M [05:30<40:47, 115k env steps/s]  6%|[35m▌         [0m| 17.8M/300M [05:30<40:45, 115k env steps/s]  6%|[35m▌         [0m| 17.8M/300M [05:31<40:43, 115k env steps/s]  6%|[35m▌         [0m| 17.8M/300M [05:31<40:43, 115k env steps/s]  6%|[35m▌         [0m| 17.9M/300M [05:31<40:43, 115k env steps/s]  6%|[35m▌         [0m| 17.9M/300M [05:31<40:42, 115k env steps/s]  6%|[35m▌         [0m| 17.9M/300M [05:32<40:43, 115k env steps/s]  6%|[35m▌         [0m| 18.0M/300M [05:32<40:43, 115k env steps/s]  6%|[35m▌         [0m| 18.0M/300M [05:32<40:43, 115k env steps/s]  6%|[35m▌         [0m| 18.0M/300M [05:33<40:43, 115k env steps/s]  6%|[35m▌         [0m| 18.1M/300M [05:33<40:42, 115k env steps/s]  6%|[35m▌         [0m| 18.1M/300M [05:33<40:42, 115k env steps/s]  6%|[35m▌         [0m| 18.1M/300M [05:33<40:42, 115k env steps/s]  6%|[35m▌         [0m| 18.2M/300M [05:34<40:42, 115k env steps/s]  6%|[35m▌         [0m| 18.2M/300M [05:34<40:41, 115k env steps/s]  6%|[35m▌         [0m| 18.2M/300M [05:34<40:41, 115k env steps/s]  6%|[35m▌         [0m| 18.3M/300M [05:35<40:41, 115k env steps/s]  6%|[35m▌         [0m| 18.3M/300M [05:35<40:41, 115k env steps/s]  6%|[35m▌         [0m| 18.3M/300M [05:35<40:40, 115k env steps/s]  6%|[35m▌         [0m| 18.4M/300M [05:35<40:40, 115k env steps/s]  6%|[35m▌         [0m| 18.4M/300M [05:36<40:39, 115k env steps/s]  6%|[35m▌         [0m| 18.4M/300M [05:36<40:42, 115k env steps/s]  6%|[35m▌         [0m| 18.4M/300M [05:36<40:40, 115k env steps/s]  6%|[35m▌         [0m| 18.5M/300M [05:37<40:40, 115k env steps/s]  6%|[35m▌         [0m| 18.5M/300M [05:37<40:38, 115k env steps/s]  6%|[35m▌         [0m| 18.5M/300M [05:37<40:38, 115k env steps/s]  6%|[35m▌         [0m| 18.6M/300M [05:37<40:38, 115k env steps/s]  6%|[35m▌         [0m| 18.6M/300M [05:38<40:38, 115k env steps/s]  6%|[35m▌         [0m| 18.6M/300M [05:38<40:38, 115k env steps/s]  6%|[35m▌         [0m| 18.7M/300M [05:38<40:37, 115k env steps/s]  6%|[35m▌         [0m| 18.7M/300M [05:39<40:37, 115k env steps/s]  6%|[35m▌         [0m| 18.7M/300M [05:39<40:36, 115k env steps/s]  6%|[35m▋         [0m| 18.8M/300M [05:39<40:36, 115k env steps/s]  6%|[35m▋         [0m| 18.8M/300M [05:39<40:36, 115k env steps/s]  6%|[35m▋         [0m| 18.8M/300M [05:40<40:37, 115k env steps/s]  6%|[35m▋         [0m| 18.9M/300M [05:40<40:36, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 20480
+    env-step:                                   16777216
+    ppo-update-ater:                            20520
+    env-step-after:                             16809984
+  env/train:                                    
+    avg_avg_episode_length:                     45.988808
+    avg_avg_return:                             0.66801494
+    avg_reward_per_step:                        0.09793091
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.31635565
+      avg_reward_per_step:                      0.039978027
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.37438908
+      avg_reward_per_step:                      0.058135986
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429684.412310465
+    ppo_updates_per_second:                     189.43388643509493
+  ppo:                                          
+    avg_advantage:                              -0.0036200956
+    avg_grad_norm_pre_clip:                     1.8680143
+    avg_loss:                                   0.0021397446
+    avg_loss_actor:                             -0.00086988736
+    avg_loss_critic:                            0.007005626
+    avg_loss_entropy:                           0.49318084
+    max_advantage:                              0.61465776
+    max_grad_norm_pre_clip:                     4.0149655
+    max_loss:                                   0.0071199685
+    max_loss_actor:                             0.0038489094
+    max_loss_critic:                            0.007590995
+    max_loss_entropy:                           0.50891596
+    std_advantage:                              0.1203784
+    std_grad_norm_pre_clip:                     0.8633298
+    std_loss:                                   0.0016495599
+    std_loss_actor:                             0.0016120984
+    std_loss_critic:                            0.00031856788
+    std_loss_entropy:                           0.0056390525
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   43.680595
+      avg_avg_return:                           0.7350073
+      avg_benchmark_regret:                     0.12359396
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.111083984
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.35959047
+        avg_reward_per_step:                    0.052261353
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.38062835
+        avg_reward_per_step:                    0.058891296
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   107.352516
+      avg_avg_return:                           0.20986336
+      avg_benchmark_regret:                     0.700753
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.027633667
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.03412077
+        avg_reward_per_step:                    0.0016860962
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.4682243
+        avg_reward_per_step:                    0.0060424805
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/512/...
+saving checkpoint to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/checkpoints/512...
+  6%|[35m▋         [0m| 18.9M/300M [05:41<40:36, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             6%|[35m▋         [0m| 18.9M/300M [05:44<40:36, 115k env steps/s]  6%|[35m▋         [0m| 18.9M/300M [05:45<4:01:06, 19.4k env steps/s]  6%|[35m▋         [0m| 18.9M/300M [05:45<3:01:52, 25.8k env steps/s]  6%|[35m▋         [0m| 19.0M/300M [05:45<2:19:28, 33.6k env steps/s]  6%|[35m▋         [0m| 19.0M/300M [05:46<1:49:48, 42.7k env steps/s]  6%|[35m▋         [0m| 19.0M/300M [05:46<1:29:03, 52.6k env steps/s]  6%|[35m▋         [0m| 19.1M/300M [05:46<1:14:29, 62.8k env steps/s]  6%|[35m▋         [0m| 19.1M/300M [05:47<1:04:18, 72.8k env steps/s]  6%|[35m▋         [0m| 19.1M/300M [05:47<57:10, 81.9k env steps/s]    6%|[35m▋         [0m| 19.2M/300M [05:47<52:11, 89.7k env steps/s]  6%|[35m▋         [0m| 19.2M/300M [05:47<48:41, 96.1k env steps/s]  6%|[35m▋         [0m| 19.2M/300M [05:48<46:15, 101k env steps/s]   6%|[35m▋         [0m| 19.3M/300M [05:48<44:32, 105k env steps/s]  6%|[35m▋         [0m| 19.3M/300M [05:48<43:21, 108k env steps/s]  6%|[35m▋         [0m| 19.3M/300M [05:49<42:30, 110k env steps/s]  6%|[35m▋         [0m| 19.4M/300M [05:49<41:55, 112k env steps/s]  6%|[35m▋         [0m| 19.4M/300M [05:49<41:29, 113k env steps/s]  6%|[35m▋         [0m| 19.4M/300M [05:49<41:12, 113k env steps/s]  6%|[35m▋         [0m| 19.5M/300M [05:50<40:59, 114k env steps/s]  6%|[35m▋         [0m| 19.5M/300M [05:50<40:52, 114k env steps/s]  7%|[35m▋         [0m| 19.5M/300M [05:50<40:46, 115k env steps/s]  7%|[35m▋         [0m| 19.6M/300M [05:51<40:39, 115k env steps/s]  7%|[35m▋         [0m| 19.6M/300M [05:51<40:36, 115k env steps/s]  7%|[35m▋         [0m| 19.6M/300M [05:51<40:34, 115k env steps/s]  7%|[35m▋         [0m| 19.7M/300M [05:51<40:31, 115k env steps/s]  7%|[35m▋         [0m| 19.7M/300M [05:52<40:30, 115k env steps/s]  7%|[35m▋         [0m| 19.7M/300M [05:52<40:29, 115k env steps/s]  7%|[35m▋         [0m| 19.8M/300M [05:52<40:29, 115k env steps/s]  7%|[35m▋         [0m| 19.8M/300M [05:53<40:32, 115k env steps/s]  7%|[35m▋         [0m| 19.8M/300M [05:53<40:29, 115k env steps/s]  7%|[35m▋         [0m| 19.9M/300M [05:53<40:29, 115k env steps/s]  7%|[35m▋         [0m| 19.9M/300M [05:53<40:27, 115k env steps/s]  7%|[35m▋         [0m| 19.9M/300M [05:54<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.0M/300M [05:54<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.0M/300M [05:54<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.0M/300M [05:55<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.1M/300M [05:55<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.1M/300M [05:55<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.1M/300M [05:55<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.2M/300M [05:56<40:27, 115k env steps/s]  7%|[35m▋         [0m| 20.2M/300M [05:56<40:25, 115k env steps/s]  7%|[35m▋         [0m| 20.2M/300M [05:56<40:25, 115k env steps/s]  7%|[35m▋         [0m| 20.3M/300M [05:57<40:25, 115k env steps/s]  7%|[35m▋         [0m| 20.3M/300M [05:57<40:25, 115k env steps/s]  7%|[35m▋         [0m| 20.3M/300M [05:57<40:26, 115k env steps/s]  7%|[35m▋         [0m| 20.3M/300M [05:57<40:23, 115k env steps/s]  7%|[35m▋         [0m| 20.4M/300M [05:58<40:24, 115k env steps/s]  7%|[35m▋         [0m| 20.4M/300M [05:58<40:23, 115k env steps/s]  7%|[35m▋         [0m| 20.4M/300M [05:58<40:24, 115k env steps/s]  7%|[35m▋         [0m| 20.5M/300M [05:59<40:23, 115k env steps/s]  7%|[35m▋         [0m| 20.5M/300M [05:59<40:22, 115k env steps/s]  7%|[35m▋         [0m| 20.5M/300M [05:59<40:20, 115k env steps/s]  7%|[35m▋         [0m| 20.6M/300M [05:59<40:20, 115k env steps/s]  7%|[35m▋         [0m| 20.6M/300M [06:00<40:20, 115k env steps/s]  7%|[35m▋         [0m| 20.6M/300M [06:00<40:22, 115k env steps/s]  7%|[35m▋         [0m| 20.7M/300M [06:00<40:20, 115k env steps/s]  7%|[35m▋         [0m| 20.7M/300M [06:01<40:20, 115k env steps/s]  7%|[35m▋         [0m| 20.7M/300M [06:01<40:19, 115k env steps/s]  7%|[35m▋         [0m| 20.8M/300M [06:01<40:21, 115k env steps/s]  7%|[35m▋         [0m| 20.8M/300M [06:01<40:19, 115k env steps/s]  7%|[35m▋         [0m| 20.8M/300M [06:02<40:18, 115k env steps/s]  7%|[35m▋         [0m| 20.9M/300M [06:02<40:19, 115k env steps/s]  7%|[35m▋         [0m| 20.9M/300M [06:02<40:18, 115k env steps/s]  7%|[35m▋         [0m| 20.9M/300M [06:03<40:20, 115k env steps/s]  7%|[35m▋         [0m| 21.0M/300M [06:03<40:18, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 23040
+    env-step:                                   18874368
+    ppo-update-ater:                            23080
+    env-step-after:                             18907136
+  env/train:                                    
+    avg_avg_episode_length:                     47.102737
+    avg_avg_return:                             0.6728831
+    avg_reward_per_step:                        0.1031189
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.34033835
+      avg_reward_per_step:                      0.04333496
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.34259778
+      avg_reward_per_step:                      0.059936523
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429540.6169896998
+    ppo_updates_per_second:                     189.28033596347598
+  ppo:                                          
+    avg_advantage:                              0.0015377493
+    avg_grad_norm_pre_clip:                     1.8747886
+    avg_loss:                                   0.0027134852
+    avg_loss_actor:                             -0.00094303413
+    avg_loss_critic:                            0.008307885
+    avg_loss_entropy:                           0.49742356
+    max_advantage:                              0.8846502
+    max_grad_norm_pre_clip:                     3.9100564
+    max_loss:                                   0.0077495137
+    max_loss_actor:                             0.0039431714
+    max_loss_critic:                            0.009089759
+    max_loss_entropy:                           0.50666505
+    std_advantage:                              0.13073564
+    std_grad_norm_pre_clip:                     0.8018103
+    std_loss:                                   0.0022212751
+    std_loss_actor:                             0.0021561116
+    std_loss_critic:                            0.000344214
+    std_loss_entropy:                           0.0047632386
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   42.362885
+      avg_avg_return:                           0.7443768
+      avg_benchmark_regret:                     0.11422447
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.1142807
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.35719386
+        avg_reward_per_step:                    0.053222656
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.39347422
+        avg_reward_per_step:                    0.06113434
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   108.67088
+      avg_avg_return:                           0.19139378
+      avg_benchmark_regret:                     0.7192226
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.026275635
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.030299872
+        avg_reward_per_step:                    0.0016326904
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.4717233
+        avg_reward_per_step:                    0.0064849854
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/576/...
+  7%|[35m▋         [0m| 21.0M/300M [06:04<40:18, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             7%|[35m▋         [0m| 21.0M/300M [06:07<40:18, 115k env steps/s]  7%|[35m▋         [0m| 21.0M/300M [06:08<3:59:41, 19.4k env steps/s]  7%|[35m▋         [0m| 21.0M/300M [06:08<2:59:46, 25.9k env steps/s]  7%|[35m▋         [0m| 21.1M/300M [06:08<2:17:54, 33.7k env steps/s]  7%|[35m▋         [0m| 21.1M/300M [06:09<1:48:36, 42.8k env steps/s]  7%|[35m▋         [0m| 21.1M/300M [06:09<1:28:05, 52.8k env steps/s]  7%|[35m▋         [0m| 21.2M/300M [06:09<1:13:44, 63.0k env steps/s]  7%|[35m▋         [0m| 21.2M/300M [06:09<1:03:40, 73.0k env steps/s]  7%|[35m▋         [0m| 21.2M/300M [06:10<56:38, 82.0k env steps/s]    7%|[35m▋         [0m| 21.3M/300M [06:10<51:42, 89.8k env steps/s]  7%|[35m▋         [0m| 21.3M/300M [06:10<48:15, 96.3k env steps/s]  7%|[35m▋         [0m| 21.3M/300M [06:11<45:51, 101k env steps/s]   7%|[35m▋         [0m| 21.4M/300M [06:11<44:09, 105k env steps/s]  7%|[35m▋         [0m| 21.4M/300M [06:11<43:00, 108k env steps/s]  7%|[35m▋         [0m| 21.4M/300M [06:11<42:08, 110k env steps/s]  7%|[35m▋         [0m| 21.5M/300M [06:12<41:33, 112k env steps/s]  7%|[35m▋         [0m| 21.5M/300M [06:12<41:09, 113k env steps/s]  7%|[35m▋         [0m| 21.5M/300M [06:12<40:52, 114k env steps/s]  7%|[35m▋         [0m| 21.6M/300M [06:13<40:39, 114k env steps/s]  7%|[35m▋         [0m| 21.6M/300M [06:13<40:31, 115k env steps/s]  7%|[35m▋         [0m| 21.6M/300M [06:13<40:24, 115k env steps/s]  7%|[35m▋         [0m| 21.7M/300M [06:13<40:19, 115k env steps/s]  7%|[35m▋         [0m| 21.7M/300M [06:14<40:16, 115k env steps/s]  7%|[35m▋         [0m| 21.7M/300M [06:14<40:13, 115k env steps/s]  7%|[35m▋         [0m| 21.8M/300M [06:14<40:11, 115k env steps/s]  7%|[35m▋         [0m| 21.8M/300M [06:15<40:10, 115k env steps/s]  7%|[35m▋         [0m| 21.8M/300M [06:15<40:10, 115k env steps/s]  7%|[35m▋         [0m| 21.9M/300M [06:15<40:10, 115k env steps/s]  7%|[35m▋         [0m| 21.9M/300M [06:15<40:10, 115k env steps/s]  7%|[35m▋         [0m| 21.9M/300M [06:16<40:10, 115k env steps/s]  7%|[35m▋         [0m| 22.0M/300M [06:16<40:09, 115k env steps/s]  7%|[35m▋         [0m| 22.0M/300M [06:16<40:11, 115k env steps/s]  7%|[35m▋         [0m| 22.0M/300M [06:17<40:08, 115k env steps/s]  7%|[35m▋         [0m| 22.1M/300M [06:17<40:08, 115k env steps/s]  7%|[35m▋         [0m| 22.1M/300M [06:17<40:08, 115k env steps/s]  7%|[35m▋         [0m| 22.1M/300M [06:17<40:06, 115k env steps/s]  7%|[35m▋         [0m| 22.2M/300M [06:18<40:05, 115k env steps/s]  7%|[35m▋         [0m| 22.2M/300M [06:18<40:05, 115k env steps/s]  7%|[35m▋         [0m| 22.2M/300M [06:18<40:05, 115k env steps/s]  7%|[35m▋         [0m| 22.2M/300M [06:19<40:05, 115k env steps/s]  7%|[35m▋         [0m| 22.3M/300M [06:19<40:05, 115k env steps/s]  7%|[35m▋         [0m| 22.3M/300M [06:19<40:03, 116k env steps/s]  7%|[35m▋         [0m| 22.3M/300M [06:19<40:03, 116k env steps/s]  7%|[35m▋         [0m| 22.4M/300M [06:20<40:03, 116k env steps/s]  7%|[35m▋         [0m| 22.4M/300M [06:20<40:03, 115k env steps/s]  7%|[35m▋         [0m| 22.4M/300M [06:20<40:02, 116k env steps/s]  7%|[35m▋         [0m| 22.5M/300M [06:21<40:02, 116k env steps/s]  8%|[35m▊         [0m| 22.5M/300M [06:21<40:01, 116k env steps/s]  8%|[35m▊         [0m| 22.5M/300M [06:21<40:02, 115k env steps/s]  8%|[35m▊         [0m| 22.6M/300M [06:21<40:02, 115k env steps/s]  8%|[35m▊         [0m| 22.6M/300M [06:22<40:02, 115k env steps/s]  8%|[35m▊         [0m| 22.6M/300M [06:22<40:01, 115k env steps/s]  8%|[35m▊         [0m| 22.7M/300M [06:22<40:02, 115k env steps/s]  8%|[35m▊         [0m| 22.7M/300M [06:23<40:01, 115k env steps/s]  8%|[35m▊         [0m| 22.7M/300M [06:23<40:00, 116k env steps/s]  8%|[35m▊         [0m| 22.8M/300M [06:23<39:59, 116k env steps/s]  8%|[35m▊         [0m| 22.8M/300M [06:23<40:01, 115k env steps/s]  8%|[35m▊         [0m| 22.8M/300M [06:24<39:59, 116k env steps/s]  8%|[35m▊         [0m| 22.9M/300M [06:24<39:58, 116k env steps/s]  8%|[35m▊         [0m| 22.9M/300M [06:24<39:58, 116k env steps/s]  8%|[35m▊         [0m| 22.9M/300M [06:25<39:58, 115k env steps/s]  8%|[35m▊         [0m| 23.0M/300M [06:25<39:58, 115k env steps/s]  8%|[35m▊         [0m| 23.0M/300M [06:25<40:00, 115k env steps/s]  8%|[35m▊         [0m| 23.0M/300M [06:25<40:00, 115k env steps/s]  8%|[35m▊         [0m| 23.1M/300M [06:26<39:57, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 25600
+    env-step:                                   20971520
+    ppo-update-ater:                            25640
+    env-step-after:                             21004288
+  env/train:                                    
+    avg_avg_episode_length:                     41.293438
+    avg_avg_return:                             0.7057563
+    avg_reward_per_step:                        0.097961426
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.3438893
+      avg_reward_per_step:                      0.04626465
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.3739653
+      avg_reward_per_step:                      0.051818848
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       428948.45890621154
+    ppo_updates_per_second:                     188.97806650619557
+  ppo:                                          
+    avg_advantage:                              -0.008367253
+    avg_grad_norm_pre_clip:                     2.309543
+    avg_loss:                                   0.0017970119
+    avg_loss_actor:                             -0.0008359354
+    avg_loss_critic:                            0.006169919
+    avg_loss_entropy:                           0.45201206
+    max_advantage:                              0.88712084
+    max_grad_norm_pre_clip:                     5.3747435
+    max_loss:                                   0.0070730476
+    max_loss_actor:                             0.0046086498
+    max_loss_critic:                            0.0067892713
+    max_loss_entropy:                           0.4678718
+    std_advantage:                              0.113216355
+    std_grad_norm_pre_clip:                     1.0189066
+    std_loss:                                   0.0019234807
+    std_loss_actor:                             0.0018808969
+    std_loss_critic:                            0.0002771257
+    std_loss_entropy:                           0.005974635
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   42.115913
+      avg_avg_return:                           0.742393
+      avg_benchmark_regret:                     0.116208225
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.11463165
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.36041993
+        avg_reward_per_step:                    0.054374695
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.39550215
+        avg_reward_per_step:                    0.0603714
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   107.54062
+      avg_avg_return:                           0.20649618
+      avg_benchmark_regret:                     0.7041203
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.02734375
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.05198872
+        avg_reward_per_step:                    0.0018081665
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.48349988
+        avg_reward_per_step:                    0.0063934326
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/640/...
+  8%|[35m▊         [0m| 23.1M/300M [06:26<39:57, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             8%|[35m▊         [0m| 23.1M/300M [06:30<39:57, 115k env steps/s]  8%|[35m▊         [0m| 23.1M/300M [06:31<3:59:46, 19.2k env steps/s]  8%|[35m▊         [0m| 23.1M/300M [06:31<2:59:57, 25.6k env steps/s]  8%|[35m▊         [0m| 23.2M/300M [06:31<2:17:56, 33.4k env steps/s]  8%|[35m▊         [0m| 23.2M/300M [06:32<1:48:32, 42.5k env steps/s]  8%|[35m▊         [0m| 23.2M/300M [06:32<1:27:57, 52.4k env steps/s]  8%|[35m▊         [0m| 23.3M/300M [06:32<1:13:33, 62.7k env steps/s]  8%|[35m▊         [0m| 23.3M/300M [06:32<1:03:28, 72.6k env steps/s]  8%|[35m▊         [0m| 23.3M/300M [06:33<56:24, 81.7k env steps/s]    8%|[35m▊         [0m| 23.4M/300M [06:33<51:28, 89.6k env steps/s]  8%|[35m▊         [0m| 23.4M/300M [06:33<48:00, 96.0k env steps/s]  8%|[35m▊         [0m| 23.4M/300M [06:34<45:34, 101k env steps/s]   8%|[35m▊         [0m| 23.5M/300M [06:34<43:52, 105k env steps/s]  8%|[35m▊         [0m| 23.5M/300M [06:34<42:40, 108k env steps/s]  8%|[35m▊         [0m| 23.5M/300M [06:34<41:51, 110k env steps/s]  8%|[35m▊         [0m| 23.6M/300M [06:35<41:16, 112k env steps/s]  8%|[35m▊         [0m| 23.6M/300M [06:35<40:51, 113k env steps/s]  8%|[35m▊         [0m| 23.6M/300M [06:35<40:33, 114k env steps/s]  8%|[35m▊         [0m| 23.7M/300M [06:35<40:21, 114k env steps/s]  8%|[35m▊         [0m| 23.7M/300M [06:36<40:13, 115k env steps/s]  8%|[35m▊         [0m| 23.7M/300M [06:36<40:06, 115k env steps/s]  8%|[35m▊         [0m| 23.8M/300M [06:36<40:02, 115k env steps/s]  8%|[35m▊         [0m| 23.8M/300M [06:37<40:02, 115k env steps/s]  8%|[35m▊         [0m| 23.8M/300M [06:37<39:58, 115k env steps/s]  8%|[35m▊         [0m| 23.9M/300M [06:37<39:55, 115k env steps/s]  8%|[35m▊         [0m| 23.9M/300M [06:37<39:54, 115k env steps/s]  8%|[35m▊         [0m| 23.9M/300M [06:38<39:52, 115k env steps/s]  8%|[35m▊         [0m| 24.0M/300M [06:38<39:52, 115k env steps/s]  8%|[35m▊         [0m| 24.0M/300M [06:38<39:51, 115k env steps/s]  8%|[35m▊         [0m| 24.0M/300M [06:39<39:50, 115k env steps/s]  8%|[35m▊         [0m| 24.1M/300M [06:39<39:50, 115k env steps/s]  8%|[35m▊         [0m| 24.1M/300M [06:39<39:49, 115k env steps/s]  8%|[35m▊         [0m| 24.1M/300M [06:39<39:49, 115k env steps/s]  8%|[35m▊         [0m| 24.2M/300M [06:40<39:48, 115k env steps/s]  8%|[35m▊         [0m| 24.2M/300M [06:40<39:48, 115k env steps/s]  8%|[35m▊         [0m| 24.2M/300M [06:40<39:48, 115k env steps/s]  8%|[35m▊         [0m| 24.2M/300M [06:41<39:48, 115k env steps/s]  8%|[35m▊         [0m| 24.3M/300M [06:41<39:48, 115k env steps/s]  8%|[35m▊         [0m| 24.3M/300M [06:41<39:47, 115k env steps/s]  8%|[35m▊         [0m| 24.3M/300M [06:41<39:46, 115k env steps/s]  8%|[35m▊         [0m| 24.4M/300M [06:42<39:46, 116k env steps/s]  8%|[35m▊         [0m| 24.4M/300M [06:42<39:46, 115k env steps/s]  8%|[35m▊         [0m| 24.4M/300M [06:42<39:46, 115k env steps/s]  8%|[35m▊         [0m| 24.5M/300M [06:43<39:45, 116k env steps/s]  8%|[35m▊         [0m| 24.5M/300M [06:43<39:44, 116k env steps/s]  8%|[35m▊         [0m| 24.5M/300M [06:43<39:44, 115k env steps/s]  8%|[35m▊         [0m| 24.6M/300M [06:43<39:45, 115k env steps/s]  8%|[35m▊         [0m| 24.6M/300M [06:44<39:44, 116k env steps/s]  8%|[35m▊         [0m| 24.6M/300M [06:44<39:43, 116k env steps/s]  8%|[35m▊         [0m| 24.7M/300M [06:44<39:43, 116k env steps/s]  8%|[35m▊         [0m| 24.7M/300M [06:45<39:42, 116k env steps/s]  8%|[35m▊         [0m| 24.7M/300M [06:45<39:43, 116k env steps/s]  8%|[35m▊         [0m| 24.8M/300M [06:45<39:42, 116k env steps/s]  8%|[35m▊         [0m| 24.8M/300M [06:45<39:42, 116k env steps/s]  8%|[35m▊         [0m| 24.8M/300M [06:46<39:42, 115k env steps/s]  8%|[35m▊         [0m| 24.9M/300M [06:46<39:42, 115k env steps/s]  8%|[35m▊         [0m| 24.9M/300M [06:46<39:43, 115k env steps/s]  8%|[35m▊         [0m| 24.9M/300M [06:47<39:43, 115k env steps/s]  8%|[35m▊         [0m| 25.0M/300M [06:47<39:42, 115k env steps/s]  8%|[35m▊         [0m| 25.0M/300M [06:47<39:42, 115k env steps/s]  8%|[35m▊         [0m| 25.0M/300M [06:47<39:41, 115k env steps/s]  8%|[35m▊         [0m| 25.1M/300M [06:48<39:41, 115k env steps/s]  8%|[35m▊         [0m| 25.1M/300M [06:48<39:40, 115k env steps/s]  8%|[35m▊         [0m| 25.1M/300M [06:48<39:40, 115k env steps/s]  8%|[35m▊         [0m| 25.2M/300M [06:49<39:40, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 28160
+    env-step:                                   23068672
+    ppo-update-ater:                            28200
+    env-step-after:                             23101440
+  env/train:                                    
+    avg_avg_episode_length:                     46.32559
+    avg_avg_return:                             0.66655296
+    avg_reward_per_step:                        0.09738159
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.2577427
+      avg_reward_per_step:                      0.030151367
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.44351256
+      avg_reward_per_step:                      0.0675354
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       428891.4648969506
+    ppo_updates_per_second:                     189.68177418350186
+  ppo:                                          
+    avg_advantage:                              0.0001765461
+    avg_grad_norm_pre_clip:                     2.0455215
+    avg_loss:                                   0.0019887716
+    avg_loss_actor:                             -0.0011460404
+    avg_loss_critic:                            0.007179353
+    avg_loss_entropy:                           0.45486423
+    max_advantage:                              0.71611506
+    max_grad_norm_pre_clip:                     4.27384
+    max_loss:                                   0.0058516916
+    max_loss_actor:                             0.002844668
+    max_loss_critic:                            0.0077622635
+    max_loss_entropy:                           0.4681785
+    std_advantage:                              0.12205064
+    std_grad_norm_pre_clip:                     0.8515307
+    std_loss:                                   0.0020484917
+    std_loss_actor:                             0.0019973095
+    std_loss_critic:                            0.0002921761
+    std_loss_entropy:                           0.007026049
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   41.28437
+      avg_avg_return:                           0.75210845
+      avg_benchmark_regret:                     0.10649282
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.11679077
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.36216176
+        avg_reward_per_step:                    0.055114746
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.40853792
+        avg_reward_per_step:                    0.06185913
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   107.05322
+      avg_avg_return:                           0.20218839
+      avg_benchmark_regret:                     0.708428
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.029823303
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.028423607
+        avg_reward_per_step:                    0.001663208
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.47426045
+        avg_reward_per_step:                    0.005844116
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/704/...
+  8%|[35m▊         [0m| 25.2M/300M [06:49<39:40, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             8%|[35m▊         [0m| 25.2M/300M [06:53<39:40, 115k env steps/s]  8%|[35m▊         [0m| 25.2M/300M [06:54<3:58:17, 19.2k env steps/s]  8%|[35m▊         [0m| 25.2M/300M [06:54<2:58:57, 25.6k env steps/s]  8%|[35m▊         [0m| 25.3M/300M [06:54<2:17:10, 33.4k env steps/s]  8%|[35m▊         [0m| 25.3M/300M [06:54<1:47:55, 42.4k env steps/s]  8%|[35m▊         [0m| 25.3M/300M [06:55<1:27:26, 52.3k env steps/s]  8%|[35m▊         [0m| 25.4M/300M [06:55<1:13:06, 62.6k env steps/s]  8%|[35m▊         [0m| 25.4M/300M [06:55<1:03:03, 72.6k env steps/s]  8%|[35m▊         [0m| 25.4M/300M [06:56<56:01, 81.7k env steps/s]    8%|[35m▊         [0m| 25.5M/300M [06:56<51:06, 89.5k env steps/s]  8%|[35m▊         [0m| 25.5M/300M [06:56<47:39, 96.0k env steps/s]  9%|[35m▊         [0m| 25.5M/300M [06:56<45:14, 101k env steps/s]   9%|[35m▊         [0m| 25.6M/300M [06:57<43:33, 105k env steps/s]  9%|[35m▊         [0m| 25.6M/300M [06:57<42:22, 108k env steps/s]  9%|[35m▊         [0m| 25.6M/300M [06:57<41:33, 110k env steps/s]  9%|[35m▊         [0m| 25.7M/300M [06:58<40:58, 112k env steps/s]  9%|[35m▊         [0m| 25.7M/300M [06:58<40:34, 113k env steps/s]  9%|[35m▊         [0m| 25.7M/300M [06:58<40:17, 113k env steps/s]  9%|[35m▊         [0m| 25.8M/300M [06:58<40:04, 114k env steps/s]  9%|[35m▊         [0m| 25.8M/300M [06:59<39:55, 114k env steps/s]  9%|[35m▊         [0m| 25.8M/300M [06:59<39:49, 115k env steps/s]  9%|[35m▊         [0m| 25.9M/300M [06:59<39:43, 115k env steps/s]  9%|[35m▊         [0m| 25.9M/300M [07:00<39:40, 115k env steps/s]  9%|[35m▊         [0m| 25.9M/300M [07:00<39:38, 115k env steps/s]  9%|[35m▊         [0m| 26.0M/300M [07:00<39:37, 115k env steps/s]  9%|[35m▊         [0m| 26.0M/300M [07:00<39:35, 115k env steps/s]  9%|[35m▊         [0m| 26.0M/300M [07:01<39:35, 115k env steps/s]  9%|[35m▊         [0m| 26.1M/300M [07:01<39:34, 115k env steps/s]  9%|[35m▊         [0m| 26.1M/300M [07:01<39:34, 115k env steps/s]  9%|[35m▊         [0m| 26.1M/300M [07:02<39:33, 115k env steps/s]  9%|[35m▊         [0m| 26.1M/300M [07:02<39:32, 115k env steps/s]  9%|[35m▊         [0m| 26.2M/300M [07:02<39:31, 115k env steps/s]  9%|[35m▊         [0m| 26.2M/300M [07:02<39:31, 115k env steps/s]  9%|[35m▊         [0m| 26.2M/300M [07:03<39:31, 115k env steps/s]  9%|[35m▉         [0m| 26.3M/300M [07:03<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.3M/300M [07:03<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.3M/300M [07:04<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.4M/300M [07:04<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.4M/300M [07:04<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.4M/300M [07:04<39:31, 115k env steps/s]  9%|[35m▉         [0m| 26.5M/300M [07:05<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.5M/300M [07:05<39:30, 115k env steps/s]  9%|[35m▉         [0m| 26.5M/300M [07:05<39:29, 115k env steps/s]  9%|[35m▉         [0m| 26.6M/300M [07:05<39:28, 115k env steps/s]  9%|[35m▉         [0m| 26.6M/300M [07:06<39:28, 115k env steps/s]  9%|[35m▉         [0m| 26.6M/300M [07:06<39:27, 115k env steps/s]  9%|[35m▉         [0m| 26.7M/300M [07:06<39:27, 115k env steps/s]  9%|[35m▉         [0m| 26.7M/300M [07:07<39:27, 115k env steps/s]  9%|[35m▉         [0m| 26.7M/300M [07:07<39:27, 115k env steps/s]  9%|[35m▉         [0m| 26.8M/300M [07:07<39:27, 115k env steps/s]  9%|[35m▉         [0m| 26.8M/300M [07:07<39:27, 115k env steps/s]  9%|[35m▉         [0m| 26.8M/300M [07:08<39:26, 115k env steps/s]  9%|[35m▉         [0m| 26.9M/300M [07:08<39:26, 115k env steps/s]  9%|[35m▉         [0m| 26.9M/300M [07:08<39:25, 115k env steps/s]  9%|[35m▉         [0m| 26.9M/300M [07:09<39:25, 115k env steps/s]  9%|[35m▉         [0m| 27.0M/300M [07:09<39:25, 115k env steps/s]  9%|[35m▉         [0m| 27.0M/300M [07:09<39:24, 115k env steps/s]  9%|[35m▉         [0m| 27.0M/300M [07:09<39:24, 115k env steps/s]  9%|[35m▉         [0m| 27.1M/300M [07:10<39:24, 115k env steps/s]  9%|[35m▉         [0m| 27.1M/300M [07:10<39:24, 115k env steps/s]  9%|[35m▉         [0m| 27.1M/300M [07:10<39:23, 115k env steps/s]  9%|[35m▉         [0m| 27.2M/300M [07:11<39:23, 115k env steps/s]  9%|[35m▉         [0m| 27.2M/300M [07:11<39:23, 115k env steps/s]  9%|[35m▉         [0m| 27.2M/300M [07:11<39:22, 115k env steps/s]  9%|[35m▉         [0m| 27.3M/300M [07:11<39:22, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 30720
+    env-step:                                   25165824
+    ppo-update-ater:                            30760
+    env-step-after:                             25198592
+  env/train:                                    
+    avg_avg_episode_length:                     38.511597
+    avg_avg_return:                             0.7295852
+    avg_reward_per_step:                        0.10559082
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.3401878
+      avg_reward_per_step:                      0.04763794
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.40949416
+      avg_reward_per_step:                      0.058135986
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429515.2272772685
+    ppo_updates_per_second:                     189.21007877913027
+  ppo:                                          
+    avg_advantage:                              -0.0025504597
+    avg_grad_norm_pre_clip:                     1.8692731
+    avg_loss:                                   0.00028911332
+    avg_loss_actor:                             -0.0019164443
+    avg_loss_critic:                            0.005147134
+    avg_loss_entropy:                           0.3680091
+    max_advantage:                              0.7092879
+    max_grad_norm_pre_clip:                     3.2901535
+    max_loss:                                   0.0047566756
+    max_loss_actor:                             0.0023736642
+    max_loss_critic:                            0.0058996635
+    max_loss_entropy:                           0.3762804
+    std_advantage:                              0.10320239
+    std_grad_norm_pre_clip:                     0.6348237
+    std_loss:                                   0.00183569
+    std_loss_actor:                             0.0017892454
+    std_loss_critic:                            0.00025155174
+    std_loss_entropy:                           0.004408462
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   39.66153
+      avg_avg_return:                           0.762444
+      avg_benchmark_regret:                     0.09615725
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.12012482
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.36032587
+        avg_reward_per_step:                    0.055900574
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.41995677
+        avg_reward_per_step:                    0.06439209
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   106.99464
+      avg_avg_return:                           0.20344089
+      avg_benchmark_regret:                     0.7071755
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.03262329
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.019717116
+        avg_reward_per_step:                    0.0016860962
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.4943366
+        avg_reward_per_step:                    0.0068588257
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/768/...
+  9%|[35m▉         [0m| 27.3M/300M [07:12<39:22, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                             9%|[35m▉         [0m| 27.3M/300M [07:16<39:22, 115k env steps/s]  9%|[35m▉         [0m| 27.3M/300M [07:16<3:54:57, 19.3k env steps/s]  9%|[35m▉         [0m| 27.3M/300M [07:17<2:56:48, 25.7k env steps/s]  9%|[35m▉         [0m| 27.4M/300M [07:17<2:15:33, 33.5k env steps/s]  9%|[35m▉         [0m| 27.4M/300M [07:17<1:46:41, 42.6k env steps/s]  9%|[35m▉         [0m| 27.4M/300M [07:18<1:26:28, 52.5k env steps/s]  9%|[35m▉         [0m| 27.5M/300M [07:18<1:12:20, 62.8k env steps/s]  9%|[35m▉         [0m| 27.5M/300M [07:18<1:02:25, 72.7k env steps/s]  9%|[35m▉         [0m| 27.5M/300M [07:18<55:30, 81.8k env steps/s]    9%|[35m▉         [0m| 27.6M/300M [07:19<50:39, 89.6k env steps/s]  9%|[35m▉         [0m| 27.6M/300M [07:19<47:14, 96.1k env steps/s]  9%|[35m▉         [0m| 27.6M/300M [07:19<44:51, 101k env steps/s]   9%|[35m▉         [0m| 27.7M/300M [07:20<43:12, 105k env steps/s]  9%|[35m▉         [0m| 27.7M/300M [07:20<42:01, 108k env steps/s]  9%|[35m▉         [0m| 27.7M/300M [07:20<41:14, 110k env steps/s]  9%|[35m▉         [0m| 27.8M/300M [07:20<40:37, 112k env steps/s]  9%|[35m▉         [0m| 27.8M/300M [07:21<40:13, 113k env steps/s]  9%|[35m▉         [0m| 27.8M/300M [07:21<39:58, 113k env steps/s]  9%|[35m▉         [0m| 27.9M/300M [07:21<39:45, 114k env steps/s]  9%|[35m▉         [0m| 27.9M/300M [07:22<39:36, 115k env steps/s]  9%|[35m▉         [0m| 27.9M/300M [07:22<39:30, 115k env steps/s]  9%|[35m▉         [0m| 28.0M/300M [07:22<39:25, 115k env steps/s]  9%|[35m▉         [0m| 28.0M/300M [07:22<39:22, 115k env steps/s]  9%|[35m▉         [0m| 28.0M/300M [07:23<39:19, 115k env steps/s]  9%|[35m▉         [0m| 28.0M/300M [07:23<39:17, 115k env steps/s]  9%|[35m▉         [0m| 28.1M/300M [07:23<39:16, 115k env steps/s]  9%|[35m▉         [0m| 28.1M/300M [07:24<39:15, 115k env steps/s]  9%|[35m▉         [0m| 28.1M/300M [07:24<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.2M/300M [07:24<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.2M/300M [07:24<39:13, 115k env steps/s]  9%|[35m▉         [0m| 28.2M/300M [07:25<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.3M/300M [07:25<39:15, 115k env steps/s]  9%|[35m▉         [0m| 28.3M/300M [07:25<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.3M/300M [07:26<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.4M/300M [07:26<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.4M/300M [07:26<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.4M/300M [07:26<39:14, 115k env steps/s]  9%|[35m▉         [0m| 28.5M/300M [07:27<39:14, 115k env steps/s] 10%|[35m▉         [0m| 28.5M/300M [07:27<39:15, 115k env steps/s] 10%|[35m▉         [0m| 28.5M/300M [07:27<39:13, 115k env steps/s] 10%|[35m▉         [0m| 28.6M/300M [07:28<39:13, 115k env steps/s] 10%|[35m▉         [0m| 28.6M/300M [07:28<39:12, 115k env steps/s] 10%|[35m▉         [0m| 28.6M/300M [07:28<39:11, 115k env steps/s] 10%|[35m▉         [0m| 28.7M/300M [07:28<39:11, 115k env steps/s] 10%|[35m▉         [0m| 28.7M/300M [07:29<39:10, 115k env steps/s] 10%|[35m▉         [0m| 28.7M/300M [07:29<39:11, 115k env steps/s] 10%|[35m▉         [0m| 28.8M/300M [07:29<39:12, 115k env steps/s] 10%|[35m▉         [0m| 28.8M/300M [07:30<39:11, 115k env steps/s] 10%|[35m▉         [0m| 28.8M/300M [07:30<39:11, 115k env steps/s] 10%|[35m▉         [0m| 28.9M/300M [07:30<39:10, 115k env steps/s] 10%|[35m▉         [0m| 28.9M/300M [07:30<39:10, 115k env steps/s] 10%|[35m▉         [0m| 28.9M/300M [07:31<39:09, 115k env steps/s] 10%|[35m▉         [0m| 29.0M/300M [07:31<39:09, 115k env steps/s] 10%|[35m▉         [0m| 29.0M/300M [07:31<39:08, 115k env steps/s] 10%|[35m▉         [0m| 29.0M/300M [07:32<39:06, 115k env steps/s] 10%|[35m▉         [0m| 29.1M/300M [07:32<39:05, 115k env steps/s] 10%|[35m▉         [0m| 29.1M/300M [07:32<39:05, 116k env steps/s] 10%|[35m▉         [0m| 29.1M/300M [07:32<39:05, 116k env steps/s] 10%|[35m▉         [0m| 29.2M/300M [07:33<39:04, 116k env steps/s] 10%|[35m▉         [0m| 29.2M/300M [07:33<39:05, 115k env steps/s] 10%|[35m▉         [0m| 29.2M/300M [07:33<39:04, 116k env steps/s] 10%|[35m▉         [0m| 29.3M/300M [07:33<39:04, 115k env steps/s] 10%|[35m▉         [0m| 29.3M/300M [07:34<39:04, 115k env steps/s] 10%|[35m▉         [0m| 29.3M/300M [07:34<39:03, 115k env steps/s] 10%|[35m▉         [0m| 29.4M/300M [07:34<39:05, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 33280
+    env-step:                                   27262976
+    ppo-update-ater:                            33320
+    env-step-after:                             27295744
+  env/train:                                    
+    avg_avg_episode_length:                     43.27329
+    avg_avg_return:                             0.6921954
+    avg_reward_per_step:                        0.11022949
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.3105469
+      avg_reward_per_step:                      0.046875
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.4122937
+      avg_reward_per_step:                      0.06359863
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429874.7275996083
+    ppo_updates_per_second:                     189.5273333238488
+  ppo:                                          
+    avg_advantage:                              -0.0003478619
+    avg_grad_norm_pre_clip:                     1.8961309
+    avg_loss:                                   0.0009930317
+    avg_loss_actor:                             -0.0014996793
+    avg_loss_critic:                            0.005809407
+    avg_loss_entropy:                           0.41199255
+    max_advantage:                              0.66398287
+    max_grad_norm_pre_clip:                     3.700257
+    max_loss:                                   0.004561677
+    max_loss_actor:                             0.0020380258
+    max_loss_critic:                            0.006269953
+    max_loss_entropy:                           0.42181784
+    std_advantage:                              0.10966954
+    std_grad_norm_pre_clip:                     0.74501234
+    std_loss:                                   0.0015116706
+    std_loss_actor:                             0.0014705834
+    std_loss_critic:                            0.00024217302
+    std_loss_entropy:                           0.0045473287
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   40.701553
+      avg_avg_return:                           0.75498116
+      avg_benchmark_regret:                     0.10362005
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.11859894
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.3665042
+        avg_reward_per_step:                    0.05571747
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.40936846
+        avg_reward_per_step:                    0.06309509
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   105.802864
+      avg_avg_return:                           0.20940374
+      avg_benchmark_regret:                     0.70121264
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.03199005
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.017851867
+        avg_reward_per_step:                    0.0016479492
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.49799183
+        avg_reward_per_step:                    0.0065460205
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/832/...
+ 10%|[35m▉         [0m| 29.4M/300M [07:35<39:05, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                            10%|[35m▉         [0m| 29.4M/300M [07:39<39:05, 115k env steps/s] 10%|[35m▉         [0m| 29.4M/300M [07:39<3:53:30, 19.3k env steps/s] 10%|[35m▉         [0m| 29.4M/300M [07:40<2:55:55, 25.6k env steps/s] 10%|[35m▉         [0m| 29.5M/300M [07:40<2:14:51, 33.4k env steps/s] 10%|[35m▉         [0m| 29.5M/300M [07:40<1:46:06, 42.5k env steps/s] 10%|[35m▉         [0m| 29.5M/300M [07:40<1:25:59, 52.4k env steps/s] 10%|[35m▉         [0m| 29.6M/300M [07:41<1:11:54, 62.7k env steps/s] 10%|[35m▉         [0m| 29.6M/300M [07:41<1:02:02, 72.6k env steps/s] 10%|[35m▉         [0m| 29.6M/300M [07:41<55:06, 81.8k env steps/s]   10%|[35m▉         [0m| 29.7M/300M [07:42<50:16, 89.6k env steps/s] 10%|[35m▉         [0m| 29.7M/300M [07:42<46:54, 96.1k env steps/s] 10%|[35m▉         [0m| 29.7M/300M [07:42<44:32, 101k env steps/s]  10%|[35m▉         [0m| 29.8M/300M [07:42<42:53, 105k env steps/s] 10%|[35m▉         [0m| 29.8M/300M [07:43<41:43, 108k env steps/s] 10%|[35m▉         [0m| 29.8M/300M [07:43<40:54, 110k env steps/s] 10%|[35m▉         [0m| 29.9M/300M [07:43<40:20, 112k env steps/s] 10%|[35m▉         [0m| 29.9M/300M [07:44<39:56, 113k env steps/s] 10%|[35m▉         [0m| 29.9M/300M [07:44<39:40, 113k env steps/s] 10%|[35m▉         [0m| 29.9M/300M [07:44<39:27, 114k env steps/s] 10%|[35m▉         [0m| 30.0M/300M [07:44<39:18, 115k env steps/s] 10%|[35m█         [0m| 30.0M/300M [07:45<39:11, 115k env steps/s] 10%|[35m█         [0m| 30.0M/300M [07:45<39:07, 115k env steps/s] 10%|[35m█         [0m| 30.1M/300M [07:45<39:03, 115k env steps/s] 10%|[35m█         [0m| 30.1M/300M [07:46<39:01, 115k env steps/s] 10%|[35m█         [0m| 30.1M/300M [07:46<39:00, 115k env steps/s] 10%|[35m█         [0m| 30.2M/300M [07:46<38:58, 115k env steps/s] 10%|[35m█         [0m| 30.2M/300M [07:46<38:57, 115k env steps/s] 10%|[35m█         [0m| 30.2M/300M [07:47<38:56, 115k env steps/s] 10%|[35m█         [0m| 30.3M/300M [07:47<38:55, 115k env steps/s] 10%|[35m█         [0m| 30.3M/300M [07:47<38:55, 115k env steps/s] 10%|[35m█         [0m| 30.3M/300M [07:48<38:54, 116k env steps/s] 10%|[35m█         [0m| 30.4M/300M [07:48<38:53, 116k env steps/s] 10%|[35m█         [0m| 30.4M/300M [07:48<38:54, 115k env steps/s] 10%|[35m█         [0m| 30.4M/300M [07:48<38:53, 116k env steps/s] 10%|[35m█         [0m| 30.5M/300M [07:49<38:53, 116k env steps/s] 10%|[35m█         [0m| 30.5M/300M [07:49<38:53, 115k env steps/s] 10%|[35m█         [0m| 30.5M/300M [07:49<38:53, 115k env steps/s] 10%|[35m█         [0m| 30.6M/300M [07:50<38:52, 116k env steps/s] 10%|[35m█         [0m| 30.6M/300M [07:50<38:52, 116k env steps/s] 10%|[35m█         [0m| 30.6M/300M [07:50<38:52, 115k env steps/s] 10%|[35m█         [0m| 30.7M/300M [07:50<38:51, 115k env steps/s] 10%|[35m█         [0m| 30.7M/300M [07:51<38:51, 116k env steps/s] 10%|[35m█         [0m| 30.7M/300M [07:51<38:50, 116k env steps/s] 10%|[35m█         [0m| 30.8M/300M [07:51<38:50, 116k env steps/s] 10%|[35m█         [0m| 30.8M/300M [07:52<38:50, 116k env steps/s] 10%|[35m█         [0m| 30.8M/300M [07:52<38:49, 116k env steps/s] 10%|[35m█         [0m| 30.9M/300M [07:52<38:49, 116k env steps/s] 10%|[35m█         [0m| 30.9M/300M [07:52<38:49, 116k env steps/s] 10%|[35m█         [0m| 30.9M/300M [07:53<38:48, 116k env steps/s] 10%|[35m█         [0m| 31.0M/300M [07:53<38:49, 116k env steps/s] 10%|[35m█         [0m| 31.0M/300M [07:53<38:48, 116k env steps/s] 10%|[35m█         [0m| 31.0M/300M [07:54<38:47, 116k env steps/s] 10%|[35m█         [0m| 31.1M/300M [07:54<38:47, 116k env steps/s] 10%|[35m█         [0m| 31.1M/300M [07:54<38:47, 116k env steps/s] 10%|[35m█         [0m| 31.1M/300M [07:54<38:48, 115k env steps/s] 10%|[35m█         [0m| 31.2M/300M [07:55<38:48, 115k env steps/s] 10%|[35m█         [0m| 31.2M/300M [07:55<38:47, 115k env steps/s] 10%|[35m█         [0m| 31.2M/300M [07:55<38:47, 115k env steps/s] 10%|[35m█         [0m| 31.3M/300M [07:56<38:47, 115k env steps/s] 10%|[35m█         [0m| 31.3M/300M [07:56<38:46, 115k env steps/s] 10%|[35m█         [0m| 31.3M/300M [07:56<38:46, 116k env steps/s] 10%|[35m█         [0m| 31.4M/300M [07:56<38:45, 116k env steps/s] 10%|[35m█         [0m| 31.4M/300M [07:57<38:45, 116k env steps/s] 10%|[35m█         [0m| 31.4M/300M [07:57<38:45, 116k env steps/s] 10%|[35m█         [0m| 31.5M/300M [07:57<38:46, 115k env steps/s]                                                           ===========================================================
+  step:                                         
+    ppo-update:                                 35840
+    env-step:                                   29360128
+    ppo-update-ater:                            35880
+    env-step-after:                             29392896
+  env/train:                                    
+    avg_avg_episode_length:                     42.14816
+    avg_avg_return:                             0.6974406
+    avg_reward_per_step:                        0.114105225
+    lvl_avg_episode_length_hist:                float32(256,)
+    lvl_avg_return_hist:                        float32(256,)
+    lvl_reward_per_step_hist:                   float32(256,)
+    proxy_bottom_right:                         
+      avg_avg_return:                           0.33223963
+      avg_reward_per_step:                      0.050445557
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    proxy_center_top:                           
+      avg_avg_return:                           0.39048856
+      avg_reward_per_step:                      0.063934326
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+    rollouts_gif:                               float32(132, 449, 113, 3)
+  perf:                                         
+    env_steps_per_second:                       429662.48952821107
+    ppo_updates_per_second:                     189.5100209558644
+  ppo:                                          
+    avg_advantage:                              -0.0055933744
+    avg_grad_norm_pre_clip:                     1.578307
+    avg_loss:                                   0.00078316947
+    avg_loss_actor:                             -0.0016060881
+    avg_loss_critic:                            0.005528958
+    avg_loss_entropy:                           0.37522146
+    max_advantage:                              0.6003902
+    max_grad_norm_pre_clip:                     3.3151636
+    max_loss:                                   0.0051733046
+    max_loss_actor:                             0.0029403903
+    max_loss_critic:                            0.006138244
+    max_loss_entropy:                           0.3902998
+    std_advantage:                              0.10650794
+    std_grad_norm_pre_clip:                     0.56167215
+    std_loss:                                   0.002222306
+    std_loss_actor:                             0.0021976857
+    std_loss_critic:                            0.00024479846
+    std_loss_entropy:                           0.0058142794
+  eval:                                         
+    on_dist_levels:                             
+      avg_avg_episode_length:                   38.90916
+      avg_avg_return:                           0.7653764
+      avg_benchmark_regret:                     0.09322493
+      avg_benchmark_return:                     0.8586013
+      avg_reward_per_step:                      0.12275696
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.3628333
+        avg_reward_per_step:                    0.057037354
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.42294508
+        avg_reward_per_step:                    0.06594086
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+    off_dist_levels:                            
+      avg_avg_episode_length:                   105.5179
+      avg_avg_return:                           0.2266374
+      avg_benchmark_regret:                     0.683979
+      avg_benchmark_return:                     0.9106164
+      avg_reward_per_step:                      0.03326416
+      lvl_avg_episode_length_hist:              float32(256,)
+      lvl_avg_return_hist:                      float32(256,)
+      lvl_benchmark_regret_hist:                float32(256,)
+      lvl_benchmark_return_hist:                float32(256,)
+      lvl_reward_per_step_hist:                 float32(256,)
+      proxy_bottom_right:                       
+        avg_avg_return:                         0.024846343
+        avg_reward_per_step:                    0.0017700195
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+      proxy_center_top:                         
+        avg_avg_return:                         0.49842253
+        avg_reward_per_step:                    0.0070877075
+        lvl_avg_return_hist:                    float32(256,)
+        lvl_reward_per_step_hist:               float32(256,)
+===========================================================
+saving metrics to /data/karim_abdel_sadek/jaxgmg/logs/run_2024-07-31_16-28-38/metrics/896/...
+ 10%|[35m█         [0m| 31.5M/300M [07:58<38:46, 115k env steps/s]wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+wandb: WARNING Serializing object of type ndarray that is 80367568 bytes
+                                                            10%|[35m█         [0m| 31.5M/300M [08:02<38:46, 115k env steps/s] 10%|[35m█         [0m| 31.5M/300M [08:02<3:52:39, 19.2k env steps/s] 11%|[35m█         [0m| 31.5M/300M [08:03<2:55:18, 25.5k env steps/s] 11%|[35m█         [0m| 31.6M/300M [08:03<2:14:19, 33.3k env steps/s] 11%|[35m█         [0m| 31.6M/300M [08:03<1:45:40, 42.3k env steps/s] 11%|[35m█         [0m| 31.6M/300M [08:03<1:25:34, 52.3k env steps/s] 11%|[35m█         [0m| 31.7M/300M [08:04<1:11:31, 62.5k env steps/s] 11%|[35m█         [0m| 31.7M/300M [08:04<1:01:42, 72.5k env steps/s] 11%|[35m█         [0m| 31.7M/300M [08:04<54:48, 81.6k env steps/s]   11%|[35m█         [0m| 31.8M/300M [08:05<49:58, 89.5k env steps/s] 11%|[35m█         [0m| 31.8M/300M [08:05<46:36, 95.9k env steps/s] 11%|[35m█         [0m| 31.8M/300M [08:05<44:14, 101k env steps/s]  11%|[35m█         [0m| 31.9M/300M [08:05<42:34, 105k env steps/s] 11%|[35m█         [0m| 31.9M/300M [08:06<41:24, 108k env steps/s]slurmstepd: error: *** JOB 1561923 ON compute-permanent-node-907 CANCELLED AT 2024-07-31T16:36:45 ***

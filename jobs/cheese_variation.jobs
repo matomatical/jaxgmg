@@ -1,0 +1,47 @@
+#!/bin/bash
+#SBATCH --job-name=cheese_variation.job
+#SBATCH --partition=high_priority
+#SBATCH --time=24:00:00
+#SBATCH --gpus-per-node=1
+
+source activate jaxgmgcondaenv
+
+jaxgmg train corner --cheese-in-center-top --cheese-in-bottom-right --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-center/bottom-right-top-300M_clip0.1_lr5e-5-bothgoals --wandb-entity=krueger-lab-cambridge
+
+jaxgmg train corner --cheese-in-top-right --cheese-in-center-left --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-top-right/center-left-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+# Run 3: cheese in bottom right
+jaxgmg train corner --cheese-in-bottom-right --cheese-in-center-top --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-bottom-right/center-top-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+
+# Run 1: cheese in top left
+
+
+# Run 6: cheese in center top
+jaxgmg train corner --cheese-in-center-top --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-center-top-300M_clip0.1_lr5e-5-bothgoals --wandb-entity=krueger-lab-cambridge
+
+# Run 2: cheese in top right
+jaxgmg train corner --cheese-in-top-right --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-top-right-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+# Run 3: cheese in bottom right
+jaxgmg train corner --cheese-in-bottom-right --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-bottom-right-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+# Run 4: cheese in bottom left
+jaxgmg train corner --cheese-in-bottom-left --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-bottom-left-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+
+# Run 7: cheese in center bottom
+jaxgmg train corner --cheese-in-center-bottom --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-center-bottom-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+# Run 8: cheese in center left
+jaxgmg train corner --cheese-in-center-left --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-center-left-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+# Run 9: cheese in center right
+jaxgmg train corner --cheese-in-center-right --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-center-right-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+
+# Run 1: cheese in top left
+jaxgmg train corner --cheese-in-top-left --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-top-left-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge
+
+# Run 5: cheese in center
+jaxgmg train corner --cheese-in-center --env-terminate-after-end --wandb-project cheese-in-corner --wandb-group moving_goal --wandb-name cheese-in-center-300M_clip0.1_lr5e-5-bothgoals  --wandb-entity=krueger-lab-cambridge

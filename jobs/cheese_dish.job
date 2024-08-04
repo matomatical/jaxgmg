@@ -1,0 +1,49 @@
+#!/bin/bash
+#SBATCH --job-name=cheese_dish.job
+#SBATCH --partition=high_priority
+#SBATCH --time=24:00:00
+#SBATCH --gpus-per-node=1
+
+source activate jaxgmgcondaenv
+
+# jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius0_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 1 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius1_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 2 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius2_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 3 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius3_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 4 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius4_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 5 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius5_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 6 --max-cheese-radius-shift 6 --env-terminate-after-dish  --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius6_shift6_terminateboth --wandb-entity=krueger-lab-cambridge
+
+
+# jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 6 --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius0_shift6 --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 1 --max-cheese-radius-shift 6 --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius1_shift6 --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 2 --max-cheese-radius-shift 6 --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius2_shift6 --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 3 --max-cheese-radius-shift 6 --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius3_shift6 --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 4 --max-cheese-radius-shift 6 --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius4_shift6 --wandb-entity=krueger-lab-cambridge
+
+# jaxgmg train dish --max-cheese-radius 5 --max-cheese-radius-shift 6 --wandb-project cheese-on-dish --wandb-group cheese_dish_updated --wandb-name train-radius5_shift6 --wandb-entity=krueger-lab-cambridge
+
+
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8  --split-elements 6 --wandb-name train-radius0_shift8_6oncheese_0onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge
+
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8  --split-elements 5 --wandb-name train-radius0_shift8_5oncheese_1onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge
+
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8  --split-elements 4 --wandb-name train-radius0_shift8_4oncheese_2onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge
+ 
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8  --split-elements 3 --wandb-name train-radius0_shift8_3oncheese_3onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge
+
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8  --split-elements 2 --wandb-name train-radius0_shift8_2oncheese_4onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge
+
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8 --split-elements 1 --wandb-name train-radius0_shift8_1oncheese_5onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge
+
+jaxgmg train dish --max-cheese-radius 0 --max-cheese-radius-shift 8  --split-elements 0 --wandb-name train-radius0_shift8_0oncheese_6onpile --wandb-project cheese-on-multiple-dishes --wandb-group multiple_dish_updated_03/08  --wandb-entity=krueger-lab-cambridge

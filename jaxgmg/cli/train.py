@@ -73,7 +73,7 @@ def corner(
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = True,                # whether to log metrics to wandb
     wandb_entity: str = None,
-    wandb_project: str = "proxy_test",
+    wandb_project: str = "proxy_test_multiple_dish",
     wandb_group: str = None,
     wandb_name: str = None,
     # checkpointing
@@ -545,9 +545,12 @@ def dish(
     # environment config
     env_size: int = 13,
     env_layout: str = 'blocks',
-    env_terminate_after_dish: bool = False,
-    max_cheese_radius: int = 1,
+    env_terminate_after_dish: bool = True,
+    split_elements:int = 4,
+    max_cheese_radius: int = 0,
     max_cheese_radius_shift: int = 6,
+    max_dish_radius: int = 0,
+    max_dish_radius_shift: int= 0,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     #cheese_location: Tuple[int,int] = (1,1) , # default: [1,1], otherwise define a fixed location where you would like your cheese to be placed
     # policy config
@@ -570,7 +573,7 @@ def dish(
     fixed_train_levels: bool = False,
     num_train_levels: int = 2048,
     # training animation dimensions
-    train_gifs: bool = True,
+    train_gifs: bool = False,
     train_gif_grid_width: int = 8,
     train_gif_level_of_detail: int = 1,
     # evals config
@@ -588,7 +591,7 @@ def dish(
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = True,                # whether to log metrics to wandb
     wandb_entity: str = None,
-    wandb_project: str = "proxy_test_dish",
+    wandb_project: str = "proxy_test_multiple_dish_final",
     wandb_group: str = None,
     wandb_name: str = None,
     # checkpointing
@@ -610,6 +613,7 @@ def dish(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
         terminate_after_cheese_and_dish= env_terminate_after_dish,
+        split_object_firstgroup = split_elements
     )
 
     print(f"generating training level distribution...")
@@ -620,8 +624,11 @@ def dish(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
-        max_cheese_radius=max_cheese_radius,  
+        max_cheese_radius=max_cheese_radius,
+        max_dish_radius = max_dish_radius,
+        split_elements =  0
     )
+
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if fixed_train_levels:
         train_levels = train_level_generator.vsample(
@@ -665,13 +672,20 @@ def dish(
         discount_rate=ppo_gamma,
         env=env,
     )
-
+        # height: int = 13
+    # width: int = 13
+    # maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
+    # max_cheese_radius: int = 0
+    # max_dish_radius: int = 0
+    # split_elements: int = 0
     # off distribution
     shift_level_generator = cheese_on_a_dish.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
         max_cheese_radius=max_cheese_radius_shift,
+        max_dish_radius = max_dish_radius_shift,
+        split_elements = split_elements,
     )
     rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
     eval_off_levels = shift_level_generator.vsample(
