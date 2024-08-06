@@ -228,6 +228,7 @@ def minimaze(
         obs_level_of_detail=level_of_detail,
     )
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    img = env.render_state(state)
+    print(util.img2str(img))
 
 

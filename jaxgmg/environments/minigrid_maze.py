@@ -319,14 +319,21 @@ class Env(base.Env):
         # dim outside of currently-visible region
         i = state.hero_pos[0]
         j = state.hero_pos[1]
-        mask = jnp.full((H, W), fill_value=0.5)
+        h = self.obs_height
+        w = self.obs_width
+        C = len(Env.Channel)
+        mask = jnp.full((H, W), fill_value=0.4)
+        fov = jnp.ones(h * w)
+        fovhw = fov.reshape(h, w)
+        fovwh = fov.reshape(w, h)
         mask = jax.lax.select_n(
             state.hero_dir,
-            mask.at[i+1-H  : i+1,      j-W//2 : j-W//2+1].set(1.), # above
-            mask.at[i-W//2 : i+W//2+1, j+1-H  : j+1     ].set(1.), # left
-            mask.at[i      : i+H,      j-W//2 : j+W//2+1].set(1.), # below
-            mask.at[i-W//2 : i+W//2+1, j      : j+H     ].set(1.), # right
+            jax.lax.dynamic_update_slice(mask, fovhw, (i+1-h,  j-w//2)),
+            jax.lax.dynamic_update_slice(mask, fovwh, (i-w//2, j+1-h )),
+            jax.lax.dynamic_update_slice(mask, fovhw, (i,      j-w//2)),
+            jax.lax.dynamic_update_slice(mask, fovwh, (i-w//2, j     )),
         )
+        mask = einops.rearrange(mask, 'H W -> H W 1 1 1')
         dimmed_spritemap = mask * spritemap
         
         # rearrange into required form
@@ -338,7 +345,7 @@ class Env(base.Env):
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> chex.Array:
         """
         Return an observation with a boolean grid image.
         """
@@ -346,9 +353,9 @@ class Env(base.Env):
         image = self._render_state_bool(state)
         
         # pad to allow slicing
-        H = self.obs_height
-        W = self.obs_width
-        M = max(H, W) - 2 # maximum padding required
+        h = self.obs_height
+        w = self.obs_width
+        M = max(h, w) - 2 # maximum padding required
         image = jnp.pad(
             array=image,
             pad_width=((M, M), (M, M), (0, 0)),
@@ -358,46 +365,32 @@ class Env(base.Env):
         # take oriented slice in front of the hero
         i = state.hero_pos[0]
         j = state.hero_pos[1]
+        C = len(Env.Channel)
+        # four possible slices
+        case_facing_up = jnp.rot90(
+            jax.lax.dynamic_slice(image, (M+i+1-h, M+j-w//2, 0), (h, w, C)),
+            k=0,
+        )
+        case_facing_left = jnp.rot90(
+            jax.lax.dynamic_slice(image, (M+i-w//2, M+j+1-h, 0), (w, h, C)),
+            k=3,
+        )
+        case_facing_down = jnp.rot90(
+            jax.lax.dynamic_slice(image, (M+i, M+j-w//2, 0), (h, w, C)),
+            k=2,
+        )
+        case_facing_right = jnp.rot90(
+            jax.lax.dynamic_slice(image, (M+i-w//2, M+j, 0), (w, h, C)),
+            k=1,
+        )
+        # chosen slice
         image = jax.lax.select_n(
             state.hero_dir,
-            # facing up:
-            jnp.rot90(
-                jax.lax.dynamic_slice(
-                    image,
-                    (M+i+1-H, M+j-W//2, 0),
-                    (H, W, len(Env.Channel)),
-                ),
-                k=0,
-            ),
-            # facing left:
-            jnp.rot90(
-                jax.lax.dynamic_slice(
-                    image,
-                    (M+i-W//2, M+j+1-H, 0),
-                    (W, H, len(Env.Channel)),
-                ),
-                k=3,
-            ),
-            # facing down:
-            jnp.rot90(
-                jax.lax.dynamic_slice(
-                    image,
-                    (M+i, M+j-W//2, 0),
-                    (H, W, len(Env.Channel)),
-                ),
-                k=2,
-            ),
-            # facing right:
-            jnp.rot90(
-                jax.lax.dynamic_slice(
-                    image,
-                    (M+i-W//2, M+j, 0),
-                    (W, H, len(Env.Channel)),
-                ),
-                k=1,
-            ),
+            case_facing_up,
+            case_facing_left,
+            case_facing_down,
+            case_facing_right,
         )
-
         return Observation(
             image=image,
             orientation=state.hero_dir,
@@ -405,13 +398,13 @@ class Env(base.Env):
     
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(
+    def _render_obs_rgb(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
     ) -> Observation:
         # get the boolean grid version of the observation
-        image_bool = self._get_obs_bool(state).image
+        image_bool = self._render_obs_bool(state).image
         H, W, _C = image_bool.shape
 
         # find out, for each position, which object to render

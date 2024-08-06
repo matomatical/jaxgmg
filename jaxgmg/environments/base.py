@@ -109,8 +109,10 @@ class Env:
     * obs_type(self, level) -> obs_type
     * _reset(self, level) -> start_state
     * _step(self, rng, state, action) -> (new_state, reward, done, info)
-    * _get_obs_bool(self, state) -> obs_bool
-    * _get_obs_rgb(self, state) -> obs_rgb
+    * _render_obs_bool(self, state) -> obs_bool
+    * _render_obs_rgb(self, state, spritesheet) -> obs_rgb
+    * _render_state_bool(self, state) -> img_bool
+    * _render_state_rgb(self, state, spritesheet) -> img_rgb
     """
 
 
@@ -154,15 +156,27 @@ class Env:
         raise NotImplementedError
 
     
-    def _get_obs_bool(self, state: EnvState) -> Observation:
+    def _render_obs_bool(self, state: EnvState) -> Observation:
         raise NotImplementedError
     
 
-    def _get_obs_rgb(
+    def _render_obs_bool(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
     ) -> Observation:
+        raise NotImplementedError
+    
+
+    def _render_state_bool(self, state: EnvState) -> chex.Array:
+        return NotImplementedError
+    
+
+    def _render_state_rgb(
+        self,
+        state: EnvState,
+        spritesheet: dict[str, chex.Array],
+    ) -> chex.Array:
         raise NotImplementedError
     
 
@@ -247,7 +261,7 @@ class Env:
         self,
         state: EnvState,
         force_lod: LevelOfDetail | None = None,
-    ):
+    ) -> Observation:
         # override LevelOfDetail
         if force_lod is None:
             lod = self.obs_level_of_detail
@@ -255,9 +269,29 @@ class Env:
             lod = force_lod
         # dispatch to the appropriate renderer
         if lod == LevelOfDetail.BOOLEAN:
-            return self._get_obs_bool(state)
+            return self._render_obs_bool(state)
         else:
-            return self._get_obs_rgb(state, load_spritesheet(lod))
+            return self._render_obs_rgb(state, load_spritesheet(lod))
+    
+
+    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
+    def render_state(
+        self,
+        state: EnvState,
+        force_lod: LevelOfDetail | None = None,
+    ) -> chex.Array: # float[h, w, rgb]
+        # TODO: reconsider API for observations vs. rendering... e.g. do we
+        # need force_lod? should lod come from self or args?
+        # override LevelOfDetail
+        if force_lod is None:
+            lod = self.obs_level_of_detail
+        else:
+            lod = force_lod
+        # dispatch to the appropriate renderer
+        if lod == LevelOfDetail.BOOLEAN:
+            return self._render_state_bool(state)
+        else:
+            return self._render_state_rgb(state, load_spritesheet(lod))
 
 
     # pre-vectorised methods
