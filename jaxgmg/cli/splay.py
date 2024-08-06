@@ -48,7 +48,7 @@ def corner(
     
     print("preparing environment...")
     env = cheese_in_the_corner.Env(
-        obs_level_of_detail=level_of_detail,
+        img_level_of_detail=level_of_detail,
     )
 
     print("preparing level generator...")
@@ -64,7 +64,7 @@ def corner(
     print("generating a level...")
     rng = jax.random.PRNGKey(seed=seed)
     level = level_generator.sample(rng=rng)
-    obs, state = env.reset_to_level(level)
+    image = env.render_level(level)
     print(util.img2str(obs))
 
     print("splaying the level...")
@@ -73,14 +73,14 @@ def corner(
     print("grid shape:", level_set.grid_shape)
 
     print("generating metamaze visualisation...")
-    obss, states = env.vreset_to_level(level_set.levels)
+    imgs = jax.vmap(env.render_level)(level_set.levels)
     img = einops.rearrange(
         jnp.zeros((
             *level_set.grid_shape,
             level_of_detail*height,
             level_of_detail*width,
             3,
-        )).at[level_set.levels_pos].set(obss),
+        )).at[level_set.levels_pos].set(imgs),
         'H W h w c -> (H h) (W w) c',
     )
 

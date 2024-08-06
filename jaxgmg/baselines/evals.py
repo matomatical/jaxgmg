@@ -110,7 +110,6 @@ class AnimatedRolloutsEval(Eval):
     levels: Level       # Level[num_levels]
     num_steps: int
     gif_grid_width: int
-    gif_level_of_detail: int
     env: Env
 
 
@@ -132,7 +131,6 @@ class AnimatedRolloutsEval(Eval):
         frames = experience.animate_rollouts(
             rollouts=rollouts,
             grid_width=self.gif_grid_width,
-            force_lod=self.gif_level_of_detail,
             env=self.env,
         )
         return {'rollouts_gif': frames}

@@ -74,7 +74,6 @@ def run(
     # training animation dimensions
     train_gifs: bool,
     train_gif_grid_width: int,
-    train_gif_level_of_detail: int,
     # checkpointing config
     checkpointing: bool,
     keep_all_checkpoints: bool,
@@ -222,7 +221,6 @@ def run(
             frames = experience.animate_rollouts(
                 rollouts=rollouts,
                 grid_width=train_gif_grid_width,
-                force_lod=train_gif_level_of_detail,
                 env=env,
             )
             metrics['env/train'].update({'rollouts_gif': frames})

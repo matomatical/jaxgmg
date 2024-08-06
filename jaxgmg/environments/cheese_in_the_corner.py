@@ -908,7 +908,7 @@ class LevelMetrics(base.LevelMetrics):
         # rendered levels in a grid
         def render_level(level):
             state = self.env._reset(level)
-            rgb = self.env.get_obs(state, force_lod=1)
+            rgb = self.env.render_state(state)
             return rgb
         rendered_levels = jax.vmap(render_level)(levels)
         rendered_levels_pad = jnp.pad(

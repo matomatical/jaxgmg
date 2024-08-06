@@ -41,9 +41,9 @@ def corner(
     print("level:", level)
 
     print("rendering...")
-    env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs.image))
+    env = cheese_in_the_corner.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def dish(
@@ -74,9 +74,9 @@ def dish(
     print("level:", level)
 
     print("rendering...")
-    env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs.image))
+    env = cheese_on_a_dish.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def follow(
@@ -111,9 +111,9 @@ def follow(
     print("level:", level)
 
     print("rendering...")
-    env = follow_me.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs.image))
+    env = follow_me.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def keys(
@@ -147,9 +147,9 @@ def keys(
     print("level:", level)
 
     print("rendering...")
-    env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs.image))
+    env = keys_and_chests.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def lava(
@@ -177,9 +177,9 @@ def lava(
     print("level:", level)
 
     print("rendering...")
-    env = lava_land.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs.image))
+    env = lava_land.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def monsters(
@@ -215,14 +215,14 @@ def monsters(
     print("level:", level)
 
     print("rendering...")
-    env = monster_world.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs.image))
+    env = monster_world.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def minimaze(
-    obs_height: int = 5,
-    obs_width: int = 5,
+    obs_height: int = 3,
+    obs_width: int = 3,
     level_of_detail: int = 8,
 ):
     """
@@ -253,10 +253,9 @@ def minimaze(
     env = minigrid_maze.Env(
         obs_height=obs_height,
         obs_width=obs_width,
-        obs_level_of_detail=level_of_detail,
+        img_level_of_detail=level_of_detail,
     )
-    obs, state = env.reset_to_level(level)
-    img = env.render_state(state)
+    img = env.render_level(level)
     print(util.img2str(img))
 
 

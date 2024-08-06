@@ -9,11 +9,12 @@ import jax.numpy as jnp
 import flax.linen as nn
 import distrax
 
+from chex import ArrayTree
+from jaxgmg.environments.base import Observation
+
 
 # # # 
 # Types
-
-from chex import ArrayTree
 
 
 ActorCriticState = ArrayTree
@@ -22,9 +23,8 @@ ActorCriticState = ArrayTree
 ActorCriticParams = ArrayTree
 
 
-# TODO: is this right?
 ActorCriticForwardPass = Callable[
-    [ActorCriticParams, ArrayTree, ActorCriticState, int],
+    [ActorCriticParams, Observation, ActorCriticState, int],
     tuple[distrax.Categorical, float, ActorCriticState],
 ]
 
@@ -78,7 +78,12 @@ class ActorCriticNetwork(nn.Module):
         raise NotImplementedError
 
 
-    def __call__(self, obs, state, prev_action):
+    def __call__(
+        self,
+        obs: Observation,
+        state: ActorCriticState,
+        prev_action: int,
+    ):
         raise NotImplementedError
 
 
@@ -104,7 +109,7 @@ class ImpalaLargeFF(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = obs
+        x = obs.image
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -169,9 +174,8 @@ class ImpalaSmallFF(ActorCriticNetwork):
 
     @nn.compact
     def __call__(self, obs, state, prev_action):
-
         # obs embedding
-        x = obs
+        x = obs.image
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -227,7 +231,7 @@ class ImpalaLarge(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = obs
+        x = obs.image
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -292,7 +296,7 @@ class ImpalaSmall(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = obs
+        x = obs.image
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -347,7 +351,7 @@ class ReLUFF(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = jnp.ravel(obs)
+        x = jnp.ravel(obs.image)
         # at least one layer (to start the residual stream)
         x = nn.Dense(self.embedding_layer_width)(x)
         x = nn.relu(x)

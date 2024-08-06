@@ -90,6 +90,9 @@ class Env:
               represented by a 3x3 square of pixels.
             * Similarly for LevelOfDetail.RGB_4PX or int 4.
             * Similarly for LevelOfDetail.RGB_8PX or int 8.
+    * img_level_of_detail: LevelOfDetail (OK to use raw int 0, 1, 3, 4, or 8)
+            The level of detail for rendered states. Same options as
+            obs_level_of_detail.
     
     Properties:
 
@@ -102,6 +105,7 @@ class Env:
     * env.reset_to_level(level) -> (obs, start_state)
     * env.step(rng, state, action) -> (obs, new_state, reward, done, info)
     * env.get_obs(state) -> obs
+    * env.render_state(state) -> obs
 
     Instructions for sublassing: Implement the following methods:
 
@@ -114,13 +118,11 @@ class Env:
     * _render_state_bool(self, state) -> img_bool
     * _render_state_rgb(self, state, spritesheet) -> img_rgb
     """
-
-
-    # fields
     max_steps_in_episode: int = 128
     penalize_time: bool = True
     automatically_reset: bool = True
     obs_level_of_detail: LevelOfDetail = LevelOfDetail.BOOLEAN
+    img_level_of_detail: LevelOfDetail = LevelOfDetail.RGB_1PX
 
 
     @property
@@ -256,42 +258,40 @@ class Env:
         )
 
 
-    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
+    @functools.partial(jax.jit, static_argnames=('self',))
     def get_obs(
         self,
         state: EnvState,
-        force_lod: LevelOfDetail | None = None,
     ) -> Observation:
-        # override LevelOfDetail
-        if force_lod is None:
-            lod = self.obs_level_of_detail
-        else:
-            lod = force_lod
         # dispatch to the appropriate renderer
-        if lod == LevelOfDetail.BOOLEAN:
+        if self.obs_level_of_detail == LevelOfDetail.BOOLEAN:
             return self._render_obs_bool(state)
         else:
-            return self._render_obs_rgb(state, load_spritesheet(lod))
+            spritesheet = load_spritesheet(self.obs_level_of_detail)
+            return self._render_obs_rgb(state, spritesheet)
     
 
-    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
+    @functools.partial(jax.jit, static_argnames=('self',))
     def render_state(
         self,
         state: EnvState,
-        force_lod: LevelOfDetail | None = None,
-    ) -> chex.Array: # float[h, w, rgb]
-        # TODO: reconsider API for observations vs. rendering... e.g. do we
-        # need force_lod? should lod come from self or args?
-        # override LevelOfDetail
-        if force_lod is None:
-            lod = self.obs_level_of_detail
-        else:
-            lod = force_lod
+    ) -> chex.Array: # float[h, w, rgb] or bool[h, w, c]
         # dispatch to the appropriate renderer
-        if lod == LevelOfDetail.BOOLEAN:
+        if self.img_level_of_detail == LevelOfDetail.BOOLEAN:
             return self._render_state_bool(state)
         else:
-            return self._render_state_rgb(state, load_spritesheet(lod))
+            spritesheet = load_spritesheet(self.img_level_of_detail)
+            return self._render_state_rgb(state, spritesheet)
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def render_level(
+        self,
+        level: Level,
+    ) -> chex.Array: # float[h, w, rgb] or bool[h, w, c]
+        state = self._reset(level)
+        image = self.render_state(state)
+        return image
 
 
     # pre-vectorised methods

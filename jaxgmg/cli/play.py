@@ -125,7 +125,7 @@ def corner(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
+    env = cheese_in_the_corner.Env(img_level_of_detail=level_of_detail)
     level_generator = cheese_in_the_corner.LevelGenerator(
         height=height,
         width=width,
@@ -162,7 +162,7 @@ def dish(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
+    env = cheese_on_a_dish.Env(img_level_of_detail=level_of_detail)
     level_generator = cheese_on_a_dish.LevelGenerator(
         height=height,
         width=width,
@@ -200,7 +200,7 @@ def follow(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = follow_me.Env(obs_level_of_detail=level_of_detail)
+    env = follow_me.Env(img_level_of_detail=level_of_detail)
     level_generator = follow_me.LevelGenerator(
         height=height,
         width=width,
@@ -241,7 +241,7 @@ def keys(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
+    env = keys_and_chests.Env(img_level_of_detail=level_of_detail)
     level_generator = keys_and_chests.LevelGenerator(
         height=height,
         width=width,
@@ -281,7 +281,7 @@ def lava(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = lava_land.Env(obs_level_of_detail=level_of_detail)
+    env = lava_land.Env(img_level_of_detail=level_of_detail)
     level_generator = lava_land.LevelGenerator(
         height=height,
         width=width,
@@ -321,7 +321,7 @@ def monsters(
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = monster_world.Env(obs_level_of_detail=level_of_detail)
+    env = monster_world.Env(img_level_of_detail=level_of_detail)
     level_generator = monster_world.LevelGenerator(
         height=height,
         width=width,
@@ -365,7 +365,7 @@ def minimaze(
     env = minigrid_maze.Env(
         obs_height=obs_height,
         obs_width=obs_width,
-        obs_level_of_detail=level_of_detail,
+        img_level_of_detail=level_of_detail,
     )
     level_generator = minigrid_maze.LevelGenerator(
         height=height,

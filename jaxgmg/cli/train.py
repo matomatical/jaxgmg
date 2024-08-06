@@ -23,7 +23,8 @@ def corner(
     env_layout: str = 'blocks',
     env_corner_size: int = 1,
     env_terminate_after_corner: bool = False,
-    env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     # policy config
     net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
     # ued config
@@ -55,7 +56,6 @@ def corner(
     # training animation dimensions
     train_gifs: bool = True,
     train_gif_grid_width: int = 16,
-    train_gif_level_of_detail: int = 1,
     # evals config
     num_cycles_per_eval: int = 64,
     num_eval_levels: int = 256,
@@ -63,7 +63,6 @@ def corner(
     # big evals config
     num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
     eval_gif_grid_width: int = 16,
-    eval_gif_level_of_detail: int = 1,      # 1, 3, 4 or 8
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
@@ -90,7 +89,8 @@ def corner(
 
     print("setting up environment...")
     env = cheese_in_the_corner.Env(
-        obs_level_of_detail=env_level_of_detail,
+        obs_level_of_detail=obs_level_of_detail,
+        img_level_of_detail=img_level_of_detail,
         penalize_time=False,
         terminate_after_cheese_and_corner=env_terminate_after_corner,
     )
@@ -239,7 +239,6 @@ def corner(
         levels=eval_on_levels,
         num_steps=env.max_steps_in_episode,
         gif_grid_width=eval_gif_grid_width,
-        gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
     eval_off_rollouts = evals.AnimatedRolloutsEval(
@@ -247,7 +246,6 @@ def corner(
         levels=eval_off_levels,
         num_steps=env.max_steps_in_episode,
         gif_grid_width=eval_gif_grid_width,
-        gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
 
@@ -337,7 +335,6 @@ def corner(
         # training animation dimensions
         train_gifs=train_gifs,
         train_gif_grid_width=train_gif_grid_width,
-        train_gif_level_of_detail=train_gif_level_of_detail,
         # logging
         num_cycles_per_log=num_cycles_per_log,
         save_files_to=save_files_to,
@@ -364,7 +361,8 @@ def keys(
     env_num_keys_max_shift: int = 12,
     env_num_chests_min: int = 12,
     env_num_chests_max: int = 24,
-    env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     # policy config
     net: str = "relu",
     # ued config
@@ -395,7 +393,6 @@ def keys(
     # training animation dimensions
     train_gifs: bool = True,
     train_gif_grid_width: int = 16,
-    train_gif_level_of_detail: int = 1,
     # evals config
     num_cycles_per_eval: int = 64,
     num_eval_levels: int = 256,
@@ -403,7 +400,6 @@ def keys(
     # big evals config
     num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
     eval_gif_grid_width: int = 16,
-    eval_gif_level_of_detail: int = 1,      # 1, 3, 4 or 8
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
@@ -430,7 +426,8 @@ def keys(
 
     print("setting up environment...")
     env = keys_and_chests.Env(
-        obs_level_of_detail=env_level_of_detail,
+        obs_level_of_detail=obs_level_of_detail,
+        img_level_of_detail=img_level_of_detail,
         penalize_time=False,
     )
 
@@ -562,7 +559,6 @@ def keys(
         levels=eval_on_levels,
         num_steps=env.max_steps_in_episode,
         gif_grid_width=eval_gif_grid_width,
-        gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
     eval_off_animation = evals.AnimatedRolloutsEval(
@@ -570,7 +566,6 @@ def keys(
         levels=eval_off_levels,
         num_steps=env.max_steps_in_episode,
         gif_grid_width=eval_gif_grid_width,
-        gif_level_of_detail=eval_gif_level_of_detail,
         env=env,
     )
 
@@ -611,7 +606,6 @@ def keys(
         # training animation dimensions
         train_gifs=train_gifs,
         train_gif_grid_width=train_gif_grid_width,
-        train_gif_level_of_detail=train_gif_level_of_detail,
         # logging
         num_cycles_per_log=num_cycles_per_log,
         save_files_to=save_files_to,

@@ -467,16 +467,15 @@ def generalised_advantage_estimation(
 # Helper functions
 
 
-@functools.partial(jax.jit, static_argnames=('grid_width','force_lod','env'))
+@functools.partial(jax.jit, static_argnames=('grid_width','env'))
 def animate_rollouts(
     rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
     grid_width: int,
-    force_lod: int | None = None,
-    env: Env | None = None,
+    env: Env = None,
 ) -> Array:
     """
     Transform a vector of rollouts into a sequence of images showing for each
-    timestep a matrix of observations.
+    timestep a matrix of rendered images.
 
     Inputs:
 
@@ -485,12 +484,9 @@ def animate_rollouts(
     * grid_width : static int
             How many levels to put in each row of the grid. Must exactly
             divide num_levels (the shape of rollouts).
-    * force_lod : optional int (any valid obs_level_of_detail for env)
-            Use this level of detail (lod) for the animations.
-    * env : optional Env (mandatory if force_lod is provided)
-            The environment provides the renderer, used if the level of
-            detail is different from the level of detail the obs are already
-            encoded at.
+    * env : Env
+            The environment provides the render method used to render the
+            states.
 
     Returns:
 
@@ -505,12 +501,12 @@ def animate_rollouts(
       * img_width = grid_width * cell_width + grid_width + 1
       * img_height = grid_height * cell_height + grid_height + 1
       * grid_height = num_levels / grid_width (divides exactly)
-      * cell_width and cell_height are dependent on the size of observations
-        at the given level of detail.
+      * cell_width and cell_height are dependent on the size of rendered
+        images at the given level of detail.
       * the `+ grid_width + 1` and `+ grid_height + 1` come from 1 pixel of
-        padding that is inserted separating each observation in the grid.
+        padding that is inserted separating each rendered image in the grid.
       * channels is usually 3 (rgb) but could be otherwise, it depends on the
-        shape of the observations.
+        shape of the renders.
     
     TODO:
 
@@ -524,29 +520,24 @@ def animate_rollouts(
     """
     num_levels = jax.tree.leaves(rollouts)[0].shape[0]
     assert (num_levels % grid_width) == 0
-    assert not (force_lod is not None and env is None)
+    
+    # TODO: first stack the final env state
 
     # assemble observations at desired level of detail
-    if force_lod is not None and force_lod != env.obs_level_of_detail:
-        # need to re-render the observations
-        vrender = jax.vmap(env.get_obs, in_axes=(0, None,)) # parallel envs
-        vvrender = jax.vmap(vrender, in_axes=(0, None,))    # time
-        obs = vvrender(rollouts.transitions.env_state, force_lod)
-        # TODO: first stack the final env state
-    else:
-        obs = rollouts.transitions.obs
-        # TODO: stack the final observation
+    vrender = jax.vmap(env.render_state)
+    vvrender = jax.vmap(vrender)
+    images = vvrender(rollouts.transitions.env_state)
 
     # flash the screen half black for the last frame of each episode
     done_mask = einops.rearrange(
         rollouts.transitions.done,
         'level step -> level step 1 1 1',
     )
-    obs = obs * (1. - .4 * done_mask)
+    images = images * (1. - .4 * done_mask)
     
-    # rearrange into a (padded) grid of observations
-    obs = jnp.pad(
-        obs,
+    # rearrange into a (padded) grid of renders
+    images = jnp.pad(
+        images,
         pad_width=(
             (0, 0), # levels
             (0, 0), # steps
@@ -556,7 +547,7 @@ def animate_rollouts(
         ),
     )
     grid = einops.rearrange(
-        obs,
+        images,
         '(level_h level_w) step h w c -> step (level_h h) (level_w w) c',
         level_w=grid_width,
     )
