@@ -321,19 +321,17 @@ class Env(base.Env):
         j = state.hero_pos[1]
         h = self.obs_height
         w = self.obs_width
-        C = len(Env.Channel)
-        mask = jnp.full((H, W), fill_value=0.4)
-        fov = jnp.ones(h * w)
-        fovhw = fov.reshape(h, w)
-        fovwh = fov.reshape(w, h)
+        M = max(h, w, 2) - 2 # maximum padding required
+        mask = jnp.full((M+H+M, M+W+M), fill_value=0.4)
+        fov = jnp.ones((h, w))
         mask = jax.lax.select_n(
             state.hero_dir,
-            jax.lax.dynamic_update_slice(mask, fovhw, (i+1-h,  j-w//2)),
-            jax.lax.dynamic_update_slice(mask, fovwh, (i-w//2, j+1-h )),
-            jax.lax.dynamic_update_slice(mask, fovhw, (i,      j-w//2)),
-            jax.lax.dynamic_update_slice(mask, fovwh, (i-w//2, j     )),
+            jax.lax.dynamic_update_slice(mask, fov,   (M+i+1-h,  M+j-w//2)),
+            jax.lax.dynamic_update_slice(mask, fov.T, (M+i-w//2, M+j+1-h )),
+            jax.lax.dynamic_update_slice(mask, fov,   (M+i,      M+j-w//2)),
+            jax.lax.dynamic_update_slice(mask, fov.T, (M+i-w//2, M+j     )),
         )
-        mask = einops.rearrange(mask, 'H W -> H W 1 1 1')
+        mask = mask[M:M+H, M:M+W, jnp.newaxis, jnp.newaxis, jnp.newaxis]
         dimmed_spritemap = mask * spritemap
         
         # rearrange into required form
@@ -355,14 +353,14 @@ class Env(base.Env):
         # pad to allow slicing
         h = self.obs_height
         w = self.obs_width
-        M = max(h, w) - 2 # maximum padding required
+        M = max(h, w, 2) - 2 # maximum padding required
         image = jnp.pad(
             array=image,
             pad_width=((M, M), (M, M), (0, 0)),
             mode='edge',
         )
 
-        # take oriented slice in front of the hero
+        # construct an oriented slice of the state in front of the hero
         i = state.hero_pos[0]
         j = state.hero_pos[1]
         C = len(Env.Channel)

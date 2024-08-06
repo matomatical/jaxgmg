@@ -52,8 +52,8 @@ class EnvState:
 @struct.dataclass
 class Observation:
     """
-    Represent an observation from the environment. Subclass to add one or
-    more fields.
+    Represent an observation from the environment. Subclass may add
+    one or more fields.
     """
 
 

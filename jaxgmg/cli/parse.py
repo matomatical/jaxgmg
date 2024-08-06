@@ -22,6 +22,10 @@ def corner(
     """
     Test the level parser from the Cheese in the Corner environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #
@@ -48,6 +52,10 @@ def dish(
     """
     Test the level parser from the Cheese on a Dish environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #
@@ -77,6 +85,10 @@ def follow(
     """
     Test the level parser from the Follow Me environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # # # #
         # @ # . . 1 #
@@ -110,6 +122,10 @@ def keys(
     """
     Test the level parser from the Keys and Chests environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . k c #
@@ -142,6 +158,10 @@ def lava(
     """
     Test the level parser from the Lava Land environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #
@@ -168,6 +188,10 @@ def monsters(
     """
     Test the level parser from the Monster World environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # s a m #
@@ -204,6 +228,10 @@ def minimaze(
     """
     Test the level parser from the Maze environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #

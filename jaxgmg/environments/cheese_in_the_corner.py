@@ -219,7 +219,7 @@ class Env(base.Env):
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> chex.Array:
         """
         Return a boolean grid observation.
         """
@@ -248,7 +248,7 @@ class Env(base.Env):
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(
+    def _render_obs_rgb(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
@@ -258,7 +258,7 @@ class Env(base.Env):
         spritesheet.
         """
         # get the boolean grid representation of the state
-        obs = self._get_obs_bool(state)
+        obs = self._render_obs_bool(state)
         H, W, _C = obs.shape
 
         # find out, for each position, which object to render
