@@ -25,9 +25,9 @@ def corner(
     env_terminate_after_corner: bool = False,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
-    net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
+    net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
     # ued config
-    ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    ued: str = "plr",                        # 'dr', 'dr-finite', 'plr'
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -36,7 +36,7 @@ def corner(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_regret_estimator: str = "proxy_regret",      # "PVL" or "absGAE" (todo "maxMC")
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -69,8 +69,8 @@ def corner(
     num_cycles_per_log: int = 64,
     save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
-    wandb_project: str = "test",
+    wandb_log: bool = True,                # whether to log metrics to wandb
+    wandb_project: str = "test_plr",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
@@ -145,6 +145,7 @@ def corner(
                 env=env,
                 discount_rate=ppo_gamma,
             ),
+            level_solver= None,
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
