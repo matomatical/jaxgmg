@@ -91,6 +91,23 @@ class EnvState(base.EnvState):
     mouse_next_beacon_id: int
 
 
+@struct.dataclass
+class Observation(base.Observation):
+    """
+    Observation for partially observable Maze environment.
+
+    * image : bool[h, w, c] or float[h, w, rgb]
+            The contents of the state. Comes in one of two formats:
+            * Boolean: a H by W by C bool array where each channel represents
+              the presence of one type of thing (walls, mouse, leader,
+              beacon, active beacon).
+            * Pixels: an D.H by D.W by 3 array of RGB float values where each
+              D by D tile corresponds to one grid square. (D is level of
+              detail.)
+    """
+    image: chex.Array
+
+
 class Env(base.Env):
     """
     Follow me environment.
@@ -110,14 +127,6 @@ class Env(base.Env):
 
     When the mouse hits an active beacon, it receives reward, the beacon
     deactivates, and the next beacon in the sequence activates.
-
-    Observations come in one of two formats:
-
-    * Boolean: a H by W by C bool array where each channel represents the
-      presence of one type of thing (walls, mouse, leader, beacon, active
-      beacon).
-    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
-      tile corresponds to one grid square.
     """
     class Action(enum.IntEnum):
         """
@@ -256,33 +265,33 @@ class Env(base.Env):
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _render_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> Observation:
         """
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
         C = len(Env.Channel)
-        obs = jnp.zeros((H, W, C), dtype=bool)
+        image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        obs = obs.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
 
         # render mouse
-        obs = obs.at[
+        image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
             Env.Channel.MOUSE,
         ].set(True)
         
         # render leader
-        obs = obs.at[
+        image = image.at[
             state.leader_pos[0],
             state.leader_pos[1],
             Env.Channel.LEADER,
         ].set(True)
         
         # render beacons
-        obs = obs.at[
+        image = image.at[
             state.level.beacons_pos[:, 0],
             state.level.beacons_pos[:, 1],
             Env.Channel.BEACON,
@@ -292,13 +301,13 @@ class Env(base.Env):
         active_beacon_pos = state.level.beacons_pos[state.mouse_next_beacon_id]
         # note: this active_beacon_pos is invalidated after id exceeds range,
         # but we don't draw in that case anyway so it's fine.
-        obs = obs.at[
+        image = image.at[
             active_beacon_pos[0],
             active_beacon_pos[1],
             Env.Channel.ACTIVE,
         ].set(~state.done)
         
-        return obs
+        return Observation(image=image)
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
@@ -312,28 +321,28 @@ class Env(base.Env):
         spritesheet.
         """
         # get the boolean grid representation of the state
-        obs = self._render_obs_bool(state)
-        H, W, _C = obs.shape
+        image_bool = self._render_obs_bool(state).image
+        H, W, _C = image_bool.shape
         C = Env.Channel
 
         # find out, for each position, which object to render
-        inactive = obs[:,:,C.BEACON] & ~obs[:,:,C.ACTIVE]
-        both_mice = obs[:,:,C.MOUSE] & obs[:,:,C.LEADER]
+        inactive = image_bool[:,:,C.BEACON] & ~image_bool[:,:,C.ACTIVE]
+        both_mice = image_bool[:,:,C.MOUSE] & image_bool[:,:,C.LEADER]
         # note: mouse & active beacon is not possible
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # combinations
             inactive & both_mice,
-            obs[:,:,C.LEADER] & obs[:,:,C.ACTIVE],
-            obs[:,:,C.LEADER] & inactive,
-            obs[:,:,C.MOUSE] & inactive,
+            image_bool[:,:,C.LEADER] & image_bool[:,:,C.ACTIVE],
+            image_bool[:,:,C.LEADER] & inactive,
+            image_bool[:,:,C.MOUSE] & inactive,
             both_mice,
             # individual entities
-            obs[:,:,C.ACTIVE],
+            image_bool[:,:,C.ACTIVE],
             inactive,
-            obs[:,:,C.LEADER],
-            obs[:,:,C.MOUSE],
-            obs[:,:,C.WALL],
+            image_bool[:,:,C.LEADER],
+            image_bool[:,:,C.MOUSE],
+            image_bool[:,:,C.WALL],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -356,12 +365,12 @@ class Env(base.Env):
             # no objects
             spritesheet['PATH'],
         ])[chosen_sprites]
-        image = einops.rearrange(
+
+        image_rgb = einops.rearrange(
             spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
-
-        return image
+        return Observation(image=image_rgb)
 
 
 @struct.dataclass

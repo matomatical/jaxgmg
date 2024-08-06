@@ -91,7 +91,7 @@ class Observation(base.Observation):
     """
     Observation for partially observable Maze environment.
 
-    * image : bool[h, w, c] or float[h, w, 3]
+    * image : bool[h, w, c] or float[h, w, rgb]
             The contents of the maze ahead of the agent.
     * orientation: int
             The direction the hero is facing.
@@ -122,8 +122,8 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
-    obs_height: int = 13 # TODO: needs to be odd
-    obs_width: int = 13 # TODO: needs to be odd
+    obs_height: int = 7
+    obs_width: int = 7 # TODO: needs to be odd
     terminate_after_goal: bool = True
 
 
@@ -134,8 +134,8 @@ class Env(base.Env):
         """
         MOVE_FORWARD = 0
         TURN_LEFT    = 1
-        TURN_RIGHT   = 2
-        STAY_STILL   = 3
+        STAY_STILL   = 2
+        TURN_RIGHT   = 3
 
 
     @property
@@ -316,14 +316,14 @@ class Env(base.Env):
             spritesheet['PATH'],
         ])[chosen_sprites] # -> h w th tw rgb
 
-        # dim outside of currently-visible region
+        # identify currently-visible region
         i = state.hero_pos[0]
         j = state.hero_pos[1]
         h = self.obs_height
         w = self.obs_width
         M = max(h, w, 2) - 2 # maximum padding required
-        mask = jnp.full((M+H+M, M+W+M), fill_value=0.4)
-        fov = jnp.ones((h, w))
+        mask = jnp.zeros((M+H+M, M+W+M), dtype=bool)
+        fov = jnp.ones((h, w), dtype=bool)
         mask = jax.lax.select_n(
             state.hero_dir,
             jax.lax.dynamic_update_slice(mask, fov,   (M+i+1-h,  M+j-w//2)),
@@ -331,12 +331,18 @@ class Env(base.Env):
             jax.lax.dynamic_update_slice(mask, fov,   (M+i,      M+j-w//2)),
             jax.lax.dynamic_update_slice(mask, fov.T, (M+i-w//2, M+j     )),
         )
-        mask = mask[M:M+H, M:M+W, jnp.newaxis, jnp.newaxis, jnp.newaxis]
-        dimmed_spritemap = mask * spritemap
+        mask = mask[M:M+H, M:M+W]
+
+        # use it to visibly highlight sprites in that region vs. outside
+        spritemap = jnp.where(
+            mask.reshape(H, W, 1, 1, 1),
+            0.2 + 0.8 * spritemap,
+            spritemap,
+        )
         
         # rearrange into required form
         image_rgb = einops.rearrange(
-            dimmed_spritemap,
+            spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
         return image_rgb

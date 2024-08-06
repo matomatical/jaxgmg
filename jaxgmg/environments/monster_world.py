@@ -105,6 +105,28 @@ class EnvState(base.EnvState):
     got_apples: chex.Array
 
 
+@struct.dataclass
+class Observation(base.Observation):
+    """
+    Observation for partially observable Maze environment.
+
+    * image : bool[h, w, c] or float[h, w, rgb]
+            The contents of the state. Comes in one of two formats:
+            * Boolean: a H by W by C bool array where each channel represents
+              the presence of one type of thing (wall, mouse, apple, shield
+              in world, monster, shield in inventory).
+            * Pixels: an D.H by D.W by 3 array of RGB float values where each
+              D by D tile corresponds to one grid square. (D is level of
+              detail.)
+
+    Observations come in one of two formats:
+
+    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
+      tile corresponds to one grid square.
+    """
+    image: chex.Array
+
+
 class Env(base.Env):
     """
     Monster gridworld environment.
@@ -127,14 +149,6 @@ class Env(base.Env):
     The episode ends when the mouse has collected all apples and defeated the
     maximum possible number of monsters (all monsters, or one monster for
     each shield if there are fewer shields than monsters).
-
-    Observations come in one of two formats:
-
-    * Boolean: a H by W by C bool array where each channel represents the
-      presence of one type of thing (wall, mouse, apple, shield in world,
-      monster, shield in inventory).
-    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
-      tile corresponds to one grid square.
     """
     class Action(enum.IntEnum):
         """
@@ -370,53 +384,53 @@ class Env(base.Env):
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _render_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> Observation:
         """
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
         C = len(Env.Channel)
-        obs = jnp.zeros((H, W, C), dtype=bool)
+        image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        obs = obs.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
 
         # render mouse
-        obs = obs.at[
+        image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
             Env.Channel.MOUSE,
         ].set(True)
 
         # render apples if not yet gotten
-        obs = obs.at[
+        image = image.at[
             state.level.apples_pos[:, 0],
             state.level.apples_pos[:, 1],
             Env.Channel.APPLE,
         ].set(~state.got_apples)
 
         # render monsters that haven't been killed
-        obs = obs.at[
+        image = image.at[
             state.monsters_pos[:, 0],
             state.monsters_pos[:, 1],
             Env.Channel.MONSTER,
         ].set(~state.got_monsters)
         
         # render shields that haven't been picked up
-        obs = obs.at[
+        image = image.at[
             state.level.shields_pos[:, 0],
             state.level.shields_pos[:, 1],
             Env.Channel.SHIELD,
         ].set(~state.got_shields)
         
         # render shields that have been picked up but haven't been used
-        obs = obs.at[
+        image = image.at[
             0,
             state.level.inventory_map,
             Env.Channel.INV,
         ].set(state.got_shields & ~state.used_shields)
 
-        return obs
+        return Observation(image=image)
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
@@ -424,29 +438,33 @@ class Env(base.Env):
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
-    ) -> chex.Array:
+    ) -> Observation:
         """
         Return an RGB observation based on a grid of tiles from the given
         spritesheet.
         """
         # get the boolean grid representation of the state
-        obs = self._render_obs_bool(state)
-        H, W, _C = obs.shape
+        image_bool = self._render_obs_bool(state).image
+        H, W, _C = image_bool.shape
 
         # find out, for each position, which object to render
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # multiple objects
-            obs[:, :, Env.Channel.WALL] & obs[:, :, Env.Channel.INV],
-            obs[:, :, Env.Channel.MONSTER] & obs[:, :, Env.Channel.APPLE],
-            obs[:, :, Env.Channel.MONSTER] & obs[:, :, Env.Channel.SHIELD],
-            obs[:, :, Env.Channel.MONSTER] & obs[:, :, Env.Channel.MOUSE],
+            image_bool[:, :, Env.Channel.WALL]
+                & image_bool[:, :, Env.Channel.INV],
+            image_bool[:, :, Env.Channel.MONSTER]
+                & image_bool[:, :, Env.Channel.APPLE],
+            image_bool[:, :, Env.Channel.MONSTER]
+                & image_bool[:, :, Env.Channel.SHIELD],
+            image_bool[:, :, Env.Channel.MONSTER]
+                & image_bool[:, :, Env.Channel.MOUSE],
             # one object
-            obs[:, :, Env.Channel.WALL],
-            obs[:, :, Env.Channel.MOUSE],
-            obs[:, :, Env.Channel.APPLE],
-            obs[:, :, Env.Channel.MONSTER],
-            obs[:, :, Env.Channel.SHIELD],
+            image_bool[:, :, Env.Channel.WALL],
+            image_bool[:, :, Env.Channel.MOUSE],
+            image_bool[:, :, Env.Channel.APPLE],
+            image_bool[:, :, Env.Channel.MONSTER],
+            image_bool[:, :, Env.Channel.SHIELD],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -468,12 +486,12 @@ class Env(base.Env):
             # no objects
             spritesheet['PATH'],
         ])[chosen_sprites]
-        image = einops.rearrange(
+        
+        image_rgb = einops.rearrange(
             spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
-
-        return image
+        return Observation(image=image_rgb)
 
         
 @struct.dataclass

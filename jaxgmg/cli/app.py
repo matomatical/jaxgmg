@@ -144,6 +144,7 @@ app.add_typer(make_typer_app(
         play.keys,
         play.lava,
         play.monsters,
+        play.minimaze,
     ),
 ))
 

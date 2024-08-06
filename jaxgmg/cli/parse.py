@@ -43,7 +43,7 @@ def corner(
     print("rendering...")
     env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(obs.image))
 
 
 def dish(
@@ -76,7 +76,7 @@ def dish(
     print("rendering...")
     env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(obs.image))
 
 
 def follow(
@@ -113,7 +113,7 @@ def follow(
     print("rendering...")
     env = follow_me.Env(obs_level_of_detail=level_of_detail)
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(obs.image))
 
 
 def keys(
@@ -149,7 +149,7 @@ def keys(
     print("rendering...")
     env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(obs.image))
 
 
 def lava(
@@ -179,7 +179,7 @@ def lava(
     print("rendering...")
     env = lava_land.Env(obs_level_of_detail=level_of_detail)
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(obs.image))
 
 
 def monsters(
@@ -217,7 +217,7 @@ def monsters(
     print("rendering...")
     env = monster_world.Env(obs_level_of_detail=level_of_detail)
     obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(obs.image))
 
 
 def minimaze(

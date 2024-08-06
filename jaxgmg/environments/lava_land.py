@@ -71,6 +71,27 @@ class EnvState(base.EnvState):
     got_cheese: bool
 
 
+@struct.dataclass
+class Observation(base.Observation):
+    """
+    Observation for partially observable Maze environment.
+
+    * image : bool[h, w, c] or float[h, w, rgb]
+            The contents of the state. Comes in one of two formats:
+            * Boolean: a H by W by C bool array where each channel represents
+              the presence of one type of thing (walls, lava, mouse, cheese).
+            * Pixels: an D.H by D.W by 3 array of RGB float values where each
+              D by D tile corresponds to one grid square. (D is level of
+              detail.)
+
+    Observations come in one of two formats:
+
+    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
+      tile corresponds to one grid square.
+    """
+    image: chex.Array
+
+
 class Env(base.Env):
     """
     Lava Land environment.
@@ -85,13 +106,6 @@ class Env(base.Env):
     * If the mouse hits the cheese, the agent gains reward and the episode
       ends.
     * If the mouse hits lava, it gets a negative reward (TODO: dies?)
-
-    Observations come in one of two formats:
-
-    * Boolean: a H by W by C bool array where each channel represents the
-      presence of one type of thing (walls, lava, mouse, cheese).
-    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
-      tile corresponds to one grid square.
     """
     class Action(enum.IntEnum):
         """
@@ -199,35 +213,35 @@ class Env(base.Env):
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _render_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> Observation:
         """
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
         C = len(Env.Channel)
-        obs = jnp.zeros((H, W, C), dtype=bool)
+        image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        obs = obs.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
         
         # render lava
-        obs = obs.at[:, :, Env.Channel.LAVA].set(state.level.lava_map)
+        image = image.at[:, :, Env.Channel.LAVA].set(state.level.lava_map)
 
         # render mouse
-        obs = obs.at[
+        image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
             Env.Channel.MOUSE,
         ].set(True)
         
         # render cheese
-        obs = obs.at[
+        image = image.at[
             state.level.cheese_pos[0],
             state.level.cheese_pos[1],
             Env.Channel.CHEESE,
         ].set(~state.got_cheese)
 
-        return obs
+        return Observation(image=image)
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
@@ -235,25 +249,26 @@ class Env(base.Env):
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
-    ) -> chex.Array:
+    ) -> Observation:
         """
         Return an RGB observation based on a grid of tiles from the given
         spritesheet.
         """
         # get the boolean grid representation of the state
-        obs = self._render_obs_bool(state)
-        H, W, _C = obs.shape
+        image_bool = self._render_obs_bool(state).image
+        H, W, _C = image_bool.shape
 
         # find out, for each position, which object to render
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # two objects
-            obs[:, :, Env.Channel.LAVA] & obs[:, :, Env.Channel.MOUSE],
+            image_bool[:, :, Env.Channel.LAVA]
+                & image_bool[:, :, Env.Channel.MOUSE],
             # one object
-            obs[:, :, Env.Channel.WALL],
-            obs[:, :, Env.Channel.LAVA],
-            obs[:, :, Env.Channel.MOUSE],
-            obs[:, :, Env.Channel.CHEESE],
+            image_bool[:, :, Env.Channel.WALL],
+            image_bool[:, :, Env.Channel.LAVA],
+            image_bool[:, :, Env.Channel.MOUSE],
+            image_bool[:, :, Env.Channel.CHEESE],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -271,12 +286,12 @@ class Env(base.Env):
             # no objects
             spritesheet['GRASS'],
         ])[chosen_sprites]
-        image = einops.rearrange(
+
+        image_rgb = einops.rearrange(
             spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
-
-        return image
+        return Observation(image=image_rgb)
     
 
     @functools.partial(jax.jit, static_argnames=('self',))

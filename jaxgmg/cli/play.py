@@ -2,9 +2,11 @@
 Interactive environment demonstrations.
 """
 
-import jax
+from typing import Callable
 import readchar
 import time
+
+import jax
 import chex
 
 from jaxgmg.procgen import maze_generation
@@ -12,9 +14,10 @@ from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import keys_and_chests
-from jaxgmg.environments import monster_world
-from jaxgmg.environments import lava_land
 from jaxgmg.environments import follow_me
+from jaxgmg.environments import lava_land
+from jaxgmg.environments import monster_world
+from jaxgmg.environments import minigrid_maze
 from jaxgmg import util
 
 
@@ -39,10 +42,11 @@ def play_forever(
         rng_level, rng = jax.random.split(rng)
         level = level_generator.sample(rng_level)
         obs, state = env.reset_to_level(level)
+        img = env.render_state(state)
 
         print("playing level...")
         print("initial state")
-        image = util.img2str(obs)
+        image = util.img2str(img)
         lines = len(str(image).splitlines())
         print(
             image,
@@ -67,10 +71,11 @@ def play_forever(
             a = "wasd".index(key)
             rng_step, rng_steps = jax.random.split(rng_steps)
             obs, state, r, d, _ = env.step(rng_step, state, a)
+            img = env.render_state(state)
             print(
                 "" if debug else f"\x1b[{lines+4}A",
                 f"action: {a} ({'uldr'[a]})",
-                util.img2str(obs),
+                util.img2str(img),
                 f"reward: {r:.2f} done: {d}",
                 "controls: w = up | a = left | s = down | d = right | q = quit",
                 sep="\n",
@@ -315,6 +320,46 @@ def monsters(
         num_shields=num_shields,
         num_monsters=num_monsters,
         monster_optimality=monster_optimality,
+    )
+    play_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        debug=debug,
+        record=record,
+    )
+    
+
+def minimaze(
+    height: int                 = 13,
+    width: int                  = 9,
+    obs_height: int             = 5,
+    obs_width: int              = 5,
+    layout: str                 = 'noise',
+    level_of_detail: int        = 8,
+    seed: int                   = 42,
+    debug: bool                 = False,
+    record: bool                = False,
+):
+    """
+    Interactive Monster World environment.
+    """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = minigrid_maze.Env(
+        obs_height=obs_height,
+        obs_width=obs_width,
+        obs_level_of_detail=level_of_detail,
+    )
+    level_generator = minigrid_maze.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
     )
     play_forever(
         rng=rng,
