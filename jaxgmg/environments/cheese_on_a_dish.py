@@ -452,7 +452,7 @@ class LevelGenerator(base.LevelGenerator):
 
 
 @struct.dataclass
-class LevelParser:
+class LevelParser(base.LevelParser):
     """
     Level parser for Cheese on a Dish environment. Given some parameters
     determining level shape, provides a `parse` method that converts an ASCII
@@ -588,16 +588,3 @@ class LevelParser:
         )
 
 
-    def parse_batch(self, level_strs):
-        """
-        Convert a list of ASCII string depiction of length `num_levels`
-        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
-        the details of the string depiction.
-        """
-        levels = [self.parse(level_str) for level_str in level_strs]
-        return Level(
-            wall_map=jnp.stack([l.wall_map for l in levels]),
-            cheese_pos=jnp.stack([l.cheese_pos for l in levels]),
-            dish_pos=jnp.stack([l.dish_pos for l in levels]),
-            initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
-        )

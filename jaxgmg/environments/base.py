@@ -417,14 +417,11 @@ class LevelParser:
         into a vectorised `Level[num_levels]` PyTree. See `parse` method for
         the details of the string depiction.
         """
+        # parse levels
         levels = [self.parse(level_str) for level_str in level_strs]
-        LevelClass = levels[0].__type__
-        return Level(
-            wall_map=jnp.stack([l.wall_map for l in levels]),
-            goal_pos=jnp.stack([l.goal_pos for l in levels]),
-            initial_hero_pos=jnp.stack([l.initial_hero_pos for l in levels]),
-            initial_hero_dir=jnp.stack([l.initial_hero_dir for l in levels]),
-        )
+        # stack into a single Level object
+        return jax.tree.map(lambda *xs: jax.numpy.stack(xs), *levels)
+
 
 # # # 
 # Level solving

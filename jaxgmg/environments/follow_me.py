@@ -467,7 +467,7 @@ class LevelGenerator(base.LevelGenerator):
 
 
 @struct.dataclass
-class LevelParser:
+class LevelParser(base.LevelParser):
     """
     Level parser for Follow Me environment. Given some parameters determining
     level shape, provides a `parse` method that converts an ASCII depiction
@@ -622,32 +622,5 @@ class LevelParser:
             dir_map=dir_map,
             initial_mouse_pos=initial_mouse_pos,
         )
-    
 
-    def parse_batch(self, level_strs):
-        """
-        Convert a list of ASCII string depiction of length `num_levels`
-        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
-        the details of the string depiction.
-        """
-        levels = [self.parse(level_str) for level_str in level_strs]
-        return Level(
-            wall_map=jnp.stack(
-                [l.wall_map for l in levels]
-            ),
-            beacons_pos=jnp.stack(
-                [l.beacons_pos for l in levels]
-            ),
-            initial_leader_pos=jnp.stack(
-                [l.initial_leader_pos for l in levels]
-            ),
-            leader_order=jnp.stack(
-                [l.leader_order for l in levels]
-            ),
-            initial_mouse_pos=jnp.stack(
-                [l.initial_mouse_pos for l in levels]
-            ),
-            dir_map=jnp.stack(
-                [l.dir_map for l in levels]
-            ),
-        )
+
