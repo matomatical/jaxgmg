@@ -196,3 +196,30 @@ jaxgmg train corner \
 # todo:
 # * implement robust plr / parallel plr
 # * have a go at formalism
+
+# try with new metrics
+jaxgmg train corner \
+    --no-console-log --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 2048 --no-train-gifs \
+    --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg --wandb-group ued-new-metrics \
+    --env-size 13 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --wandb-name plr-r5-0 --ued plr --plr-prob-replay 0.5 --plr-buffer-size 2048 --seed 0
+jaxgmg train corner \
+    --no-console-log --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 2048 --no-train-gifs \
+    --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg --wandb-group ued-new-metrics \
+    --env-size 13 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --wandb-name plr-r5-1 --ued plr --plr-prob-replay 0.5 --plr-buffer-size 2048 --seed 1
+jaxgmg train corner \
+    --no-console-log --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 2048 --no-train-gifs \
+    --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg --wandb-group ued-new-metrics \
+    --env-size 13 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --wandb-name plr-r5-2 --ued plr --plr-prob-replay 0.5 --plr-buffer-size 2048 --seed 2
+jaxgmg train corner \
+    --no-console-log --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 2048 --no-train-gifs \
+    --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg --wandb-group ued-new-metrics \
+    --env-size 13 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --wandb-name plr-r5-3 --ued plr --plr-prob-replay 0.5 --plr-buffer-size 2048 --seed 3
+jaxgmg train corner \
+    --no-console-log --num-cycles-per-log 8 --num-cycles-per-eval 8 --num-cycles-per-big-eval 2048 --no-train-gifs \
+    --wandb-log --wandb-entity krueger-lab-cambridge --wandb-project matt-gmg --wandb-group ued-new-metrics \
+    --env-size 13 --env-corner-size 1 --net impala:lstm --num-total-env-steps 20000000 \
+    --wandb-name plr-r5-4 --ued plr --plr-prob-replay 0.5 --plr-buffer-size 2048 --seed 4
