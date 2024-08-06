@@ -106,8 +106,39 @@ class Observation(base.Observation):
               detail.)
     """
     image: chex.Array
+    
+
+class Action(enum.IntEnum):
+    """
+    The environment has a discrete action space of size 4 with the following
+    meanings.
+    """
+    MOVE_UP     = 0
+    MOVE_LEFT   = 1
+    MOVE_DOWN   = 2
+    MOVE_RIGHT  = 3
 
 
+class Channel(enum.IntEnum):
+    """
+    The observations returned by the environment are an `h` by `w` by
+    `channel` Boolean array, where the final dimensions 0 through 4
+    indicate the following:
+
+    * `WALL`:   True in the locations where there is a wall.
+    * `MOUSE`:  True in the one location the mouse occupies.
+    * `LEADER`: True in the one location the leader occupies.
+    * `BEACON`: True in the locations occupied by a beacon.
+    * `ACTIVE`: True in the one location occupied by the currently active
+                beacon.
+    """
+    WALL    = 0
+    MOUSE   = 1
+    LEADER  = 2
+    BEACON  = 3
+    ACTIVE  = 4
+
+    
 class Env(base.Env):
     """
     Follow me environment.
@@ -128,51 +159,23 @@ class Env(base.Env):
     When the mouse hits an active beacon, it receives reward, the beacon
     deactivates, and the next beacon in the sequence activates.
     """
-    class Action(enum.IntEnum):
-        """
-        The environment has a discrete action space of size 4 with the following
-        meanings.
-        """
-        MOVE_UP     = 0
-        MOVE_LEFT   = 1
-        MOVE_DOWN   = 2
-        MOVE_RIGHT  = 3
-
-
     @property
     def num_actions(self) -> int:
-        return len(Env.Action)
+        return len(Action)
 
 
     def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
+        # TODO: only works for boolean observations...
         H, W = level.wall_map.shape
-        C = len(Env.Channel)
-        return jax.ShapeDtypeStruct(
-            shape=(H, W, C),
-            dtype=bool,
+        C = len(Channel)
+        return Observation(
+            image=jax.ShapeDtypeStruct(
+                shape=(H, W, C),
+                dtype=bool,
+            ),
         )
 
 
-    class Channel(enum.IntEnum):
-        """
-        The observations returned by the environment are an `h` by `w` by
-        `channel` Boolean array, where the final dimensions 0 through 4
-        indicate the following:
-
-        * `WALL`:   True in the locations where there is a wall.
-        * `MOUSE`:  True in the one location the mouse occupies.
-        * `LEADER`: True in the one location the leader occupies.
-        * `BEACON`: True in the locations occupied by a beacon.
-        * `ACTIVE`: True in the one location occupied by the currently active
-                    beacon.
-        """
-        WALL    = 0
-        MOUSE   = 1
-        LEADER  = 2
-        BEACON  = 3
-        ACTIVE  = 4
-
-    
     def _reset(
         self,
         level: Level,
@@ -270,31 +273,31 @@ class Env(base.Env):
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
-        C = len(Env.Channel)
+        C = len(Channel)
         image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Channel.WALL].set(state.level.wall_map)
 
         # render mouse
         image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
-            Env.Channel.MOUSE,
+            Channel.MOUSE,
         ].set(True)
         
         # render leader
         image = image.at[
             state.leader_pos[0],
             state.leader_pos[1],
-            Env.Channel.LEADER,
+            Channel.LEADER,
         ].set(True)
         
         # render beacons
         image = image.at[
             state.level.beacons_pos[:, 0],
             state.level.beacons_pos[:, 1],
-            Env.Channel.BEACON,
+            Channel.BEACON,
         ].set(True)
 
         # render active beacon
@@ -304,7 +307,7 @@ class Env(base.Env):
         image = image.at[
             active_beacon_pos[0],
             active_beacon_pos[1],
-            Env.Channel.ACTIVE,
+            Channel.ACTIVE,
         ].set(~state.done)
         
         return Observation(image=image)
@@ -323,7 +326,7 @@ class Env(base.Env):
         # get the boolean grid representation of the state
         image_bool = self._render_obs_bool(state).image
         H, W, _C = image_bool.shape
-        C = Env.Channel
+        C = Channel
 
         # find out, for each position, which object to render
         inactive = image_bool[:,:,C.BEACON] & ~image_bool[:,:,C.ACTIVE]
@@ -515,31 +518,31 @@ class LevelParser(base.LevelParser):
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Env.Channel.WALL`.
-            * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character '*' maps to `Env.Channel.LEADER`.
-            * The charcters '0' through '9' map to 'Env.Channel.BEACON`.
-            * The character '.' maps to `len(Env.Channel)`, i.e. none of the
+            * The character '#' maps to `Channel.WALL`.
+            * The character '@' maps to `Channel.MOUSE`.
+            * The character '*' maps to `Channel.LEADER`.
+            * The charcters '0' through '9' map to 'Channel.BEACON`.
+            * The character '.' maps to `len(Channel)`, i.e. none of the
               above, representing the absence of an item.
             The beacon order is determined by the lexicographic order of the
-            symbols used that map to `Env.Channel.BEACON`.
+            symbols used that map to `Channel.BEACON`.
     """
     height: int
     width: int
     num_beacons: int
     leader_order: tuple
     char_map = {
-        '#': Env.Channel.WALL,
-        '@': Env.Channel.MOUSE,
-        '*': Env.Channel.LEADER,
+        '#': Channel.WALL,
+        '@': Channel.MOUSE,
+        '*': Channel.LEADER,
         # the following all map to BEACON, the lexicographic order is used to
         # determine the beacon order.
-        '0': Env.Channel.BEACON, '1': Env.Channel.BEACON,
-        '2': Env.Channel.BEACON, '3': Env.Channel.BEACON,
-        '4': Env.Channel.BEACON, '5': Env.Channel.BEACON,
-        '6': Env.Channel.BEACON, '7': Env.Channel.BEACON,
-        '8': Env.Channel.BEACON, '9': Env.Channel.BEACON,
-        '.': len(Env.Channel), # PATH
+        '0': Channel.BEACON, '1': Channel.BEACON,
+        '2': Channel.BEACON, '3': Channel.BEACON,
+        '4': Channel.BEACON, '5': Channel.BEACON,
+        '6': Channel.BEACON, '7': Channel.BEACON,
+        '8': Channel.BEACON, '9': Channel.BEACON,
+        '.': len(Channel), # PATH
     }
 
 
@@ -590,14 +593,14 @@ class LevelParser(base.LevelParser):
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Env.Channel.WALL)
+        wall_map = (level_map == Channel.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
         assert wall_map[:,-1].all(), "right border incomplete"
     
         # extract beacon positions and number
-        beacon_map = (level_map == Env.Channel.BEACON)
+        beacon_map = (level_map == Channel.BEACON)
         num_beacons = beacon_map.sum()
         assert num_beacons == self.num_beacons, "wrong number of beacons"
         unordered_beacons_pos = jnp.stack(
@@ -616,14 +619,14 @@ class LevelParser(base.LevelParser):
         beacons_pos = unordered_beacons_pos[beacon_order]
         
         # extract leader spawn position
-        leader_spawn_map = (level_map == Env.Channel.LEADER)
+        leader_spawn_map = (level_map == Channel.LEADER)
         assert leader_spawn_map.sum() == 1, "there must be exactly one leader"
         initial_leader_pos = jnp.concatenate(
             jnp.where(leader_spawn_map, size=1)
         )
 
         # extract mouse spawn position
-        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        mouse_spawn_map = (level_map == Channel.MOUSE)
         assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
         initial_mouse_pos = jnp.concatenate(
             jnp.where(mouse_spawn_map, size=1)

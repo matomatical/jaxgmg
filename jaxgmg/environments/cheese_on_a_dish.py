@@ -89,6 +89,34 @@ class Observation(base.Observation):
     image: chex.Array
 
 
+class Action(enum.IntEnum):
+    """
+    The environment has a discrete action space of size 4 with the following
+    meanings.
+    """
+    MOVE_UP     = 0
+    MOVE_LEFT   = 1
+    MOVE_DOWN   = 2
+    MOVE_RIGHT  = 3
+
+
+class Channel(enum.IntEnum):
+    """
+    The observations returned by the environment are an `h` by `w` by
+    `channel` Boolean array, where the final dimensions 0 through 4
+    indicate the following:
+
+    * `WALL`:   True in the locations where there is a wall.
+    * `MOUSE`:  True in the one location the mouse occupies.
+    * `CHEESE`: True in the one location the cheese occupies.
+    * `DISH`:   True in the one location the dish occupies.
+    """
+    WALL    = 0
+    MOUSE   = 1
+    CHEESE  = 2
+    DISH    = 3
+
+
 class Env(base.Env):
     """
     Cheese on a Dish environment.
@@ -104,48 +132,25 @@ class Env(base.Env):
     * If the mouse hits the cheese, the agent gains reward and the episode
       ends.
     """
-    class Action(enum.IntEnum):
-        """
-        The environment has a discrete action space of size 4 with the following
-        meanings.
-        """
-        MOVE_UP     = 0
-        MOVE_LEFT   = 1
-        MOVE_DOWN   = 2
-        MOVE_RIGHT  = 3
 
 
     @property
     def num_actions(self) -> int:
-        return len(Env.Action)
+        return len(Action)
 
 
     def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
+        # TODO: only works for boolean observations...
         H, W = level.wall_map.shape
-        C = len(Env.Channel)
-        return jax.ShapeDtypeStruct(
-            shape=(H, W, C),
-            dtype=bool,
+        C = len(Channel)
+        return Observation(
+            image=jax.ShapeDtypeStruct(
+                shape=(H, W, C),
+                dtype=bool,
+            ),
         )
 
 
-    class Channel(enum.IntEnum):
-        """
-        The observations returned by the environment are an `h` by `w` by
-        `channel` Boolean array, where the final dimensions 0 through 4
-        indicate the following:
-
-        * `WALL`:   True in the locations where there is a wall.
-        * `MOUSE`:  True in the one location the mouse occupies.
-        * `CHEESE`: True in the one location the cheese occupies.
-        * `DISH`:   True in the one location the dish occupies.
-        """
-        WALL    = 0
-        MOUSE   = 1
-        CHEESE  = 2
-        DISH    = 3
-
-    
     def _reset(
         self,
         level: Level,
@@ -214,31 +219,31 @@ class Env(base.Env):
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
-        C = len(Env.Channel)
+        C = len(Channel)
         image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Channel.WALL].set(state.level.wall_map)
 
         # render mouse
         image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
-            Env.Channel.MOUSE,
+            Channel.MOUSE,
         ].set(True)
         
         # render cheese
         image = image.at[
             state.level.cheese_pos[0],
             state.level.cheese_pos[1],
-            Env.Channel.CHEESE,
+            Channel.CHEESE,
         ].set(~state.got_cheese)
         
         # render dish
         image = image.at[
             state.level.dish_pos[0],
             state.level.dish_pos[1],
-            Env.Channel.DISH,
+            Channel.DISH,
         ].set(~state.got_dish)
 
         return Observation(image=image)
@@ -262,13 +267,13 @@ class Env(base.Env):
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # two objects
-            image_bool[:, :, Env.Channel.CHEESE]
-                & image_bool[:, :, Env.Channel.DISH],
+            image_bool[:, :, Channel.CHEESE]
+                & image_bool[:, :, Channel.DISH],
             # one object
-            image_bool[:, :, Env.Channel.WALL],
-            image_bool[:, :, Env.Channel.MOUSE],
-            image_bool[:, :, Env.Channel.CHEESE],
-            image_bool[:, :, Env.Channel.DISH],
+            image_bool[:, :, Channel.WALL],
+            image_bool[:, :, Channel.MOUSE],
+            image_bool[:, :, Channel.CHEESE],
+            image_bool[:, :, Channel.DISH],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -497,24 +502,24 @@ class LevelParser(base.LevelParser):
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Env.Channel.WALL`.
-            * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character 'd' maps to `Env.Channel.DISH`.
-            * The character 'c' maps to `Env.Channel.CHEESE`.
-            * The character 'b' maps to `len(Env.Channel)`, i.e. none of the
+            * The character '#' maps to `Channel.WALL`.
+            * The character '@' maps to `Channel.MOUSE`.
+            * The character 'd' maps to `Channel.DISH`.
+            * The character 'c' maps to `Channel.CHEESE`.
+            * The character 'b' maps to `len(Channel)`, i.e. none of the
               above, representing *both* the cheese and the dish.
-            * The character '.' maps to `len(Env.Channel)+1`, i.e. none of
+            * The character '.' maps to `len(Channel)+1`, i.e. none of
               the above, representing the absence of an item.
     """
     height: int
     width: int
     char_map = {
-        '#': Env.Channel.WALL,
-        '@': Env.Channel.MOUSE,
-        'd': Env.Channel.DISH,
-        'c': Env.Channel.CHEESE,
-        'b': len(Env.Channel),   # BOTH
-        '.': len(Env.Channel)+1, # PATH
+        '#': Channel.WALL,
+        '@': Channel.MOUSE,
+        'd': Channel.DISH,
+        'c': Channel.CHEESE,
+        'b': len(Channel),   # BOTH
+        '.': len(Channel)+1, # PATH
         # TODO: I should switch these to using a standalone enum...
     }
 
@@ -574,7 +579,7 @@ class LevelParser(base.LevelParser):
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Env.Channel.WALL)
+        wall_map = (level_map == Channel.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
@@ -582,8 +587,8 @@ class LevelParser(base.LevelParser):
         
         # extract cheese position
         cheese_map = (
-            (level_map == Env.Channel.CHEESE)
-            | (level_map == len(Env.Channel)) # both dish and cheese
+            (level_map == Channel.CHEESE)
+            | (level_map == len(Channel)) # both dish and cheese
         )
         assert cheese_map.sum() == 1, "there must be exactly one cheese"
         cheese_pos = jnp.concatenate(
@@ -592,8 +597,8 @@ class LevelParser(base.LevelParser):
         
         # extract dish position
         dish_map = (
-            (level_map == Env.Channel.DISH)
-            | (level_map == len(Env.Channel)) # both dish and cheese
+            (level_map == Channel.DISH)
+            | (level_map == len(Channel)) # both dish and cheese
         )
         assert dish_map.sum() == 1, "there must be exactly one dish"
         dish_pos = jnp.concatenate(
@@ -601,7 +606,7 @@ class LevelParser(base.LevelParser):
         )
 
         # extract mouse spawn position
-        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        mouse_spawn_map = (level_map == Channel.MOUSE)
         assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
         initial_mouse_pos = jnp.concatenate(
             jnp.where(mouse_spawn_map, size=1)

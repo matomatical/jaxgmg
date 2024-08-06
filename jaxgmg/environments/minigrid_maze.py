@@ -100,6 +100,32 @@ class Observation(base.Observation):
     orientation: int
 
 
+class Action(enum.IntEnum):
+    """
+    The environment has a discrete action space of size 4 with the following
+    meanings.
+    """
+    MOVE_FORWARD = 0
+    TURN_LEFT    = 1
+    STAY_STILL   = 2
+    TURN_RIGHT   = 3
+
+
+class Channel(enum.IntEnum):
+    """
+    The observations returned by the environment are an `h` by `w` by
+    `channel` Boolean array, where the final dimensions 0 through 4
+    indicate the following:
+
+    * `WALL`:   True in the locations where there is a wall.
+    * `HERO`:  True in the one location the hero occupies.
+    * `GOAL`: True in the one location the goal occupies.
+    """
+    WALL    = 0
+    HERO   = 1
+    GOAL  = 2
+
+
 @struct.dataclass
 class Env(base.Env):
     """
@@ -127,27 +153,14 @@ class Env(base.Env):
     terminate_after_goal: bool = True
 
 
-    class Action(enum.IntEnum):
-        """
-        The environment has a discrete action space of size 4 with the following
-        meanings.
-        """
-        MOVE_FORWARD = 0
-        TURN_LEFT    = 1
-        STAY_STILL   = 2
-        TURN_RIGHT   = 3
-
-
     @property
     def num_actions(self) -> int:
-        return len(Env.Action)
+        return len(Action)
     
 
     def obs_type(self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
         # TODO: this will not work for RGB observations...
-        # TODO: remove dependence on level
-        # TODO: i need to adapt the networks to work with obs structs...?
-        C = len(Env.Channel)
+        C = len(Channel)
         return Observation(
             image=jax.ShapeDtypeStruct(
                 shape=(self.obs_height, self.obs_width, C),
@@ -160,21 +173,6 @@ class Env(base.Env):
         )
 
 
-    class Channel(enum.IntEnum):
-        """
-        The observations returned by the environment are an `h` by `w` by
-        `channel` Boolean array, where the final dimensions 0 through 4
-        indicate the following:
-
-        * `WALL`:   True in the locations where there is a wall.
-        * `HERO`:  True in the one location the hero occupies.
-        * `GOAL`: True in the one location the goal occupies.
-        """
-        WALL    = 0
-        HERO   = 1
-        GOAL  = 2
-
-    
     def _reset(
         self,
         level: Level,
@@ -205,11 +203,11 @@ class Env(base.Env):
         # we can implement them independently
 
         # turn actions
-        turn_left = (action == Env.Action.TURN_LEFT)
-        turn_right = (action == Env.Action.TURN_RIGHT)
+        turn_left = (action == Action.TURN_LEFT)
+        turn_right = (action == Action.TURN_RIGHT)
         new_dir = (state.hero_dir + turn_left - turn_right) % 4
         # move forward action
-        move_forward = (action == Env.Action.MOVE_FORWARD)
+        move_forward = (action == Action.MOVE_FORWARD)
         steps = jnp.array((
             (-1,  0),   # up
             ( 0, -1),   # left
@@ -255,24 +253,24 @@ class Env(base.Env):
         Render a boolean grid image of the current state.
         """
         H, W = state.level.wall_map.shape
-        C = len(Env.Channel)
+        C = len(Channel)
         image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Channel.WALL].set(state.level.wall_map)
 
         # render hero
         image = image.at[
             state.hero_pos[0],
             state.hero_pos[1],
-            Env.Channel.HERO,
+            Channel.HERO,
         ].set(True)
         
         # render goal
         image = image.at[
             state.level.goal_pos[0],
             state.level.goal_pos[1],
-            Env.Channel.GOAL,
+            Channel.GOAL,
         ].set(~state.got_goal)
 
         return image
@@ -298,9 +296,9 @@ class Env(base.Env):
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # one object
-            image_bool[:, :, Env.Channel.WALL],
-            image_bool[:, :, Env.Channel.HERO],
-            image_bool[:, :, Env.Channel.GOAL],
+            image_bool[:, :, Channel.WALL],
+            image_bool[:, :, Channel.HERO],
+            image_bool[:, :, Channel.GOAL],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -369,7 +367,7 @@ class Env(base.Env):
         # construct an oriented slice of the state in front of the hero
         i = state.hero_pos[0]
         j = state.hero_pos[1]
-        C = len(Env.Channel)
+        C = len(Channel)
         # four possible slices
         case_facing_up = jnp.rot90(
             jax.lax.dynamic_slice(image, (M+i+1-h, M+j-w//2, 0), (h, w, C)),
@@ -415,9 +413,9 @@ class Env(base.Env):
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # one object
-            image_bool[:, :, Env.Channel.WALL],
-            image_bool[:, :, Env.Channel.HERO],
-            image_bool[:, :, Env.Channel.GOAL],
+            image_bool[:, :, Channel.WALL],
+            image_bool[:, :, Channel.HERO],
+            image_bool[:, :, Channel.GOAL],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -548,23 +546,23 @@ class LevelParser(base.LevelParser):
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Env.Channel.WALL`.
-            * The characters '^', '<', 'v', and '>' map to `Env.Channel.HERO`
+            * The character '#' maps to `Channel.WALL`.
+            * The characters '^', '<', 'v', and '>' map to `Channel.HERO`
               (in initial orientations up, left, down, right respectively).
-            * The character '*' maps to `Env.Channel.GOAL`.
-            * The character '.' maps to `len(Env.Channel)`, i.e. none of the
+            * The character '*' maps to `Channel.GOAL`.
+            * The character '.' maps to `len(Channel)`, i.e. none of the
               above, representing the absence of an item.
     """
     height: int
     width: int
     char_map = {
-        '#': Env.Channel.WALL,
-        '^': Env.Channel.HERO,
-        '<': Env.Channel.HERO,
-        'v': Env.Channel.HERO,
-        '>': Env.Channel.HERO,
-        '*': Env.Channel.GOAL,
-        '.': len(Env.Channel), # PATH
+        '#': Channel.WALL,
+        '^': Channel.HERO,
+        '<': Channel.HERO,
+        'v': Channel.HERO,
+        '>': Channel.HERO,
+        '*': Channel.GOAL,
+        '.': len(Channel), # PATH
     }
 
 
@@ -604,21 +602,21 @@ class LevelParser(base.LevelParser):
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Env.Channel.WALL)
+        wall_map = (level_map == Channel.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
         assert wall_map[:,-1].all(), "right border incomplete"
         
         # extract goal position
-        goal_map = (level_map == Env.Channel.GOAL)
+        goal_map = (level_map == Channel.GOAL)
         assert goal_map.sum() == 1, "there must be exactly one goal"
         goal_pos = jnp.concatenate(
             jnp.where(goal_map, size=1)
         )
 
         # extract hero spawn position
-        hero_spawn_map = (level_map == Env.Channel.HERO)
+        hero_spawn_map = (level_map == Channel.HERO)
         assert hero_spawn_map.sum() == 1, "there must be exactly one hero"
         initial_hero_pos = jnp.concatenate(
             jnp.where(hero_spawn_map, size=1)
@@ -643,332 +641,6 @@ class LevelParser(base.LevelParser):
 
 
 # # # 
-# Level solving
-
-
-@struct.dataclass
-class LevelSolution(base.LevelSolution):
-    level: Level
-    directional_distance_to_goal: chex.Array
-
-
-@struct.dataclass
-class LevelSolver(base.LevelSolver):
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def solve(self, level: Level) -> LevelSolution:
-        """
-        Compute the distance from each possible hero position to the goal
-        position a given level. From this information one can easy compute
-        the optimal action or value from any state of this level.
-
-        Parameters:
-
-        * level : Level
-                The level to compute the optimal value for.
-
-        Returns:
-
-        * soln : LevelSolution
-                The necessary precomputed (directional) distances for later
-                computing optimal values and actions from states.
-
-        TODO:
-
-        * Solving the mazes currently uses all pairs shortest paths
-          algorithm, which is not efficient enough to work for very large
-          mazes. If we wanted to solve very large mazes, we could by changing
-          to a single source shortest path algorithm.
-        """
-        # compute distance between hero and goal
-        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
-        dir_dist_to_goal = dir_dist[
-            :,
-            :,
-            level.goal_pos[0],
-            level.goal_pos[1],
-            :,
-        ]
-
-        return LevelSolution(
-            level=level,
-            directional_distance_to_goal=dir_dist_to_goal,
-        )
-
-    
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
-        """
-        Optimal return value from a given state.
-
-        Parameters:
-
-        * soln : LevelSolution
-                The output of `solve` method for this level.
-        * state : EnvState
-                The state to compute the value for.
-
-        Return:
-
-        * value : float
-                The optimal value of this state.
-        """
-        # steps to get to the goal: look up in distance cache
-        optimal_dist = soln.directional_distance_to_goal[
-            state.hero_pos[0],
-            state.hero_pos[1],
-            4, # stay here
-        ]
-
-        # reward when we get to the goal is 1 iff the goal is still there
-        reward = (1.0 - state.got_goal)
-        # maybe we apply a time penalty
-        time_of_reward = state.steps + optimal_dist
-        penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
-        penalized_reward = jnp.where(
-            self.env.penalize_time,
-            penalty * reward,
-            reward,
-        )
-        # mask out rewards beyond the end of the episode
-        episode_still_valid = time_of_reward < self.env.max_steps_in_episode
-        valid_reward = penalized_reward * episode_still_valid
-
-        # discount the reward
-        discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
-
-        return discounted_reward
-
-    
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_action_values(
-        self,
-        soln: LevelSolution,
-        state: EnvState,
-    ) -> chex.Array: # float[4]
-        """
-        Optimal return value from a given state.
-
-        Parameters:
-
-        * soln : LevelSolution
-                The output of `solve` method for this level.
-        * state : EnvState
-                The state to compute the value for.
-            
-        Notes:
-
-        * With a steep discount rate or long episodes, this algorithm might
-          run into minor numerical issues where small contributions to the
-          return from late into the episode are lost.
-        """
-        # steps to get to the goal for adjacent squares: look up in cache
-        dir_dists = soln.directional_distance_to_goal[
-            state.hero_pos[0],
-            state.hero_pos[1],
-        ] # -> float[5] (up left down right stay)
-        # steps after taking each action, taking collisions into account:
-        # replace inf values with stay-still values
-        action_dists = jnp.where(
-            jnp.isinf(dir_dists[:4]),
-            dir_dists[4],
-            dir_dists[:4],
-        )
-
-        # reward when we get to the goal is 1 iff the goal is still there
-        reward = (1.0 - state.got_goal)
-        # maybe we apply a time penalty
-        times_of_reward = state.steps + action_dists
-        penalties = (
-            1.0 - 0.9 * times_of_reward / self.env.max_steps_in_episode
-        )
-        penalized_rewards = jnp.where(
-            self.env.penalize_time,
-            penalties * reward,
-            reward,
-        )
-        # mask out rewards beyond the end of the episode
-        episode_still_valids = times_of_reward < self.env.max_steps_in_episode
-        valid_rewards = penalized_rewards * episode_still_valids
-
-        # discount the reward
-        discounted_rewards = (
-            (self.discount_rate ** action_dists) * valid_rewards
-        )
-
-        return discounted_rewards
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
-        """
-        Optimal action from a given state.
-
-        Parameters:
-
-        * soln : LevelSolution
-                The output of `solve` method for this level.
-        * state : EnvState
-                The state to compute the optimal action for.
-            
-        Return:
-
-        * action : int                      # TODO: use the Env.Action enum?
-                An optimal action from the given state.
-                
-        Notes:
-
-        * If there are multiple equally optimal actions, this method will
-          return the first according to the order up (0), left (1), down (2),
-          or right (3).
-        * As a special case of this, if the goal is unreachable, the
-          returned action will be up (0).
-        * If the goal is on the current square, the returned action is
-          arbitrary, and in fact it might even be suboptimal, since if there
-          is a wall the optimal action is to move into that wall.
-        * If the goal has already been gotten then there is no more reward
-          available, but this method will still direct the hero towards the
-          goal position.
-        * If the goal is too far away to reach by the end of the episode,
-          this method will still direct the hero towards the goal.
-
-        TODO: 
-
-        * Make all environments have a 'stay action' will simplify these
-          solutions a fair bit. The hero could stay when on the goal, or
-          when the goal is unreachable, or when the goal is already
-          gotten.
-        """
-        action = jnp.argmin(soln.directional_distance_to_goal[
-            state.hero_pos[0],
-            state.hero_pos[1],
-            :4,
-        ])
-        return action
-
-
-# # # 
-# Splay functions
-# Note that these functions are not jittable.
-
-
-def splay_hero(level: Level):
-    free_map = ~level.wall_map
-    free_map = free_map.at[
-        level.goal_pos[0],
-        level.goal_pos[1],
-    ].set(False)
-
-    # assemble level batch
-    num_levels = free_map.sum()
-    levels = Level(
-        wall_map=einops.repeat(
-            level.wall_map,
-            'h w -> n h w',
-            n=num_levels,
-        ),
-        goal_pos=einops.repeat(
-            level.goal_pos,
-            'c -> n c',
-            n=num_levels,
-        ),
-        initial_hero_pos=jnp.stack(jnp.where(free_map), axis=1),
-    )
-    
-    # remember how to put the levels back together into a grid
-    levels_pos = jnp.where(free_map)
-    grid_shape = free_map.shape
-    
-    return (
-        levels,
-        num_levels,
-        levels_pos,
-        grid_shape,
-    )
-
-
-def splay_goal(level: Level):
-    free_map = ~level.wall_map
-    free_map = free_map.at[
-        level.initial_hero_pos[0],
-        level.initial_hero_pos[1],
-    ].set(False)
-
-    # assemble level batch
-    num_levels = free_map.sum()
-    levels = Level(
-        wall_map=einops.repeat(
-            level.wall_map,
-            'h w -> n h w',
-            n=num_levels,
-        ),
-        goal_pos=jnp.stack(jnp.where(free_map), axis=1),
-        initial_hero_pos=einops.repeat(
-            level.initial_hero_pos,
-            'c -> n c',
-            n=num_levels,
-        ),
-    )
-    
-    # remember how to put the levels back together into a grid
-    levels_pos = jnp.where(free_map)
-    grid_shape = free_map.shape
-    
-    return (
-        levels,
-        num_levels,
-        levels_pos,
-        grid_shape,
-    )
-
-
-def splay_goal_and_hero(level: Level):
-    free_map = ~level.wall_map
-    # macromaze
-    free_metamap = free_map[None,None,:,:] & free_map[:,:,None,None]
-    # remove hero/goal clashes
-    free_pos = jnp.where(free_map)
-    clash_pos = free_pos + free_pos # concatenate tuples
-    free_metamap = free_metamap.at[clash_pos].set(False)
-    # rearrange into appropriate order(s)
-    free_metamap_hhww = einops.rearrange(
-        free_metamap,
-        'H W h w -> H h W w',
-    )
-
-    # assemble level batch
-    num_spaces = free_map.sum()
-    num_levels = (num_spaces - 1) * num_spaces
-    # goal/hero spawn locations
-    goal1, hero1, goal2, hero2 = jnp.where(free_metamap_hhww)
-    levels = Level(
-        wall_map=einops.repeat(
-            level.wall_map,
-            'h w -> n h w',
-            n=num_levels,
-        ),
-        goal_pos=jnp.stack((goal1, goal2), axis=1),
-        initial_hero_pos=jnp.stack((hero1, hero2), axis=1),
-    )
-
-    # remember how to put the levels back together into a grid
-    free_metamap_grid = einops.rearrange(
-        free_metamap_hhww[1:-1,:,1:-1,:],
-        'H h W w -> (H h) (W w)',
-    )
-    levels_pos = jnp.where(free_metamap_grid)
-    grid_shape = free_metamap_grid.shape
-    
-    return (
-        levels,
-        num_levels,
-        levels_pos,
-        grid_shape,
-    )
-
-
-# # # 
 # Level complexity metrics
 
 
@@ -982,6 +654,11 @@ class LevelMetrics(base.LevelMetrics):
         levels: Level,          # Level[num_levels]
         weights: chex.Array,    # float[num_levels]
     ) -> dict[str, Any]:        # metrics
+        """
+        TODO: This is copied from Cheese in the Corner. There is more to do
+        like measure the distribution of initial directions and to measure
+        whether the goal is visible in the initial state or not.
+        """
         # basics
         num_levels, h, w = levels.wall_map.shape
         dists = jax.vmap(maze_solving.maze_distances)(levels.wall_map)

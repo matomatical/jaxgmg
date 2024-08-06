@@ -127,6 +127,40 @@ class Observation(base.Observation):
     image: chex.Array
 
 
+class Action(enum.IntEnum):
+    """
+    The environment has a discrete action space of size 4 with the following
+    meanings.
+    """
+    MOVE_UP     = 0
+    MOVE_LEFT   = 1
+    MOVE_DOWN   = 2
+    MOVE_RIGHT  = 3
+
+
+class Channel(enum.IntEnum):
+    """
+    The observations returned by the environment are an `h` by `w` by
+    `channel` Boolean array, where the final dimensions 0 through 4 indicate
+    the following:
+
+    * WALL:     True in the locations where there is a wall.
+    * MOUSE:    True in the one location the mouse occupies.
+    * APPLE:   True in locations occupied by an apple.
+    * SHIELD:   True in locations occupied by a shield.
+    * MONSTER:  True in locations occupied by a monster.
+    * INV:      True in a number of locations along the top row
+                corresponding to the number of previously-collected but
+                as-yet-unused shields.
+    """
+    WALL = 0
+    MOUSE = 1
+    APPLE = 2
+    MONSTER = 3
+    SHIELD = 4
+    INV = 5
+
+
 class Env(base.Env):
     """
     Monster gridworld environment.
@@ -150,51 +184,21 @@ class Env(base.Env):
     maximum possible number of monsters (all monsters, or one monster for
     each shield if there are fewer shields than monsters).
     """
-    class Action(enum.IntEnum):
-        """
-        The environment has a discrete action space of size 4 with the following
-        meanings.
-        """
-        MOVE_UP     = 0
-        MOVE_LEFT   = 1
-        MOVE_DOWN   = 2
-        MOVE_RIGHT  = 3
-
-
-    class Channel(enum.IntEnum):
-        """
-        The observations returned by the environment are an `h` by `w` by
-        `channel` Boolean array, where the final dimensions 0 through 4 indicate
-        the following:
-
-        * WALL:     True in the locations where there is a wall.
-        * MOUSE:    True in the one location the mouse occupies.
-        * APPLE:   True in locations occupied by an apple.
-        * SHIELD:   True in locations occupied by a shield.
-        * MONSTER:  True in locations occupied by a monster.
-        * INV:      True in a number of locations along the top row
-                    corresponding to the number of previously-collected but
-                    as-yet-unused shields.
-        """
-        WALL = 0
-        MOUSE = 1
-        APPLE = 2
-        MONSTER = 3
-        SHIELD = 4
-        INV = 5
-
 
     @property
     def num_actions(self) -> int:
-        return len(Env.Action)
+        return len(Action)
 
     
     def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
+        # TODO: only works for boolean observations...
         H, W = level.wall_map.shape
-        C = len(Env.Channel)
-        return jax.ShapeDtypeStruct(
-            shape=(H, W, C),
-            dtype=bool,
+        C = len(Channel)
+        return Observation(
+            image=jax.ShapeDtypeStruct(
+                shape=(H, W, C),
+                dtype=bool,
+            ),
         )
 
 
@@ -203,9 +207,6 @@ class Env(base.Env):
         self,
         level: Level,
     ) -> EnvState:
-        """
-        See reset_to_level method of UnderspecifiedEnv.
-        """
         num_shields, _2 = level.shields_pos.shape
         num_monsters, _2 = level.initial_monsters_pos.shape
         num_apples, _2 = level.apples_pos.shape
@@ -389,45 +390,45 @@ class Env(base.Env):
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
-        C = len(Env.Channel)
+        C = len(Channel)
         image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        image = image.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Channel.WALL].set(state.level.wall_map)
 
         # render mouse
         image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
-            Env.Channel.MOUSE,
+            Channel.MOUSE,
         ].set(True)
 
         # render apples if not yet gotten
         image = image.at[
             state.level.apples_pos[:, 0],
             state.level.apples_pos[:, 1],
-            Env.Channel.APPLE,
+            Channel.APPLE,
         ].set(~state.got_apples)
 
         # render monsters that haven't been killed
         image = image.at[
             state.monsters_pos[:, 0],
             state.monsters_pos[:, 1],
-            Env.Channel.MONSTER,
+            Channel.MONSTER,
         ].set(~state.got_monsters)
         
         # render shields that haven't been picked up
         image = image.at[
             state.level.shields_pos[:, 0],
             state.level.shields_pos[:, 1],
-            Env.Channel.SHIELD,
+            Channel.SHIELD,
         ].set(~state.got_shields)
         
         # render shields that have been picked up but haven't been used
         image = image.at[
             0,
             state.level.inventory_map,
-            Env.Channel.INV,
+            Channel.INV,
         ].set(state.got_shields & ~state.used_shields)
 
         return Observation(image=image)
@@ -451,20 +452,16 @@ class Env(base.Env):
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # multiple objects
-            image_bool[:, :, Env.Channel.WALL]
-                & image_bool[:, :, Env.Channel.INV],
-            image_bool[:, :, Env.Channel.MONSTER]
-                & image_bool[:, :, Env.Channel.APPLE],
-            image_bool[:, :, Env.Channel.MONSTER]
-                & image_bool[:, :, Env.Channel.SHIELD],
-            image_bool[:, :, Env.Channel.MONSTER]
-                & image_bool[:, :, Env.Channel.MOUSE],
+            image_bool[:,:,Channel.WALL] & image_bool[:,:,Channel.INV],
+            image_bool[:,:,Channel.MONSTER] & image_bool[:,:,Channel.APPLE],
+            image_bool[:,:,Channel.MONSTER] & image_bool[:,:,Channel.SHIELD],
+            image_bool[:,:,Channel.MONSTER] & image_bool[:,:,Channel.MOUSE],
             # one object
-            image_bool[:, :, Env.Channel.WALL],
-            image_bool[:, :, Env.Channel.MOUSE],
-            image_bool[:, :, Env.Channel.APPLE],
-            image_bool[:, :, Env.Channel.MONSTER],
-            image_bool[:, :, Env.Channel.SHIELD],
+            image_bool[:,:,Channel.WALL],
+            image_bool[:,:,Channel.MOUSE],
+            image_bool[:,:,Channel.APPLE],
+            image_bool[:,:,Channel.MONSTER],
+            image_bool[:,:,Channel.SHIELD],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -643,12 +640,12 @@ class LevelParser(base.LevelParser):
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Env.Channel.WALL`.
-            * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character 'a' maps to `Env.Channel.APPLE`.
-            * The character 'm' maps to `Env.Channel.MONSTER`.
-            * The character 's' maps to `Env.Channel.SHIELD`.
-            * The character '.' maps to `len(Env.Channel)`, i.e. none of the
+            * The character '#' maps to `Channel.WALL`.
+            * The character '@' maps to `Channel.MOUSE`.
+            * The character 'a' maps to `Channel.APPLE`.
+            * The character 'm' maps to `Channel.MONSTER`.
+            * The character 's' maps to `Channel.SHIELD`.
+            * The character '.' maps to `len(Channel)`, i.e. none of the
               above, representing the absence of an item.
     """
     height: int
@@ -659,12 +656,12 @@ class LevelParser(base.LevelParser):
     monster_optimality: float
     inventory_map: chex.Array
     char_map = {
-        '#': Env.Channel.WALL,
-        '@': Env.Channel.MOUSE,
-        'a': Env.Channel.APPLE,
-        'm': Env.Channel.MONSTER,
-        's': Env.Channel.SHIELD,
-        '.': len(Env.Channel), # PATH
+        '#': Channel.WALL,
+        '@': Channel.MOUSE,
+        'a': Channel.APPLE,
+        'm': Channel.MONSTER,
+        's': Channel.SHIELD,
+        '.': len(Channel), # PATH
     }
 
 
@@ -715,7 +712,7 @@ class LevelParser(base.LevelParser):
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Env.Channel.WALL)
+        wall_map = (level_map == Channel.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
@@ -725,7 +722,7 @@ class LevelParser(base.LevelParser):
         dist_map = maze_solving.maze_directional_distances(wall_map)
 
         # extract apple positions and number
-        apple_map = (level_map == Env.Channel.APPLE)
+        apple_map = (level_map == Channel.APPLE)
         num_apples = apple_map.sum()
         assert num_apples == self.num_apples, "wrong number of apples"
         apples_pos = jnp.stack(
@@ -734,7 +731,7 @@ class LevelParser(base.LevelParser):
         )
 
         # extract monsters positions and number
-        monster_map = (level_map == Env.Channel.MONSTER)
+        monster_map = (level_map == Channel.MONSTER)
         num_monsters = monster_map.sum()
         assert num_monsters == self.num_monsters, "wrong number of monsters"
         monsters_pos = jnp.stack(
@@ -743,7 +740,7 @@ class LevelParser(base.LevelParser):
         )
 
         # extract shields positions and number
-        shield_map = (level_map == Env.Channel.SHIELD)
+        shield_map = (level_map == Channel.SHIELD)
         num_shields = shield_map.sum()
         assert num_shields == self.num_shields, "wrong number of shields"
         shields_pos = jnp.stack(
@@ -752,7 +749,7 @@ class LevelParser(base.LevelParser):
         )
         
         # extract mouse spawn position
-        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        mouse_spawn_map = (level_map == Channel.MOUSE)
         assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
         initial_mouse_pos = jnp.concatenate(
             jnp.where(mouse_spawn_map, size=1)

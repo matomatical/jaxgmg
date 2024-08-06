@@ -28,6 +28,7 @@ from jaxgmg import util
 def play_forever(
     rng: chex.PRNGKey,
     env: base.Env,
+    actions: list[str],
     level_generator: base.LevelGenerator,
     record: bool = False,
     debug: bool = False,
@@ -37,6 +38,12 @@ def play_forever(
     """
     if record: frames = []
     playing = True
+    controls = (
+        "controls: "
+        f"[w {actions[0]}] [a {actions[1]}] "
+        f"[s {actions[2]}] [d {actions[3]}] "
+        "[r reset] [q quit]"
+    )
     while playing:
         print("generating level...")
         rng_level, rng = jax.random.split(rng)
@@ -51,7 +58,7 @@ def play_forever(
         print(
             image,
             "",
-            "controls: w = up | a = left | s = down | d = right | q = quit",
+            controls,
             sep="\n",
         )
         if record: frames.append(obs)
@@ -77,7 +84,7 @@ def play_forever(
                 f"action: {a} ({'uldr'[a]})",
                 util.img2str(img),
                 f"reward: {r:.2f} done: {d}",
-                "controls: w = up | a = left | s = down | d = right | q = quit",
+                controls,
                 sep="\n",
             )
             if record and not d: frames.append(obs)
@@ -101,7 +108,7 @@ def play_forever(
 
 
 def corner(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'tree',
     corner_size: int            = 3,
@@ -130,6 +137,7 @@ def corner(
     play_forever(
         rng=rng,
         env=env,
+        actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
@@ -137,7 +145,7 @@ def corner(
 
 
 def dish(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'tree',
     max_cheese_radius: int      = 3,
@@ -166,6 +174,7 @@ def dish(
     play_forever(
         rng=rng,
         env=env,
+        actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
@@ -173,7 +182,7 @@ def dish(
 
 
 def follow(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'edges',
     num_beacons: int            = 3,
@@ -204,6 +213,7 @@ def follow(
     play_forever(
         rng=rng,
         env=env,
+        actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
@@ -211,7 +221,7 @@ def follow(
 
 
 def keys(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'tree',
     num_keys_min: int           = 2,
@@ -246,6 +256,7 @@ def keys(
     play_forever(
         rng=rng,
         env=env,
+        actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
@@ -253,7 +264,7 @@ def keys(
 
 
 def lava(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'edges',
     lava_threshold: float       = -0.25,
@@ -282,6 +293,7 @@ def lava(
     play_forever(
         rng=rng,
         env=env,
+        actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
@@ -289,7 +301,7 @@ def lava(
     
 
 def monsters(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'open',
     num_apples: int             = 5,
@@ -324,6 +336,7 @@ def monsters(
     play_forever(
         rng=rng,
         env=env,
+        actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
@@ -331,10 +344,10 @@ def monsters(
     
 
 def minimaze(
-    height: int                 = 13,
+    height: int                 = 9,
     width: int                  = 9,
-    obs_height: int             = 5,
-    obs_width: int              = 5,
+    obs_height: int             = 7,
+    obs_width: int              = 7,
     layout: str                 = 'noise',
     level_of_detail: int        = 8,
     seed: int                   = 42,
@@ -364,6 +377,7 @@ def minimaze(
     play_forever(
         rng=rng,
         env=env,
+        actions=['forward', 'turn-left', 'wait', 'turn-right'],
         level_generator=level_generator,
         debug=debug,
         record=record,
