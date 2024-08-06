@@ -5,6 +5,7 @@ Launcher for training runs.
 import jax
 
 from jaxgmg.procgen import maze_generation
+from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.baselines import ppo
@@ -27,6 +28,7 @@ def corner(
     net: str = "relu",                      # e.g. 'impala:ff', 'impala:lstm'
     # ued config
     ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
@@ -98,12 +100,29 @@ def corner(
     maze_generator = maze_generation.get_generator_class_from_name(
         name=env_layout,
     )()
-    train_level_generator = cheese_in_the_corner.LevelGenerator(
+    orig_level_generator = cheese_in_the_corner.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
         corner_size=env_corner_size,
     )
+    shift_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        corner_size=env_size-2,
+    )
+    if prob_shift > 0.0:
+        train_level_generator = base.MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+
+
+    print("configuring ued level distributions...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
         gen = autocurricula.InfiniteDomainRandomisation(
@@ -120,10 +139,12 @@ def corner(
             levels=train_levels,
         )
     elif ued == "plr":
-        level_solver = cheese_in_the_corner.LevelSolver(env, ppo_gamma)
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_solver=level_solver,
+            level_metrics=cheese_in_the_corner.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -134,6 +155,24 @@ def corner(
             rng=rng_train_levels,
             batch_size_hint=num_parallel_envs,
         )
+    elif ued == "plr-parallel":
+        gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
+            level_generator=train_level_generator,
+            level_metrics=cheese_in_the_corner.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            regret_estimator=plr_regret_estimator,
+        )
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
+    else:
+        raise ValueError(f"unknown UED algorithm: {ued!r}")
 
     
     print(f"setting up agent with architecture {net!r}...")
@@ -156,7 +195,7 @@ def corner(
     )
     # on distribution
     rng_eval_on_levels, rng_setup = jax.random.split(rng_setup)
-    eval_on_levels = train_level_generator.vsample(
+    eval_on_levels = orig_level_generator.vsample(
         rng_eval_on_levels,
         num_levels=num_eval_levels,
     )
@@ -175,12 +214,6 @@ def corner(
 
 
     # off distribution
-    shift_level_generator = cheese_in_the_corner.LevelGenerator(
-        height=env_size,
-        width=env_size,
-        maze_generator=maze_generator,
-        corner_size=env_size-2,
-    )
     rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
     eval_off_levels = shift_level_generator.vsample(
         rng_eval_off_levels,
@@ -415,6 +448,9 @@ def keys(
         num_chests_min=env_num_chests_min,
         num_chests_max=env_num_chests_max,
     )
+    
+    print("configuring ued level distributions...")
+    rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
         gen = autocurricula.InfiniteDomainRandomisation(
             level_generator=train_level_generator,
@@ -432,7 +468,11 @@ def keys(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_solver=None, # TODO: implement one for keys...
+            level_metrics=None,
+            # level_metrics=keys_and_chests.LevelMetrics( # TODO: define
+            #     env=env,
+            #     discount_rate=ppo_gamma,
+            # ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -443,6 +483,24 @@ def keys(
             rng=rng_train_levels,
             batch_size_hint=num_parallel_envs,
         )
+    elif ued == "plr-parallel":
+        gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
+            level_generator=train_level_generator,
+            level_metrics=cheese_in_the_corner.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            regret_estimator=plr_regret_estimator,
+        )
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
+    else:
+        raise ValueError(f"unknown UED algorithm: {ued!r}")
 
 
     print(f"setting up agent with architecture {net!r}...")

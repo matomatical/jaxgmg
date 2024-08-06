@@ -301,6 +301,7 @@ def wandb_run(f):
     @functools.wraps(f)
     def g(*args, **kwargs):
         if kwargs['wandb_log']:
+            wandb.require("core")
             # convert kwargs into config dictionary
             # exclude those that are passed to the init function directly
             config = wandb.helper.parse_config(

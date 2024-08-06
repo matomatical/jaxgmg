@@ -2,6 +2,8 @@
 Actor-critic architectures for RL experiments.
 """
 
+from typing import Callable
+
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
@@ -21,10 +23,10 @@ ActorCriticParams = ArrayTree
 
 
 # TODO: is this right?
-# ActorCriticForwardPass = Callable[
-#     [ActorCriticParams, ArrayTree, ActorCriticState, int],
-#     tuple[distrax.categorical, float, ActorCriticState],
-# ]
+ActorCriticForwardPass = Callable[
+    [ActorCriticParams, ArrayTree, ActorCriticState, int],
+    tuple[distrax.Categorical, float, ActorCriticState],
+]
 
 
 class ActorCriticNetwork(nn.Module):

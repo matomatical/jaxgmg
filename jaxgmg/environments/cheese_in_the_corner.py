@@ -27,6 +27,7 @@ Classes:
 
 import enum
 import functools
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -39,6 +40,8 @@ from jaxtyping import PyTree
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
+
+from jaxgmg import util
 
 
 @struct.dataclass
@@ -285,7 +288,11 @@ class Env(base.Env):
         )
 
         return image
-    
+
+
+# # # 
+# Level generation
+
 
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
@@ -380,6 +387,10 @@ class LevelGenerator(base.LevelGenerator):
             cheese_pos=cheese_pos,
             initial_mouse_pos=initial_mouse_pos,
         )
+
+
+# # # 
+# Level parsing
 
 
 @struct.dataclass
@@ -491,6 +502,10 @@ class LevelParser:
             cheese_pos=jnp.stack([l.cheese_pos for l in levels]),
             initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
         )
+
+
+# # # 
+# Level solving
 
 
 @struct.dataclass
@@ -813,5 +828,119 @@ def splay_cheese_and_mouse(level: Level):
         levels_pos,
         grid_shape,
     )
+
+
+# # # 
+# Level complexity metrics
+
+
+@struct.dataclass
+class LevelMetrics(base.LevelMetrics):
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def compute_metrics(
+        self,
+        levels: Level,          # Level[num_levels]
+        weights: chex.Array,    # float[num_levels]
+    ) -> dict[str, Any]:        # metrics
+        # basics
+        num_levels, h, w = levels.wall_map.shape
+        dists = jax.vmap(maze_solving.maze_distances)(levels.wall_map)
+        
+        # num walls (excluding border)
+        inner_wall_maps = levels.wall_map[:,1:-1,1:-1]
+        num_walls = jnp.sum(inner_wall_maps, axis=(1,2))
+        prop_walls = num_walls / ((h-2) * (w-2) - 2)
+
+        # avg wall location, cheese location, mouse location
+        wall_map = levels.wall_map
+        mouse_map = jnp.zeros_like(levels.wall_map).at[
+            levels.initial_mouse_pos[:, 0],
+            levels.initial_mouse_pos[:, 1],
+        ].set(True)
+        cheese_map = jnp.zeros_like(levels.wall_map).at[
+            levels.cheese_pos[0],
+            levels.cheese_pos[1],
+        ].set(True)
+        
+        # cheese distance from top left corner
+        cheese_dists = dists[
+            jnp.arange(num_levels),
+            1,
+            1,
+            levels.cheese_pos[:, 0],
+            levels.cheese_pos[:, 1],
+        ]
+        cheese_dists_finite = jnp.nan_to_num(
+            cheese_dists,
+            posinf=(h-2)*(w-2)/2,
+        )
+        avg_cheese_dist = cheese_dists_finite.mean()
+
+        # shortest path length and solvability
+        opt_dists = dists[
+            jnp.arange(num_levels),
+            levels.initial_mouse_pos[:, 0],
+            levels.initial_mouse_pos[:, 1],
+            levels.cheese_pos[:, 0],
+            levels.cheese_pos[:, 1],
+        ]
+        solvable = ~jnp.isposinf(opt_dists)
+        opt_dists_solvable = solvable * opt_dists
+        opt_dists_finite = jnp.nan_to_num(opt_dists, posinf=(h-2)*(w-2)/2)
+        
+        # rendered levels in a grid
+        def render_level(level):
+            state = self.env._reset(level)
+            rgb = self.env.get_obs(state, force_lod=1)
+            return rgb
+        rendered_levels = jax.vmap(render_level)(levels)
+        rendered_levels_pad = jnp.pad(
+            rendered_levels,
+            pad_width=((0, 0), (0, 1), (0, 1), (0, 0)),
+        )
+        rendered_levels_grid = einops.rearrange(
+            rendered_levels_pad,
+            '(level_h level_w) h w c -> (level_h h) (level_w w) c',
+            level_w=64,
+        )[:-1,:-1] # cut off last pixel of padding
+
+        return {
+            'layout': {
+                'levels_img': rendered_levels_grid,
+                # number of walls
+                'num_walls_hist': num_walls,
+                'num_walls_avg': num_walls.mean(),
+                'num_walls_wavg': num_walls @ weights,
+                # proportion of walls
+                'prop_walls_hist': prop_walls,
+                'prop_walls_avg': prop_walls.mean(),
+                'prop_walls_wavg': prop_walls @ weights,
+                # superimposed layout and position maps
+                'wall_map_avg_img': util.viridis(wall_map.mean(axis=0)),
+                'wall_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', wall_map, weights)),
+                'mouse_map_avg_img': util.viridis(mouse_map.mean(axis=0)),
+                'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
+                'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
+                'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
+            },
+            'distances': {
+                # solvability
+                'solvable_num': solvable.sum(),
+                'solvable_avg': solvable.mean(),
+                'solvable_wavg': solvable @ weights,
+                # optimal dist mouse to cheese
+                'mouse_dist_finite_hist': opt_dists_finite,
+                'mouse_dist_finite_avg': opt_dists_finite.mean(),
+                'mouse_dist_finite_wavg': (opt_dists_finite @ weights),
+                'mouse_dist_solvable_avg': opt_dists_solvable.sum() / solvable.sum(),
+                'mouse_dist_solvable_wavg': (opt_dists_solvable @ weights) / (solvable @ weights),
+                # optimal dist from cheese to mouse
+                'cheese_dist_hist': cheese_dists_finite,
+                'cheese_dist_avg': cheese_dists_finite.mean(),
+                'cheese_dist_wavg': cheese_dists_finite @ weights,
+            },
+        }
 
 

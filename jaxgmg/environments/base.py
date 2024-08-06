@@ -3,6 +3,7 @@ Abstract base classes for jaxgmg environment.
 """
 
 import functools
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -12,6 +13,10 @@ import chex
 from jaxtyping import PyTree
 
 from jaxgmg.graphics import LevelOfDetail, load_spritesheet
+
+
+# # # 
+# Basic structs
 
 
 Observation = chex.ArrayTree
@@ -45,6 +50,10 @@ class EnvState:
     level: Level
     steps: int
     done: bool
+
+
+# # #
+# Environment base class
 
 
 @struct.dataclass
@@ -291,6 +300,10 @@ class Env:
         )
 
 
+# # # 
+# Level generator
+
+
 @struct.dataclass
 class LevelGenerator:
     """
@@ -333,8 +346,12 @@ class LevelGenerator:
         return vectorised_sample(jax.random.split(rng, num_levels))
 
 
+# # # 
+# Level generator combinators
+
+
 @struct.dataclass
-class MixtureLevelGenerator:
+class MixtureLevelGenerator(LevelGenerator):
     level_generator1: LevelGenerator
     level_generator2: LevelGenerator
     prob_level1: float
@@ -361,6 +378,10 @@ class MixtureLevelGenerator:
         )
 
         return chosen_level
+
+
+# # # 
+# Level solving
 
 
 @struct.dataclass
@@ -430,5 +451,20 @@ class LevelSolver:
             self.level_value,
         )
         return vectorised_level_value(solns, levels)
+
+
+# # # 
+# Level complexity metrics
+
+
+@struct.dataclass
+class LevelMetrics:
+    env: Env
+    discount_rate: float
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def compute_metrics(self, levels: Level) -> dict[str, Any]:
+        raise NotImplementedError
 
 

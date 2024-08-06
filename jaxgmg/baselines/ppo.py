@@ -135,7 +135,7 @@ def run(
 
     # init train state
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
+        apply_fn=net.apply,
         params=net_init_params,
         tx=optax.chain(
             optax.clip_by_global_norm(ppo_max_grad_norm),
@@ -183,6 +183,12 @@ def run(
             rng=rng_levels,
             num_levels=num_parallel_envs,
         )
+        # NOTE: get_batch may return num_levels levels or a number of
+        # additional levels (e.g. in the case of parallel robust PLR,
+        # 2*num_levels levels are returned). The contract is that we
+        # should do rollouts and update UED in all of them, but we should
+        # only train in the first num_levels of them.
+        # TODO: more fine-grained logging.
     
         
         # collect experience
@@ -192,7 +198,8 @@ def run(
         rollouts = experience.collect_rollouts(
             rng=rng_env,
             num_steps=num_env_steps_per_cycle,
-            train_state=train_state,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
             net_init_state=net_init_state,
             env=env,
             levels=levels_t,
@@ -208,6 +215,9 @@ def run(
             metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
+            # TODO: steps per second is now wrong, doesn't account for actual
+            # levels generated and simulated... use size of rollouts
+            # TODO: split up each kind of rollouts/metrics?
         if log_cycle and train_gifs:
             frames = experience.animate_rollouts(
                 rollouts=rollouts,
@@ -216,6 +226,9 @@ def run(
                 env=env,
             )
             metrics['env/train'].update({'rollouts_gif': frames})
+            # TODO: split up each kind of rollouts/metrics?
+            # TODO: count the number of env steps total along with the number
+            # of env steps used for training
         
 
         # generalised advantage estimation
@@ -227,8 +240,24 @@ def run(
             ppo_gae_lambda,
             ppo_gamma,
         )
+        
+
+        # report experience and performance to level generator
+        gen_state = gen.update(
+            state=gen_state,
+            levels=levels_t,
+            rollouts=rollouts,
+            advantages=advantages, # shortcut: we did gae already
+        )
+        if log_cycle:
+            metrics['ued'].update(gen.compute_metrics(gen_state))
 
 
+        # isolate valid levels for ppo updating
+        valid_rollouts, valid_advantages = jax.tree.map(
+            lambda x: x[:num_parallel_envs],
+            (rollouts, advantages),
+        )
         # ppo update network on this data a few times
         rng_update, rng_t = jax.random.split(rng_t)
         if log_cycle:
@@ -237,8 +266,8 @@ def run(
         train_state, ppo_metrics = ppo_update(
             rng=rng_update,
             train_state=train_state,
-            rollouts=rollouts,
-            advantages=advantages,
+            rollouts=valid_rollouts,
+            advantages=valid_advantages,
             num_epochs=num_epochs_per_cycle,
             num_minibatches_per_epoch=num_minibatches_per_epoch,
             gamma=ppo_gamma,
@@ -253,17 +282,6 @@ def run(
             metrics['perf']['ppo_updates_per_second'] = (
                 num_updates_per_cycle / ppo_elapsed_time
             )
-        
-
-        # report experience and performance to level generator
-        gen_state = gen.update(
-            state=gen_state,
-            levels=levels_t,
-            rollouts=rollouts,
-            advantages=advantages, # shortcut: we did gae already
-        )
-        if log_cycle:
-            metrics['ued'].update(gen.compute_metrics(gen_state))
         
 
         # periodic evaluations
@@ -490,7 +508,10 @@ def ppo_loss(
     dict[str, float],           # loss components and other diagnostics
 ]:
     # run network to get current value/log_prob prediction
-    action_distribution, value, _net_state = apply_fn(
+    action_distribution, value, _net_state = jax.vmap(
+        apply_fn,
+        in_axes=(None, 0, 0, 0),
+    )(
         params,
         transitions.obs,
         transitions.net_state,
@@ -591,7 +612,7 @@ def eval_checkpoint(
 
     # reload checkpoint of interest
     train_state = TrainState.create(
-        apply_fn=jax.vmap(net.apply, in_axes=(None, 0, 0, 0)),
+        apply_fn=net.apply,
         params=net_init_params,
         tx=optax.sgd(0), # dummy, will be overridden
     )
