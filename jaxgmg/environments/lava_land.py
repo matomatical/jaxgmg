@@ -295,6 +295,23 @@ class Env(base.Env):
     
 
     @functools.partial(jax.jit, static_argnames=('self',))
+    def _render_state_bool(
+        self,
+        state: EnvState,
+    ) -> chex.Array:
+        return self._render_obs_bool(state).image
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def _render_state_rgb(
+        self,
+        state: EnvState,
+        spritesheet: dict[str, chex.Array],
+    ) -> chex.Array:
+        return self._render_obs_rgb(state, spritesheet).image
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
     def optimal_value(
         self,
         level: Level,
