@@ -19,9 +19,6 @@ from jaxgmg.graphics import LevelOfDetail, load_spritesheet
 # Basic structs
 
 
-Observation = chex.ArrayTree
-
-
 @struct.dataclass
 class Level:
     """
@@ -50,6 +47,14 @@ class EnvState:
     level: Level
     steps: int
     done: bool
+
+
+@struct.dataclass
+class Observation:
+    """
+    Represent an observation from the environment. Subclass to add one or
+    more fields.
+    """
 
 
 # # #
