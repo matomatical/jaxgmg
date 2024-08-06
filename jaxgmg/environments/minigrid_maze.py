@@ -75,10 +75,14 @@ class EnvState(base.EnvState):
     * hero_pos : index[2]
             Current coordinates of the hero. Initialised to
             `level.initial_hero_pos`.
+    * hero_dir : int
+            Current orientation of the hero. Initialised to
+            `level.initial_hero_dir`.
     * got_goal : bool
             Whether the hero has already gotten the goal.
     """
     hero_pos: chex.Array
+    hero_dir: int
     got_goal: bool
 
 
@@ -118,8 +122,8 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
-    partial_obs_height: int = 13 # TODO: needs to be odd
-    partial_obs_width: int = 13 # TODO: needs to be odd
+    obs_height: int = 13 # TODO: needs to be odd
+    obs_width: int = 13 # TODO: needs to be odd
     terminate_after_goal: bool = True
 
 
@@ -146,7 +150,7 @@ class Env(base.Env):
         C = len(Env.Channel)
         return Observation(
             image=jax.ShapeDtypeStruct(
-                shape=(self.partial_obs_height, self.partial_obs_width, C),
+                shape=(self.obs_height, self.obs_width, C),
                 dtype=bool,
             ),
             orientation=jax.ShapeDtypeStruct(
@@ -274,7 +278,6 @@ class Env(base.Env):
         return image
 
     
-
     @functools.partial(jax.jit, static_argnames=('self',))
     def _render_state_rgb(
         self,
@@ -343,12 +346,12 @@ class Env(base.Env):
         image = self._render_state_bool(state)
         
         # pad to allow slicing
-        H = self.partial_obs_height
-        W = self.partial_obs_width
+        H = self.obs_height
+        W = self.obs_width
         M = max(H, W) - 2 # maximum padding required
         image = jnp.pad(
             array=image,
-            pad_width=(M, M, 0),
+            pad_width=((M, M), (M, M), (0, 0)),
             mode='edge',
         )
 
@@ -358,13 +361,41 @@ class Env(base.Env):
         image = jax.lax.select_n(
             state.hero_dir,
             # facing up:
-            jnp.rot90(image[M+i+1-H  : M+i+1,      M+j-W//2 : M+j-W//2+1], 0),
+            jnp.rot90(
+                jax.lax.dynamic_slice(
+                    image,
+                    (M+i+1-H, M+j-W//2, 0),
+                    (H, W, len(Env.Channel)),
+                ),
+                k=0,
+            ),
             # facing left:
-            jnp.rot90(image[M+i-W//2 : M+i+W//2+1, M+j+1-H  : M+j+1     ], 3),
+            jnp.rot90(
+                jax.lax.dynamic_slice(
+                    image,
+                    (M+i-W//2, M+j+1-H, 0),
+                    (W, H, len(Env.Channel)),
+                ),
+                k=3,
+            ),
             # facing down:
-            jnp.rot90(image[M+i      : M+i+H,      M+j-W//2 : M+j+W//2+1], 2),
+            jnp.rot90(
+                jax.lax.dynamic_slice(
+                    image,
+                    (M+i, M+j-W//2, 0),
+                    (H, W, len(Env.Channel)),
+                ),
+                k=2,
+            ),
             # facing right:
-            jnp.rot90(image[M+i-W//2 : M+i+W//2+1, M+j      : M+j+H     ], 1),
+            jnp.rot90(
+                jax.lax.dynamic_slice(
+                    image,
+                    (M+i-W//2, M+j, 0),
+                    (W, H, len(Env.Channel)),
+                ),
+                k=1,
+            ),
         )
 
         return Observation(
@@ -380,7 +411,7 @@ class Env(base.Env):
         spritesheet: dict[str, chex.Array],
     ) -> Observation:
         # get the boolean grid version of the observation
-        image_bool = self._render_state_bool(state)
+        image_bool = self._get_obs_bool(state).image
         H, W, _C = image_bool.shape
 
         # find out, for each position, which object to render
@@ -420,9 +451,9 @@ class Env(base.Env):
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
     """
-    Level generator for Maze environment. Given some maze
-    configuration parameters and goal location parameter, provides a
-    `sample` method that generates a random level.
+    Level generator for Maze environment. Given some maze configuration
+    parameters and goal location parameter, provides a `sample` method that
+    generates a random level.
 
     * height : int,(>= 3, odd)
             The number of rows in the grid representing the maze
@@ -434,18 +465,11 @@ class LevelGenerator(base.LevelGenerator):
             Provides the maze generation method to use (see module
             `maze_generation` for details).
             The default is a tree maze generator using Kruskal's algorithm.
-    * corner_size : int (>=1, <=width, <=height):
-            The goal will spawn within a square of this width located in
-            the top left corner.
     """
     height: int = 13
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
-    corner_size: int = 1
     
-    def __post_init__(self):
-        assert self.corner_size >= 1
-
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def sample(self, rng: chex.PRNGKey) -> Level:
@@ -466,49 +490,42 @@ class LevelGenerator(base.LevelGenerator):
             jnp.indices((self.height, self.width)),
             'c h w -> (h w) c',
         )
-        no_wall_map = ~wall_map
-        no_wall_mask = no_wall_map.flatten()
         
-        # goal spawn in top left corner region
-        corner_mask = (
-            # first `corner_size` rows not including border
-              (coords[:, 0] >= 1)
-            & (coords[:, 0] <= self.corner_size)
-            # first `corner_size` cols not including border
-            & (coords[:, 1] >= 1)
-            & (coords[:, 1] <= self.corner_size)
-        ).flatten()
-        # ... not on a wall (unless that's the only option)
-        goal_mask = corner_mask & no_wall_mask
-        goal_mask = goal_mask | (~(goal_mask.any()) & corner_mask)
+        # spawn goal in some random valid position
+        no_wall = ~wall_map.flatten()
         rng_spawn_goal, rng = jax.random.split(rng)
         goal_pos = jax.random.choice(
             key=rng_spawn_goal,
             a=coords,
             axis=0,
-            p=goal_mask,
+            p=no_wall,
         )
-        # ... in case there *was* a wall there , remove it
-        wall_map = wall_map.at[goal_pos[0], goal_pos[1]].set(False)
-        
-        # hero spawn in some remaining valid position
-        hero_mask = no_wall_map.at[
+
+        # spawn hero in some random remaining valid position
+        no_goal = jnp.ones_like(wall_map).at[
             goal_pos[0],
             goal_pos[1],
         ].set(False).flatten()
-
-        rng_spawn_hero, rng = jax.random.split(rng)
+        rng_spawn_hero_pos, rng = jax.random.split(rng)
         initial_hero_pos = jax.random.choice(
-            key=rng_spawn_hero,
+            key=rng_spawn_hero_pos,
             a=coords,
             axis=0,
-            p=hero_mask,
+            p=no_wall & no_goal,
+        )
+
+        # spawn hero with some random orientation
+        rng_spawn_hero_dir, rng = jax.random.split(rng)
+        initial_hero_dir = jax.random.choice(
+            key=rng_spawn_hero_dir,
+            a=4,
         )
 
         return Level(
             wall_map=wall_map,
             goal_pos=goal_pos,
             initial_hero_pos=initial_hero_pos,
+            initial_hero_dir=initial_hero_dir,
         )
 
 
@@ -517,13 +534,12 @@ class LevelGenerator(base.LevelGenerator):
 
 
 @struct.dataclass
-class LevelParser:
+class LevelParser(base.LevelParser):
     """
-    Level parser for Maze environment. Given some parameters
-    determining level shape, provides a `parse` method that converts an ASCII
-    depiction of a level into a Level struct. Also provides a `parse_batch`
-    method that parses a list of level strings into a single vectorised Level
-    PyTree object.
+    Level parser for Maze environment. Given some parameters determining
+    level shape, provides a `parse` method that converts an ASCII depiction
+    of a level into a Level struct. Also provides a `parse_batch` method that
+    parses a list of level strings into a single vectorised Level PyTree.
 
     * height (int, >= 3, odd):
             The number of rows in the grid representing the maze
@@ -536,7 +552,8 @@ class LevelParser:
             to define the location of the walls and each of the items. The
             default map is as follows:
             * The character '#' maps to `Env.Channel.WALL`.
-            * The character '@' maps to `Env.Channel.HERO`.
+            * The characters '^', '<', 'v', and '>' map to `Env.Channel.HERO`
+              (in initial orientations up, left, down, right respectively).
             * The character '*' maps to `Env.Channel.GOAL`.
             * The character '.' maps to `len(Env.Channel)`, i.e. none of the
               above, representing the absence of an item.
@@ -545,7 +562,10 @@ class LevelParser:
     width: int
     char_map = {
         '#': Env.Channel.WALL,
-        '@': Env.Channel.HERO,
+        '^': Env.Channel.HERO,
+        '<': Env.Channel.HERO,
+        'v': Env.Channel.HERO,
+        '>': Env.Channel.HERO,
         '*': Env.Channel.GOAL,
         '.': len(Env.Channel), # PATH
     }
@@ -560,7 +580,7 @@ class LevelParser:
         >>> p.parse('''
         ... # # # # #
         ... # . . . #
-        ... # @ # . #
+        ... # < # . #
         ... # . . * #
         ... # # # # #
         ... ''')
@@ -574,6 +594,7 @@ class LevelParser:
             ], dtype=bool),
             goal_pos=Array([3, 3], dtype=int32),
             initial_hero_pos=Array([2, 1], dtype=int32),
+            initial_hero_dir=1,
         )
         """
         # parse into grid of IntEnum elements
@@ -606,24 +627,21 @@ class LevelParser:
             jnp.where(hero_spawn_map, size=1)
         )
 
+        # extract hero direction
+        if '^' in level_str:
+            initial_hero_dir = 0
+        elif '<' in level_str:
+            initial_hero_dir = 1
+        elif 'v' in level_str:
+            initial_hero_dir = 2
+        else: # '>' in level_str:
+            initial_hero_dir = 3
+
         return Level(
             wall_map=wall_map,
             goal_pos=goal_pos,
             initial_hero_pos=initial_hero_pos,
-        )
-
-
-    def parse_batch(self, level_strs):
-        """
-        Convert a list of ASCII string depiction of length `num_levels`
-        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
-        the details of the string depiction.
-        """
-        levels = [self.parse(level_str) for level_str in level_strs]
-        return Level(
-            wall_map=jnp.stack([l.wall_map for l in levels]),
-            goal_pos=jnp.stack([l.goal_pos for l in levels]),
-            initial_hero_pos=jnp.stack([l.initial_hero_pos for l in levels]),
+            initial_hero_dir=initial_hero_dir,
         )
 
 

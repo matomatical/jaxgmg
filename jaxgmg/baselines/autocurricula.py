@@ -202,7 +202,6 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
     staleness_coeff: float
     prob_replay: float
     regret_estimator: str                   # "absGAE", "PVL", todo: "maxMC"
-    level_solver: None | LevelSolver        # note: only used for metrics
 
 
     @struct.dataclass
@@ -212,7 +211,6 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             level: Level
             last_score: float
             last_visit_time: int
-            solution: None | LevelSolution  # note: only used for metrics
             first_visit_time: int           # note: only used for metrics
         buffer: AnnotatedLevel              # AnnotatedLevel[buffer_size]
         num_replay_batches: int
@@ -237,20 +235,12 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
         )
         initial_scores = jnp.ones(self.buffer_size) * default_score
         initial_time = jnp.zeros(self.buffer_size, dtype=int)
-        # if solution method is given, solve the levels for metrics
-        if self.level_solver is not None:
-            initial_level_solutions = self.level_solver.vmap_solve(
-                levels=initial_levels,
-            )
-        else:
-            initial_level_solutions = None
         # initialise the state with the above information in the level buffer
         # and additional information needed to maintain the state of the PLR
         # algorithm
         return self.State(
             buffer=self.State.AnnotatedLevel(
                 level=initial_levels,
-                solution=initial_level_solutions,
                 last_score=initial_scores,
                 last_visit_time=initial_time,
                 first_visit_time=initial_time,
@@ -394,14 +384,8 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
 
         # annotate the levels we're trying to add to the buffer
         time_now = jnp.full(num_levels, state.num_replay_batches, dtype=int)
-        # (if solutions are enabled, solve the levels too)
-        if self.level_solver is not None:
-            level_solutions = self.level_solver.vmap_solve(levels)
-        else:
-            level_solutions = None
         challengers = self.State.AnnotatedLevel(
             level=levels,
-            solution=level_solutions,
             last_score=scores,
             last_visit_time=time_now,
             first_visit_time=time_now,

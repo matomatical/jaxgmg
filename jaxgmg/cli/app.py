@@ -128,6 +128,7 @@ app.add_typer(make_typer_app(
         parse.keys,
         parse.lava,
         parse.monsters,
+        parse.minimaze,
     ),
 ))
 

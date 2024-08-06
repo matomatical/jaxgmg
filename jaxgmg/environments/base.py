@@ -386,6 +386,47 @@ class MixtureLevelGenerator(LevelGenerator):
 
 
 # # # 
+# Level parsing
+
+
+@struct.dataclass
+class LevelParser:
+    """
+    Level parser for an environment. Given some parameters (e.g. determining
+    expected level shape), provides a `parse` method that converts an ASCII
+    depiction of a level into a Level struct. Also provides a `parse_batch`
+    method that parses a list of level strings into a single vectorised Level
+    PyTree.
+
+    Subclasses must implement the `parse` method, this superclass implements
+    `parse_batch` based on that.
+    """
+    
+
+    def parse(self, level_str: str) -> Level:
+        """
+        Convert an ASCII string depiction of a level into a Level struct.
+        Implemented in subclass.
+        """
+        raise NotImplementedError
+
+
+    def parse_batch(self, level_strs: list[str]) -> Level: # Level[n]
+        """
+        Convert a list of ASCII string depiction of length `num_levels`
+        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
+        the details of the string depiction.
+        """
+        levels = [self.parse(level_str) for level_str in level_strs]
+        LevelClass = levels[0].__type__
+        return Level(
+            wall_map=jnp.stack([l.wall_map for l in levels]),
+            goal_pos=jnp.stack([l.goal_pos for l in levels]),
+            initial_hero_pos=jnp.stack([l.initial_hero_pos for l in levels]),
+            initial_hero_dir=jnp.stack([l.initial_hero_dir for l in levels]),
+        )
+
+# # # 
 # Level solving
 
 

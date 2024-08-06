@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import keys_and_chests
+from jaxgmg.environments import minigrid_maze
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import lava_land
 from jaxgmg.environments import follow_me
@@ -191,6 +192,41 @@ def monsters(
 
     print("rendering...")
     env = monster_world.Env(obs_level_of_detail=level_of_detail)
+    obs, state = env.reset_to_level(level)
+    print(util.img2str(obs))
+
+
+def minimaze(
+    obs_height: int = 5,
+    obs_width: int = 5,
+    level_of_detail: int = 8,
+):
+    """
+    Test the level parser from the Maze environment.
+    """
+    test_string = """
+        # # # # #
+        # . . . #
+        # . # . #
+        # ^ # * #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = minigrid_maze.LevelParser(
+        height=5,
+        width=5,
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = minigrid_maze.Env(
+        obs_height=obs_height,
+        obs_width=obs_width,
+        obs_level_of_detail=level_of_detail,
+    )
     obs, state = env.reset_to_level(level)
     print(util.img2str(obs))
 
