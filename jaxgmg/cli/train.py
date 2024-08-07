@@ -452,6 +452,7 @@ def keys(
         num_chests_max=env_num_chests_max,
     )
     
+    
     print("configuring ued level distributions...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
@@ -640,9 +641,10 @@ def dish(
     max_cheese_radius_shift: int = 6,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
-    net: str = "relu",
+    net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
     # ued config
     ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
@@ -714,12 +716,29 @@ def dish(
     maze_generator = maze_generation.get_generator_class_from_name(
         name=env_layout,
     )()
-    train_level_generator = cheese_on_a_dish.LevelGenerator(
+    orig_level_generator = cheese_on_a_dish.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
         max_cheese_radius=max_cheese_radius,  
     )
+    
+    shift_level_generator = cheese_on_a_dish.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        max_cheese_radius=max_cheese_radius_shift,  
+    )
+
+    if prob_shift > 0.0:
+        train_level_generator = base.MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+    
     
     print("configuring ued level distributions...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)

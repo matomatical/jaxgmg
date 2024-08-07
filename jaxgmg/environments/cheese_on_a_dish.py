@@ -465,15 +465,22 @@ class LevelGenerator(base.LevelGenerator):
             dish_pos[0],
             dish_pos[1],
         ]
-        near_dish = (distance_to_dish <= self.max_cheese_radius).flatten()
+
+        near_dish = (distance_to_dish == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
+        #remove the walls from the near_dish mask
+        near_dish_nowall = near_dish | (near_dish & no_wall)
+
 
         rng_spawn_cheese, rng = jax.random.split(rng)
         cheese_pos = jax.random.choice(
             key=rng_spawn_cheese,
             a=coords,
             axis=0,
-            p=no_wall & no_mouse & near_dish,
+            #p=no_wall & no_mouse & near_dish,
+            p = no_mouse & near_dish_nowall,
         )
+
+        wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
 
         return Level(
             wall_map=wall_map,
