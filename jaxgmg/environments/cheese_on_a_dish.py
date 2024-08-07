@@ -72,7 +72,7 @@ class EnvState(base.EnvState):
     got_cheese: bool
     got_dish: bool
 
-
+@struct.dataclass
 class Env(base.Env):
     """
     Cheese on a Dish environment.
@@ -95,6 +95,8 @@ class Env(base.Env):
     * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
       tile corresponds to one grid square.
     """
+    terminate_after_cheese_and_dish: bool = False
+
     class Action(enum.IntEnum):
         """
         The environment has a discrete action space of size 4 with the following
@@ -181,21 +183,50 @@ class Env(base.Env):
 
         # check if mouse got to cheese
         got_cheese = (state.mouse_pos == state.level.cheese_pos).all()
+        got_cheese_first_time = got_cheese & ~state.got_cheese
         state = state.replace(got_cheese=state.got_cheese | got_cheese)
         
         # check if mouse got to dish
         got_dish = (state.mouse_pos == state.level.dish_pos).all()
+        got_dish_first_time = got_dish & ~state.got_dish
         state = state.replace(got_dish=state.got_dish | got_dish)
 
         # reward and done
-        reward = got_cheese.astype(float)
-        done = state.got_cheese
+        reward = got_cheese_first_time.astype(float)
+        proxy_reward_dish = got_dish_first_time.astype(float)
+
+        got_dish_before_cheese = state.got_dish & ~state.got_cheese
+        got_cheese_before_dish = state.got_cheese & ~state.got_dish
+
+        #got_dish_after_cheese = state.got_dish & state.got_cheese
+        #got_cheese_after_dish = state.got_cheese & state.got_dish
+
+        #proxy_cheese_second = reward * got_dish_after_cheese
+        #proxy_dish_second = proxy_reward_dish * got_cheese_after_dish
+        
+        proxy_cheese_first = reward * got_cheese_before_dish
+        proxy_dish_first = proxy_reward_dish * got_dish_before_cheese
+        
+
+
+        if self.terminate_after_cheese_and_dish:
+            done = state.got_cheese & state.got_dish
+        else:
+            done = got_cheese
 
         return (
             state,
             reward,
             done,
-            {},
+            {
+                'proxy_rewards': {
+                    'proxy_dish': proxy_reward_dish,
+                    'proxy_first_dish': proxy_dish_first,
+                    'proxy_cheese_first': proxy_cheese_first,
+                     #'proxy_cheese_second': proxy_cheese_second,
+                     #'proxy_dish_second': proxy_dish_second,
+                },
+            },
         )
 
     
