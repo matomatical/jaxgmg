@@ -8,6 +8,7 @@ from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
+from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.baselines import ppo
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import evals
@@ -740,10 +741,10 @@ def dish(
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
             level_metrics=None,
-            # level_metrics=keys_and_chests.LevelMetrics( # TODO: define
-            #     env=env,
-            #     discount_rate=ppo_gamma,
-            # ),
+            level_metrics = cheese_on_a_dish.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -757,10 +758,10 @@ def dish(
     elif ued == "plr-parallel":
         gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_metrics = None, #=cheese_in_the_corner.LevelMetrics(
-                #env=env,
-                #discount_rate=ppo_gamma,
-            #),
+            level_metrics = cheese_on_a_dish.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,

@@ -21,6 +21,7 @@ Classes:
 
 import enum
 import functools
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -632,3 +633,160 @@ class LevelParser:
             dish_pos=jnp.stack([l.dish_pos for l in levels]),
             initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
         )
+    
+
+class LevelMetrics(base.LevelMetrics):
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def compute_metrics(
+        self,
+        levels: Level,          # Level[num_levels]
+        weights: chex.Array,    # float[num_levels]
+    ) -> dict[str, Any]:        # metrics
+        # basics
+        num_levels, h, w = levels.wall_map.shape
+        dists = jax.vmap(maze_solving.maze_distances)(levels.wall_map)
+        
+        # num walls (excluding border)
+        inner_wall_maps = levels.wall_map[:,1:-1,1:-1]
+        num_walls = jnp.sum(inner_wall_maps, axis=(1,2))
+        prop_walls = num_walls / ((h-2) * (w-2) - 2)
+
+        # avg wall location, cheese location, mouse location
+        wall_map = levels.wall_map
+        mouse_map = jnp.zeros_like(levels.wall_map).at[
+            levels.initial_mouse_pos[:, 0],
+            levels.initial_mouse_pos[:, 1],
+        ].set(True)
+        cheese_map = jnp.zeros_like(levels.wall_map).at[
+            levels.cheese_pos[0],
+            levels.cheese_pos[1],
+        ].set(True)
+        dish_map = jnp.zeros_like(levels.wall_map).at[
+            levels.dish_pos[0],
+            levels.dish_pos[1],
+        ].set(True)
+        
+        # cheese - dish distance
+
+        cheese_dish_dists = dists[
+            jnp.arange(num_levels),
+            levels.cheese_pos[:, 0],
+            levels.cheese_pos[:, 1],
+            levels.dish_pos[:, 0],
+            levels.dish_pos[:, 1],
+        ]
+
+        cheese_dish_dists_finite = jnp.nan_to_num(
+            cheese_dish_dists,
+            posinf=(h-2)*(w-2)/2,
+        )
+
+        avg_cheese_dish_dist = cheese_dish_dists_finite.mean()
+
+        # cheese_dists = dists[
+        #     jnp.arange(num_levels),
+        #     1,
+        #     1,
+        #     levels.cheese_pos[:, 0],
+        #     levels.cheese_pos[:, 1],
+        # ]
+        # cheese_dists_finite = jnp.nan_to_num(
+        #     cheese_dists,
+        #     posinf=(h-2)*(w-2)/2,
+        # )
+        # avg_cheese_dist = cheese_dists_finite.mean()
+
+        # shortest path length and solvability - mouse to cheese
+        opt_dists_cheese = dists[
+            jnp.arange(num_levels),
+            levels.initial_mouse_pos[:, 0],
+            levels.initial_mouse_pos[:, 1],
+            levels.cheese_pos[:, 0],
+            levels.cheese_pos[:, 1],
+        ]
+        solvable = ~jnp.isposinf(opt_dists_cheese)
+        opt_dists_solvable_cheese = solvable * opt_dists_cheese
+        opt_dists_finite_cheese = jnp.nan_to_num(opt_dists_cheese, posinf=(h-2)*(w-2)/2)
+
+        # shortest path length and solvability - mouse to dish
+        opt_dists_dish = dists[
+            jnp.arange(num_levels),
+            levels.initial_mouse_pos[:, 0],
+            levels.initial_mouse_pos[:, 1],
+            levels.dish_pos[:, 0],
+            levels.dish_pos[:, 1],
+        ]
+        solvable_dish = ~jnp.isposinf(opt_dists_dish)
+        opt_dists_solvable_dish = solvable_dish * opt_dists_dish
+        opt_dists_finite_dish = jnp.nan_to_num(opt_dists_dish, posinf=(h-2)*(w-2)/2)
+
+        
+        # rendered levels in a grid
+        def render_level(level):
+            state = self.env._reset(level)
+            rgb = self.env.get_obs(state, force_lod=1)
+            return rgb
+        rendered_levels = jax.vmap(render_level)(levels)
+        rendered_levels_pad = jnp.pad(
+            rendered_levels,
+            pad_width=((0, 0), (0, 1), (0, 1), (0, 0)),
+        )
+        rendered_levels_grid = einops.rearrange(
+            rendered_levels_pad,
+            '(level_h level_w) h w c -> (level_h h) (level_w w) c',
+            level_w=64,
+        )[:-1,:-1] # cut off last pixel of padding
+
+        return {
+            'layout': {
+                'levels_img': rendered_levels_grid,
+                # number of walls
+                'num_walls_hist': num_walls,
+                'num_walls_avg': num_walls.mean(),
+                'num_walls_wavg': num_walls @ weights,
+                # proportion of walls
+                'prop_walls_hist': prop_walls,
+                'prop_walls_avg': prop_walls.mean(),
+                'prop_walls_wavg': prop_walls @ weights,
+                # superimposed layout and position maps
+                'wall_map_avg_img': util.viridis(wall_map.mean(axis=0)),
+                'wall_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', wall_map, weights)),
+                'mouse_map_avg_img': util.viridis(mouse_map.mean(axis=0)),
+                'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
+                'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
+                'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
+                'dish_map_avg_img': util.viridis(dish_map.mean(axis=0)),
+                'dish_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
+
+            },
+            'distances': {
+                # solvability
+                'solvable_num': solvable.sum(),
+                'solvable_avg': solvable.mean(),
+                'solvable_wavg': solvable @ weights,
+                # optimal dist mouse to cheese
+                'mouse_cheese_dist_finite_hist': opt_dists_finite_cheese,
+                'mouse_cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
+                'mouse_cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
+                'mouse_cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
+                'mouse_cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
+                ## optimal dist from cheese to dish
+                # optimal dist from mouse to dish
+                'mouse_dish_dist_finite_hist': opt_dists_finite_dish,
+                'mouse_dish_dist_finite_avg': opt_dists_finite_dish.mean(),
+                'mouse_dish_dist_finite_wavg': (opt_dists_finite_dish @ weights),
+                'mouse_dish_dist_solvable_avg': opt_dists_solvable_dish.sum() / solvable_dish.sum(),
+                'mouse_dish_dist_solvable_wavg': (opt_dists_solvable_dish @ weights) / (solvable_dish @ weights),
+                # avg cheese-dish distance
+                'cheese_dish_dist_hist': cheese_dish_dists_finite,
+                'cheese_dish_dist_avg': avg_cheese_dish_dist,
+                'cheese_dish_dist_wavg': cheese_dish_dists_finite @ weights,
+
+
+
+            },
+        }
+
+
