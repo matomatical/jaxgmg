@@ -69,5 +69,18 @@ def load_spritesheet(lod: LevelOfDetail):
         'MOUSE_ON_BEACON_OFF':     _spritesheet[3,5],
         'MOUSE_ON_LEADER':         _spritesheet[3,6],
         'BOTH_MICE_ON_BEACON_OFF': _spritesheet[3,7],
+        'Seven_obj':               _spritesheet[0,4],
+        'Six_obj_cheese':            _spritesheet[0,4],
+        'Five_obj_cheese':            _spritesheet[0,4],
+        'Four_obj_cheese':            _spritesheet[0,4],
+        'Three_obj_cheese':            _spritesheet[0,4],
+        'Two_obj_cheese':            _spritesheet[0,4],
+        'One_no_cheese' :            _spritesheet[3,1],
+        'Two_no_cheese' :           _spritesheet[3,1],
+        'Three_no_cheese':            _spritesheet[3,1],
+        'Four_no_cheese' :           _spritesheet[3,1],
+        'Five_no_cheese' :           _spritesheet[3,1],
+        'Six_no_cheese'  :          _spritesheet[3,1],
     }
+    
 

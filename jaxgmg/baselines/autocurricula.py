@@ -187,11 +187,11 @@ def plr_compute_scores(
             return jnp.abs(advantages).mean(axis=1)
         case "pvl":
             return jnp.maximum(advantages, 0).mean(axis=1)
-        case "proxy_regret":
+        case "proxy_regret_corner":
             true_reward = rollouts.transitions.reward.sum(axis=1)
             proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
             return jnp.maximum(true_reward - proxy_reward,0)
-        case "proxy_regret_weighted_dist":
+        case "proxy_regret_corner_wdistance":
             true_reward = rollouts.transitions.reward.sum(axis=1)
             proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
             mouse_pos = rollouts.transitions.env_state.mouse_pos[:, 0]
@@ -206,7 +206,14 @@ def plr_compute_scores(
             weight_reward_diff = 0.7
             weight_distance = 0.3
             return weight_reward_diff * reward_diff + weight_distance * normalized_distance
-
+        case "proxy_regret_dish":
+            true_reward = rollouts.transitions.reward.sum(axis=1)
+            proxy_reward = rollouts.transitions.info['proxy_rewards']['dish'].sum(axis=1)
+            return jnp.maximum(true_reward - proxy_reward,0)
+        case "proxy_regret_pile":
+            true_reward = rollouts.transitions.reward.sum(axis=1)
+            proxy_reward = rollouts.transitions.info['proxy_rewards']['pile'].sum(axis=1)
+            return jnp.maximum(true_reward - proxy_reward,0)
         case "maxmc":
             raise NotImplementedError # TODO
         case _:
