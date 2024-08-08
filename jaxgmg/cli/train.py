@@ -1056,11 +1056,10 @@ def pile(
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
             level_metrics=None,
-            level_metrics = None,
-            # cheese_on_a_dish.LevelMetrics(
-            #     env=env,
-            #     discount_rate=ppo_gamma,
-            # ),
+            level_metrics = cheese_on_a_pile.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -1074,11 +1073,10 @@ def pile(
     elif ued == "plr-parallel":
         gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_metrics = None,
-            # cheese_on_a_dish.LevelMetrics(
-            #     env=env,
-            #     discount_rate=ppo_gamma,
-            # ),
+            level_metrics = cheese_on_a_pile.LevelMetrics(
+                env=env,
+                discount_rate=ppo_gamma,
+            ),
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
