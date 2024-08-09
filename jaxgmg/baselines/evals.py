@@ -137,6 +137,45 @@ class AnimatedRolloutsEval(Eval):
 
 
 @struct.dataclass
+class SingleLevelEval(Eval):
+    num_steps: int
+    discount_rate: float
+    env: Env
+    level: Level
+
+
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+        net_init_state: networks.ActorCriticState,
+    ) -> dict[str, Any]:
+        rollout = experience.collect_rollout(
+            rng=rng,
+            num_steps=self.num_steps,
+            net_apply=train_state.apply_fn,
+            net_params=train_state.params,
+            net_init_state=net_init_state,
+            env=self.env,
+            level=self.level,
+        )
+        eval_metrics = experience.compute_single_rollout_metrics(
+            rollout=rollout,
+            discount_rate=self.discount_rate,
+            benchmark_return=None,
+        )
+        eval_metrics['rollouts_gif'] = experience.animate_rollouts(
+            rollouts=jax.tree.map(
+                lambda x: jnp.asarray(x)[jnp.newaxis],
+                rollout,
+            ),
+            grid_width=1,
+            env=self.env,
+        )
+        return eval_metrics
+
+
+@struct.dataclass
 class ActorCriticHeatmapVisualisationEval(Eval):
     levels: Level
     num_levels: int

@@ -223,6 +223,7 @@ app.add_typer(make_typer_app(
         train.keys,
         # train.lava,
         # train.monsters,
+        train.minimaze,
     ),
 ))
 

@@ -273,6 +273,69 @@ def collect_rollouts(
 
 
 @jax.jit
+def compute_single_rollout_metrics(
+    rollout: Rollout,
+    discount_rate: float,
+    benchmark_return: float | None
+) -> dict[str, Any]:
+    """
+    Parameters:
+
+    * rollout: Rollout (with Transition[num_steps] inside)
+            The rollout to score.
+    * discount_rate : float
+            Used in computing the return metric.
+    * benchmark_return : float | None
+            What is the benchmark (e.g. optimal) return to be aiming for?
+            If None, skip this metric.
+
+    Returns:
+
+    * metrics : {str: Any}
+            A dictionary of statistics calculated based on the rollout.
+    """
+    # compute episode lengths
+    eps_per_step = rollout.transitions.done.mean()
+    steps_per_ep = 1 / (eps_per_step + 1e-10)
+    # average return for episodes contained in the rollout
+    avg_return = compute_average_return(
+        rewards=rollout.transitions.reward,
+        dones=rollout.transitions.done,
+        discount_rate=discount_rate,
+    )
+    # compute average reward
+    reward_per_step = rollout.transitions.reward.mean()
+    metrics = {
+        'avg_return': avg_return,
+        'avg_episode_length': steps_per_ep,
+        'reward_per_step': reward_per_step,
+    }
+
+    # compare return to benchmark return if provided
+    if benchmark_return is not None:
+        metrics.update({
+            'benchmark_return': benchmark_return,
+            'benchmark_regret': benchmark_return - avg_return,
+        })
+    
+    # if there are any proxy rewards, add new metrics for each
+    proxy_dict = rollout.transitions.info.get("proxy_rewards", {})
+    for proxy_name, proxy_rewards in proxy_dict.items():
+        avg_proxy_return = compute_average_return(
+            rewards=proxy_rewards,
+            dones=rollout.transitions.done,
+            discount_rate=discount_rate,
+        )
+        proxy_reward_per_step = proxy_rewards.mean()
+        metrics["proxy_"+proxy_name] = {
+            'avg_return': avg_proxy_returns,
+            'reward_per_step': proxy_reward_per_step,
+        }
+    
+    return metrics
+
+
+@jax.jit
 def compute_rollout_metrics(
     rollouts: Rollout,                  # Rollout[num_levels]
     discount_rate: float,
@@ -293,8 +356,7 @@ def compute_rollout_metrics(
 
     * metrics : {str: Any}
             A dictionary of statistics calculated based on the collected
-            experience. Each key is prefixed with `metrics_prefix`.
-            If `compute_metrics` is False, the dictionary is empty.
+            experience.
     """
     # note: comments use shorthand L = num_levels, S = num_steps.
 
@@ -464,7 +526,7 @@ def generalised_advantage_estimation(
 
     
 # # # 
-# Helper functions
+# Animating rollouts
 
 
 @functools.partial(jax.jit, static_argnames=('grid_width','env'))
