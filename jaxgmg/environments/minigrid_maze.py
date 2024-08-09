@@ -93,11 +93,12 @@ class Observation(base.Observation):
 
     * image : bool[h, w, c] or float[h, w, rgb]
             The contents of the maze ahead of the agent.
-    * orientation: int
-            The direction the hero is facing.
+    * orientation: float[4]
+            One-hot encoding of the direction the hero is facing (dimensions
+            correspond to up, left, down, right).
     """
     image: chex.Array
-    orientation: int
+    orientation: chex.Array
 
 
 class Action(enum.IntEnum):
@@ -167,8 +168,8 @@ class Env(base.Env):
                 dtype=bool,
             ),
             orientation=jax.ShapeDtypeStruct(
-                shape=(),
-                dtype=int,
+                shape=(4,),
+                dtype=float,
             ),
         )
 
@@ -393,9 +394,11 @@ class Env(base.Env):
             case_facing_down,
             case_facing_right,
         )
+        # encode orientation
+        orientation = jnp.eye(4)[state.hero_dir]
         return Observation(
             image=image,
-            orientation=state.hero_dir,
+            orientation=orientation,
         )
     
 
@@ -406,7 +409,8 @@ class Env(base.Env):
         spritesheet: dict[str, chex.Array],
     ) -> Observation:
         # get the boolean grid version of the observation
-        image_bool = self._render_obs_bool(state).image
+        obs_bool = self._render_obs_bool(state)
+        image_bool = obs_bool.image
         H, W, _C = image_bool.shape
 
         # find out, for each position, which object to render
@@ -436,7 +440,10 @@ class Env(base.Env):
             spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
-        return image_rgb
+        return Observation(
+            image=image_rgb,
+            orientation=obs_bool.orientation,
+        )
 
 
 # # # 
