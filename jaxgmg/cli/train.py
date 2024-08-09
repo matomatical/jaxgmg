@@ -638,13 +638,13 @@ def dish(
     env_size: int = 13,
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = False,
-    max_cheese_radius: int = 1,
-    max_cheese_radius_shift: int = 6,
+    max_cheese_radius: int = 0,
+    max_cheese_radius_shift: int = 16,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
     # ued config
-    ued: str = "dr",                        # 'dr', 'dr-finite', 'plr'
+    ued: str = "plr",                        # 'dr', 'dr-finite', 'plr'
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -760,11 +760,11 @@ def dish(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_metrics=None,
             level_metrics = cheese_on_a_dish.LevelMetrics(
                 env=env,
                 discount_rate=ppo_gamma,
             ),
+            level_solver= None,
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -922,10 +922,10 @@ def pile(
     env_size: int = 13,
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = True,
-    split_elements_train:int = 0,
+    split_elements_train:int = 0, # how many objects go on the cheese - not important cuz we want to train with both in the same position
     split_elements_shift:int = 4,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 6,
+    max_cheese_radius_shift: int = 16,
     max_dish_radius: int = 0, # this is not relevant and can be ignored for now ( they may come useful in next implementations)
     max_dish_radius_shift: int= 0, # this is not relevant and can be ignored for now ( they may come useful in next implementations)
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
@@ -1055,11 +1055,11 @@ def pile(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_metrics=None,
             level_metrics = cheese_on_a_pile.LevelMetrics(
                 env=env,
                 discount_rate=ppo_gamma,
             ),
+            level_solver= None,
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,

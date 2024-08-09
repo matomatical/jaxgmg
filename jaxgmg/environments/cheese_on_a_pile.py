@@ -35,6 +35,9 @@ from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
+from jaxgmg import util
+from jax import lax
+
 
 @struct.dataclass
 class Level(base.Level):
@@ -964,18 +967,23 @@ class LevelMetrics(base.LevelMetrics):
             (levels.spoon_pos == levels.cheese_pos).all(axis=1) +
             (levels.glass_pos == levels.cheese_pos).all(axis=1) +
             (levels.mug_pos == levels.cheese_pos).all(axis=1) 
-            ).sum()
+            ).mean()
         objects_on_pile = (
             (levels.dish_pos == levels.napkin_pos).all(axis=1) +
             (levels.fork_pos == levels.napkin_pos).all(axis=1) +
             (levels.spoon_pos == levels.napkin_pos).all(axis=1) +
             (levels.glass_pos == levels.napkin_pos).all(axis=1) +
             (levels.mug_pos == levels.napkin_pos).all(axis=1) 
-            ).sum()
+            ).mean()
         
-        if levels.cheese_pos == levels.napkin_pos: #sufficient to check 5 + this because the napkin is always the last to be added
-            objects_on_cheese = 6
-            objects_on_pile = 0
+        dish_napkin_same = jnp.all(jnp.all(levels.dish_pos == levels.napkin_pos, axis=1))
+
+
+        objects_on_cheese, objects_on_pile = lax.cond(
+            dish_napkin_same,
+            lambda: (jnp.float32(6), jnp.float32(0)),
+            lambda: (objects_on_cheese, objects_on_pile)
+        )
 
 
         # rendered levels in a grid

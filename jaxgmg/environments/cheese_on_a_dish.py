@@ -35,6 +35,8 @@ from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
+from jaxgmg import util
+
 
 @struct.dataclass
 class Level(base.Level):
