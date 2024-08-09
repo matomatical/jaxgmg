@@ -154,11 +154,11 @@ def corner(
     """
     match splayer:
         case 'cheese':
-            splayer = cheese_in_the_corner.LevelSplayer.splay_cheese
+            splayer = cheese_in_the_corner.splay_cheese
         case 'mouse':
-            splayer = cheese_in_the_corner.LevelSplayer.splay_mouse
+            splayer = cheese_in_the_corner.splay_mouse
         case 'cheese-and-mouse':
-            splayer = cheese_in_the_corner.LevelSplayer.splay_cheese_and_mouse
+            splayer = cheese_in_the_corner.splay_cheese_and_mouse
         case _:
             raise ValueError(f"unknown splayer {splayer!r}")
     util.print_config(locals())

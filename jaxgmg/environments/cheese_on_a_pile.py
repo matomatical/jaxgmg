@@ -88,6 +88,57 @@ class EnvState(base.EnvState):
     #got_items_grouptwo: bool
     #collected_dishes: chex.Array
 
+
+@struct.dataclass
+class Observation(base.Observation):
+    """
+    Observation for partially observable Maze environment.
+
+    * image : bool[h, w, c] or float[h, w, rgb]
+            The contents of the state. Comes in one of two formats:
+            * Boolean: a H by W by C bool array where each channel represents
+              the presence of one type of thing (walls, mouse, cheese, dish,
+              etc.).
+            * Pixels: an D.H by D.W by 3 array of RGB float values where each
+              D by D tile corresponds to one grid square. (D is level of
+              detail.)
+    """
+    image: chex.Array
+    
+
+class Action(enum.IntEnum):
+    """
+    The environment has a discrete action space of size 4 with the following
+    meanings.
+    """
+    MOVE_UP     = 0
+    MOVE_LEFT   = 1
+    MOVE_DOWN   = 2
+    MOVE_RIGHT  = 3
+
+
+class Channel(enum.IntEnum):
+    """
+    The observations returned by the environment are an `h` by `w` by
+    `channel` Boolean array, where the final dimensions 0 through 4
+    indicate the following:
+
+    * `WALL`:   True in the locations where there is a wall.
+    * `MOUSE`:  True in the one location the mouse occupies.
+    * `CHEESE`: True in the one location the cheese occupies.
+    * `DISH`:   True in the one location the dish occupies.
+    """
+    WALL    = 0
+    MOUSE   = 1
+    CHEESE  = 2
+    DISH    = 3
+    FORK    = 4
+    SPOON   = 5
+    GLASS   = 6
+    MUG     = 7
+    NAPKIN  = 8
+
+    
 @struct.dataclass
 class Env(base.Env):
     """
@@ -103,64 +154,26 @@ class Env(base.Env):
     * If the mouse hits the dish, the dish is removed.
     * If the mouse hits the cheese, the agent gains reward and the episode
       ends.
-
-    Observations come in one of two formats:
-
-    * Boolean: a H by W by C bool array where each channel represents the
-      presence of one type of thing (walls, mouse, cheese, dish).
-    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
-      tile corresponds to one grid square.
     """
     terminate_after_cheese_and_dish: bool = False
-    split_object_firstgroup: int=6
-
-    class Action(enum.IntEnum):
-        """
-        The environment has a discrete action space of size 4 with the following
-        meanings.
-        """
-        MOVE_UP     = 0
-        MOVE_LEFT   = 1
-        MOVE_DOWN   = 2
-        MOVE_RIGHT  = 3
-
+    split_object_firstgroup: int = 6
 
     @property
     def num_actions(self) -> int:
-        return len(Env.Action)
+        return len(Action)
 
 
     def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
         H, W = level.wall_map.shape
-        C = len(Env.Channel)
-        return jax.ShapeDtypeStruct(
-            shape=(H, W, C),
-            dtype=bool,
+        C = len(Channel)
+        return Observation(
+            image=jax.ShapeDtypeStruct(
+                shape=(H, W, C),
+                dtype=bool,
+            ),
         )
 
 
-    class Channel(enum.IntEnum):
-        """
-        The observations returned by the environment are an `h` by `w` by
-        `channel` Boolean array, where the final dimensions 0 through 4
-        indicate the following:
-
-        * `WALL`:   True in the locations where there is a wall.
-        * `MOUSE`:  True in the one location the mouse occupies.
-        * `CHEESE`: True in the one location the cheese occupies.
-        * `DISH`:   True in the one location the dish occupies.
-        """
-        WALL    = 0
-        MOUSE   = 1
-        CHEESE  = 2
-        DISH    = 3
-        FORK    = 4
-        SPOON   = 5
-        GLASS   = 6
-        MUG     = 7
-        NAPKIN  = 8
-
-    
     def _reset(
         self,
         level: Level,
@@ -285,8 +298,6 @@ class Env(base.Env):
 
         #proxy_reward_dish = got_dish_first_time.astype(float)
 
-        
-
         #got_dish_after_cheese = state.got_dish & state.got_cheese
         #got_cheese_after_dish = state.got_cheese & state.got_dish
 
@@ -296,8 +307,6 @@ class Env(base.Env):
         proxy_cheese_first = reward * got_cheese_before_pile
         proxy_pile_first = proxy_pile * got_pile_before_cheese
         
-
-
         if self.terminate_after_cheese_and_dish:
             if len(second_group_first_time_objects) > 0:
                 done = state.got_cheese & state.got_napkin
@@ -323,126 +332,150 @@ class Env(base.Env):
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> chex.Array:
         """
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
-        C = len(Env.Channel)
+        C = len(Channel)
         obs = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        obs = obs.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        obs = obs.at[:, :, Channel.WALL].set(state.level.wall_map)
 
         # render mouse
         obs = obs.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
-            Env.Channel.MOUSE,
+            Channel.MOUSE,
         ].set(True)
         
         # render cheese
         obs = obs.at[
             state.level.cheese_pos[0],
             state.level.cheese_pos[1],
-            Env.Channel.CHEESE,
+            Channel.CHEESE,
         ].set(~state.got_cheese)
         
         # render dish
         obs = obs.at[
             state.level.dish_pos[0],
             state.level.dish_pos[1],
-            Env.Channel.DISH,
+            Channel.DISH,
         ].set(~state.got_dish)
 
         #render other objects
         obs = obs.at[
             state.level.fork_pos[0],
             state.level.fork_pos[1],
-            Env.Channel.FORK,
+            Channel.FORK,
         ].set(~state.got_fork)
 
         obs = obs.at[
             state.level.spoon_pos[0],
             state.level.spoon_pos[1],
-            Env.Channel.SPOON,
+            Channel.SPOON,
         ].set(~state.got_spoon)
 
         obs = obs.at[
             state.level.glass_pos[0],
             state.level.glass_pos[1],
-            Env.Channel.GLASS,
+            Channel.GLASS,
         ].set(~state.got_glass)
 
         obs = obs.at[
             state.level.mug_pos[0],
             state.level.mug_pos[1],
-            Env.Channel.MUG,
+            Channel.MUG,
         ].set(~state.got_mug)
 
         obs = obs.at[
             state.level.napkin_pos[0],
             state.level.napkin_pos[1],
-            Env.Channel.NAPKIN,
+            Channel.NAPKIN,
         ].set(~state.got_napkin)
         
-
-
-        return obs
+        return Observation(image=obs)
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(
+    def _render_obs_rgb(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
-    ) -> chex.Array:
+    ) -> Observation:
         """
         Return an RGB observation based on a grid of tiles from the given
         spritesheet.
         """
         # get the boolean grid representation of the state
-        obs = self._get_obs_bool(state)
+        obs = self._render_obs_bool(state).image
         H, W, _C = obs.shape
 
         # find out, for each position, which object to render
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             #seven objects
-            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.MUG] & obs[:, :, Env.Channel.NAPKIN],
+            obs[:, :, Channel.CHEESE]
+                & obs[:, :, Channel.DISH]
+                & obs[:, :, Channel.FORK]
+                & obs[:, :, Channel.SPOON]
+                & obs[:, :, Channel.GLASS]
+                & obs[:, :, Channel.MUG]
+                & obs[:, :, Channel.NAPKIN],
             #six objects
-            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.MUG],
-
-            obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.MUG] & obs[:, :, Env.Channel.NAPKIN],
+            obs[:, :, Channel.CHEESE]
+                & obs[:, :, Channel.DISH]
+                & obs[:, :, Channel.FORK]
+                & obs[:, :, Channel.SPOON]
+                & obs[:, :, Channel.GLASS]
+                & obs[:, :, Channel.MUG],
+            obs[:, :, Channel.DISH]
+                & obs[:, :, Channel.FORK]
+                & obs[:, :, Channel.SPOON]
+                & obs[:, :, Channel.GLASS]
+                & obs[:, :, Channel.MUG]
+                & obs[:, :, Channel.NAPKIN],
             #five objects
-            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS],
-
-            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG]& obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.FORK],
+            obs[:, :, Channel.CHEESE]
+                & obs[:, :, Channel.DISH]
+                & obs[:, :, Channel.FORK]
+                & obs[:, :, Channel.SPOON]
+                & obs[:, :, Channel.GLASS],
+            obs[:, :, Channel.NAPKIN]
+                & obs[:, :, Channel.MUG]
+                & obs[:, :, Channel.GLASS]
+                & obs[:, :, Channel.SPOON]
+                & obs[:, :, Channel.FORK],
             #four objects
-            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON],
-
-            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG]& obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.SPOON],
-
+            obs[:, :, Channel.CHEESE]
+                & obs[:, :, Channel.DISH]
+                & obs[:, :, Channel.FORK]
+                & obs[:, :, Channel.SPOON],
+            obs[:, :, Channel.NAPKIN]
+                & obs[:, :, Channel.MUG]
+                & obs[:, :, Channel.GLASS]
+                & obs[:, :, Channel.SPOON],
             #three objects
-
-            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG]& obs[:, :, Env.Channel.GLASS],
-
-            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK],
-
+            obs[:, :, Channel.CHEESE]
+                & obs[:, :, Channel.DISH]
+                & obs[:, :, Channel.FORK],
+            obs[:, :, Channel.NAPKIN]
+                & obs[:, :, Channel.MUG]
+                & obs[:, :, Channel.GLASS],
             # two objects
-            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG],
-
-            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH],
+            obs[:, :, Channel.CHEESE] & obs[:, :, Channel.DISH],
+            obs[:, :, Channel.NAPKIN] & obs[:, :, Channel.MUG],
             # one object
-            obs[:, :, Env.Channel.WALL],
-            obs[:, :, Env.Channel.MOUSE],
-            obs[:, :, Env.Channel.CHEESE],
-            obs[:, :, Env.Channel.DISH],
-            obs[:, :, Env.Channel.FORK],
-            obs[:, :, Env.Channel.SPOON],
-            obs[:, :, Env.Channel.GLASS],
-            obs[:, :, Env.Channel.MUG],
-            obs[:, :, Env.Channel.NAPKIN],
+            obs[:, :, Channel.WALL],
+            obs[:, :, Channel.MOUSE],
+            obs[:, :, Channel.CHEESE],
+            obs[:, :, Channel.DISH],
+            obs[:, :, Channel.FORK],
+            obs[:, :, Channel.SPOON],
+            obs[:, :, Channel.GLASS],
+            obs[:, :, Channel.MUG],
+            obs[:, :, Channel.NAPKIN],
 
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
@@ -452,42 +485,59 @@ class Env(base.Env):
         # put the corresponding sprite into each square
         spritemap = jnp.stack([
             #seven objects
-            spritesheet['Seven_obj'],
+            spritesheet['CHEESE'],
             #six objects
-            spritesheet['Six_obj_cheese'],
-            spritesheet['Six_no_cheese'],
+            spritesheet['CHEESE'],
+            spritesheet['BEACON_OFF'],
             #five objects
-            spritesheet['Five_obj_cheese'],
-            spritesheet['Five_no_cheese'],
+            spritesheet['CHEESE'],
+            spritesheet['BEACON_OFF'],
             #four objects
-            spritesheet['Four_obj_cheese'],
-            spritesheet['Four_no_cheese'],
+            spritesheet['CHEESE'],
+            spritesheet['BEACON_OFF'],
             #three objects
-            spritesheet['Three_no_cheese'],
-            spritesheet['Three_obj_cheese'],
-
+            spritesheet['CHEESE'],
+            spritesheet['BEACON_OFF'],
             # two objects
-            spritesheet['Two_no_cheese'],
-            spritesheet['Two_obj_cheese'],
+            spritesheet['CHEESE'],
+            spritesheet['BEACON_OFF'],
             # one object
             spritesheet['WALL'],
             spritesheet['MOUSE'],
             spritesheet['CHEESE'],
-            spritesheet['One_no_cheese'],
-            spritesheet['One_no_cheese'],
-            spritesheet['One_no_cheese'],
-            spritesheet['One_no_cheese'],
-            spritesheet['One_no_cheese'],
-            spritesheet['One_no_cheese'],
+            spritesheet['BEACON_OFF'],
+            spritesheet['BEACON_OFF'],
+            spritesheet['BEACON_OFF'],
+            spritesheet['BEACON_OFF'],
+            spritesheet['BEACON_OFF'],
+            spritesheet['BEACON_OFF'],
             # no objects
             spritesheet['PATH'],
         ])[chosen_sprites]
+
         image = einops.rearrange(
             spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
+        return Observation(image=image)
 
-        return image
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def _render_state_bool(
+        self,
+        state: EnvState,
+    ) -> chex.Array:
+        return self._render_obs_bool(state).image
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def _render_state_rgb(
+        self,
+        state: EnvState,
+        spritesheet: dict[str, chex.Array],
+    ) -> chex.Array:
+        return self._render_obs_rgb(state, spritesheet).image
+
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def optimal_value(
@@ -654,8 +704,8 @@ class LevelGenerator(base.LevelGenerator):
         #    key=rng_spawn_dish,
         #    a=coords,
         #    axis=0,
-         #   p=no_wall & no_mouse,
-       # )
+        #    p=no_wall & no_mouse,
+        #)
 
         # cheese spawns in some remaining valid position near the dish
         distance_to_napkin = maze_solving.maze_distances(wall_map)[
@@ -737,24 +787,24 @@ class LevelParser: # I need to change dish for this new env, ops
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Env.Channel.WALL`.
-            * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character 'd' maps to `Env.Channel.DISH`.
-            * The character 'c' maps to `Env.Channel.CHEESE`.
-            * The character 'b' maps to `len(Env.Channel)`, i.e. none of the
+            * The character '#' maps to `Channel.WALL`.
+            * The character '@' maps to `Channel.MOUSE`.
+            * The character 'd' maps to `Channel.DISH`.
+            * The character 'c' maps to `Channel.CHEESE`.
+            * The character 'b' maps to `len(Channel)`, i.e. none of the
               above, representing *both* the cheese and the dish.
-            * The character '.' maps to `len(Env.Channel)+1`, i.e. none of
+            * The character '.' maps to `len(Channel)+1`, i.e. none of
               the above, representing the absence of an item.
     """
     height: int
     width: int
     char_map = {
-        '#': Env.Channel.WALL,
-        '@': Env.Channel.MOUSE,
-        'd': Env.Channel.DISH,
-        'c': Env.Channel.CHEESE,
-        'b': len(Env.Channel),   # BOTH
-        '.': len(Env.Channel)+1, # PATH
+        '#': Channel.WALL,
+        '@': Channel.MOUSE,
+        'd': Channel.DISH,
+        'c': Channel.CHEESE,
+        'b': len(Channel),   # BOTH
+        '.': len(Channel)+1, # PATH
         # TODO: I should switch these to using a standalone enum...
     }
 
@@ -814,7 +864,7 @@ class LevelParser: # I need to change dish for this new env, ops
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Env.Channel.WALL)
+        wall_map = (level_map == Channel.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
@@ -822,8 +872,8 @@ class LevelParser: # I need to change dish for this new env, ops
         
         # extract cheese position
         cheese_map = (
-            (level_map == Env.Channel.CHEESE)
-            | (level_map == len(Env.Channel)) # both dish and cheese
+            (level_map == Channel.CHEESE)
+            | (level_map == len(Channel)) # both dish and cheese
         )
         assert cheese_map.sum() == 1, "there must be exactly one cheese"
         cheese_pos = jnp.concatenate(
@@ -832,8 +882,8 @@ class LevelParser: # I need to change dish for this new env, ops
         
         # extract dish position
         dish_map = (
-            (level_map == Env.Channel.DISH)
-            | (level_map == len(Env.Channel)) # both dish and cheese
+            (level_map == Channel.DISH)
+            | (level_map == len(Channel)) # both dish and cheese
         )
         assert dish_map.sum() == 1, "there must be exactly one dish"
         dish_pos = jnp.concatenate(
@@ -841,7 +891,7 @@ class LevelParser: # I need to change dish for this new env, ops
         )
 
         # extract mouse spawn position
-        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        mouse_spawn_map = (level_map == Channel.MOUSE)
         assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
         initial_mouse_pos = jnp.concatenate(
             jnp.where(mouse_spawn_map, size=1)
@@ -854,21 +904,6 @@ class LevelParser: # I need to change dish for this new env, ops
             initial_mouse_pos=initial_mouse_pos,
         )
 
-
-    def parse_batch(self, level_strs):
-        """
-        Convert a list of ASCII string depiction of length `num_levels`
-        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
-        the details of the string depiction.
-        """
-        levels = [self.parse(level_str) for level_str in level_strs]
-        return Level(
-            wall_map=jnp.stack([l.wall_map for l in levels]),
-            cheese_pos=jnp.stack([l.cheese_pos for l in levels]),
-            dish_pos=jnp.stack([l.dish_pos for l in levels]),
-            initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
-        )
-    
 
 class LevelMetrics(base.LevelMetrics):
 

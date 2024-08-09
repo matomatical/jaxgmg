@@ -74,7 +74,6 @@ def run(
     # training animation dimensions
     train_gifs: bool,
     train_gif_grid_width: int,
-    train_gif_level_of_detail: int,
     # checkpointing config
     checkpointing: bool,
     keep_all_checkpoints: bool,
@@ -222,7 +221,6 @@ def run(
             frames = experience.animate_rollouts(
                 rollouts=rollouts,
                 grid_width=train_gif_grid_width,
-                force_lod=train_gif_level_of_detail,
                 env=env,
             )
             metrics['env/train'].update({'rollouts_gif': frames})
@@ -308,15 +306,7 @@ def run(
             
             # log to wandb
             if wandb_log:
-                metrics_wandb = util.flatten_dict(metrics)
-                for key, val in metrics_wandb.items():
-                    if key.endswith("_hist"):
-                        metrics_wandb[key] = wandb.Histogram(val)
-                    elif key.endswith("_gif"):
-                        metrics_wandb[key] = util.wandb_gif(val)
-                    elif key.endswith("_img"):
-                        metrics_wandb[key] = util.wandb_img(val)
-                    wandb.log(step=t, data=metrics_wandb)
+                wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
             
             # either way, log to disk
             metrics_disk = util.flatten_dict(metrics)

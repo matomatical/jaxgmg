@@ -19,9 +19,6 @@ from jaxgmg.graphics import LevelOfDetail, load_spritesheet
 # Basic structs
 
 
-Observation = chex.ArrayTree
-
-
 @struct.dataclass
 class Level:
     """
@@ -50,6 +47,14 @@ class EnvState:
     level: Level
     steps: int
     done: bool
+
+
+@struct.dataclass
+class Observation:
+    """
+    Represent an observation from the environment. Subclass may add
+    one or more fields.
+    """
 
 
 # # #
@@ -85,6 +90,9 @@ class Env:
               represented by a 3x3 square of pixels.
             * Similarly for LevelOfDetail.RGB_4PX or int 4.
             * Similarly for LevelOfDetail.RGB_8PX or int 8.
+    * img_level_of_detail: LevelOfDetail (OK to use raw int 0, 1, 3, 4, or 8)
+            The level of detail for rendered states. Same options as
+            obs_level_of_detail.
     
     Properties:
 
@@ -97,6 +105,7 @@ class Env:
     * env.reset_to_level(level) -> (obs, start_state)
     * env.step(rng, state, action) -> (obs, new_state, reward, done, info)
     * env.get_obs(state) -> obs
+    * env.render_state(state) -> obs
 
     Instructions for sublassing: Implement the following methods:
 
@@ -104,16 +113,16 @@ class Env:
     * obs_type(self, level) -> obs_type
     * _reset(self, level) -> start_state
     * _step(self, rng, state, action) -> (new_state, reward, done, info)
-    * _get_obs_bool(self, state) -> obs_bool
-    * _get_obs_rgb(self, state) -> obs_rgb
+    * _render_obs_bool(self, state) -> obs_bool
+    * _render_obs_rgb(self, state, spritesheet) -> obs_rgb
+    * _render_state_bool(self, state) -> img_bool
+    * _render_state_rgb(self, state, spritesheet) -> img_rgb
     """
-
-
-    # fields
     max_steps_in_episode: int = 128
     penalize_time: bool = True
     automatically_reset: bool = True
     obs_level_of_detail: LevelOfDetail = LevelOfDetail.BOOLEAN
+    img_level_of_detail: LevelOfDetail = LevelOfDetail.RGB_1PX
 
 
     @property
@@ -149,15 +158,27 @@ class Env:
         raise NotImplementedError
 
     
-    def _get_obs_bool(self, state: EnvState) -> Observation:
+    def _render_obs_bool(self, state: EnvState) -> Observation:
         raise NotImplementedError
     
 
-    def _get_obs_rgb(
+    def _render_obs_rgb(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
     ) -> Observation:
+        raise NotImplementedError
+    
+
+    def _render_state_bool(self, state: EnvState) -> chex.Array:
+        return NotImplementedError
+    
+
+    def _render_state_rgb(
+        self,
+        state: EnvState,
+        spritesheet: dict[str, chex.Array],
+    ) -> chex.Array:
         raise NotImplementedError
     
 
@@ -237,22 +258,40 @@ class Env:
         )
 
 
-    @functools.partial(jax.jit, static_argnames=('self', 'force_lod'))
+    @functools.partial(jax.jit, static_argnames=('self',))
     def get_obs(
         self,
         state: EnvState,
-        force_lod: LevelOfDetail | None = None,
-    ):
-        # override LevelOfDetail
-        if force_lod is None:
-            lod = self.obs_level_of_detail
-        else:
-            lod = force_lod
+    ) -> Observation:
         # dispatch to the appropriate renderer
-        if lod == LevelOfDetail.BOOLEAN:
-            return self._get_obs_bool(state)
+        if self.obs_level_of_detail == LevelOfDetail.BOOLEAN:
+            return self._render_obs_bool(state)
         else:
-            return self._get_obs_rgb(state, load_spritesheet(lod))
+            spritesheet = load_spritesheet(self.obs_level_of_detail)
+            return self._render_obs_rgb(state, spritesheet)
+    
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def render_state(
+        self,
+        state: EnvState,
+    ) -> chex.Array: # float[h, w, rgb] or bool[h, w, c]
+        # dispatch to the appropriate renderer
+        if self.img_level_of_detail == LevelOfDetail.BOOLEAN:
+            return self._render_state_bool(state)
+        else:
+            spritesheet = load_spritesheet(self.img_level_of_detail)
+            return self._render_state_rgb(state, spritesheet)
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def render_level(
+        self,
+        level: Level,
+    ) -> chex.Array: # float[h, w, rgb] or bool[h, w, c]
+        state = self._reset(level)
+        image = self.render_state(state)
+        return image
 
 
     # pre-vectorised methods
@@ -378,6 +417,44 @@ class MixtureLevelGenerator(LevelGenerator):
         )
 
         return chosen_level
+
+
+# # # 
+# Level parsing
+
+
+@struct.dataclass
+class LevelParser:
+    """
+    Level parser for an environment. Given some parameters (e.g. determining
+    expected level shape), provides a `parse` method that converts an ASCII
+    depiction of a level into a Level struct. Also provides a `parse_batch`
+    method that parses a list of level strings into a single vectorised Level
+    PyTree.
+
+    Subclasses must implement the `parse` method, this superclass implements
+    `parse_batch` based on that.
+    """
+    
+
+    def parse(self, level_str: str) -> Level:
+        """
+        Convert an ASCII string depiction of a level into a Level struct.
+        Implemented in subclass.
+        """
+        raise NotImplementedError
+
+
+    def parse_batch(self, level_strs: list[str]) -> Level: # Level[n]
+        """
+        Convert a list of ASCII string depiction of length `num_levels`
+        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
+        the details of the string depiction.
+        """
+        # parse levels
+        levels = [self.parse(level_str) for level_str in level_strs]
+        # stack into a single Level object
+        return jax.tree.map(lambda *xs: jax.numpy.stack(xs), *levels)
 
 
 # # # 

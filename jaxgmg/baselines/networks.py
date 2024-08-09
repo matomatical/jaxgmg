@@ -9,11 +9,12 @@ import jax.numpy as jnp
 import flax.linen as nn
 import distrax
 
+from chex import ArrayTree
+from jaxgmg.environments.base import Observation
+
 
 # # # 
 # Types
-
-from chex import ArrayTree
 
 
 ActorCriticState = ArrayTree
@@ -22,9 +23,8 @@ ActorCriticState = ArrayTree
 ActorCriticParams = ArrayTree
 
 
-# TODO: is this right?
 ActorCriticForwardPass = Callable[
-    [ActorCriticParams, ArrayTree, ActorCriticState, int],
+    [ActorCriticParams, Observation, ActorCriticState, int],
     tuple[distrax.Categorical, float, ActorCriticState],
 ]
 
@@ -78,7 +78,12 @@ class ActorCriticNetwork(nn.Module):
         raise NotImplementedError
 
 
-    def __call__(self, obs, state, prev_action):
+    def __call__(
+        self,
+        obs: Observation,
+        state: ActorCriticState,
+        prev_action: int,
+    ):
         raise NotImplementedError
 
 
@@ -104,7 +109,7 @@ class ImpalaLargeFF(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = obs
+        x = obs.image
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -125,6 +130,13 @@ class ImpalaLargeFF(ActorCriticNetwork):
         x = nn.relu(x)
         obs_embedding = x
 
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
+
         # previous action embedding
         prev_action_embedding = jax.nn.one_hot(
             x=prev_action,
@@ -132,7 +144,11 @@ class ImpalaLargeFF(ActorCriticNetwork):
         )
 
         # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+        embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
         
         # dense block in lieu of lstm
         x = nn.Dense(features=256)(embedding)
@@ -169,9 +185,8 @@ class ImpalaSmallFF(ActorCriticNetwork):
 
     @nn.compact
     def __call__(self, obs, state, prev_action):
-
         # obs embedding
-        x = obs
+        x = obs.image
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -180,6 +195,20 @@ class ImpalaSmallFF(ActorCriticNetwork):
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
         obs_embedding = x
+        
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
+        
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
 
         # previous action embedding
         prev_action_embedding = jax.nn.one_hot(
@@ -188,7 +217,11 @@ class ImpalaSmallFF(ActorCriticNetwork):
         )
 
         # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+        embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
         
         # dense block in lieu of lstm
         x = nn.Dense(features=256)(embedding)
@@ -227,7 +260,7 @@ class ImpalaLarge(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = obs
+        x = obs.image
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -248,6 +281,13 @@ class ImpalaLarge(ActorCriticNetwork):
         x = nn.relu(x)
         obs_embedding = x
         
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
+        
         # previous action embedding
         prev_action_embedding = jax.nn.one_hot(
             x=prev_action,
@@ -255,7 +295,11 @@ class ImpalaLarge(ActorCriticNetwork):
         )
 
         # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+        embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
 
         # lstm block
         state, lstm_out = self._lstm_block(state, embedding)
@@ -292,7 +336,7 @@ class ImpalaSmall(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = obs
+        x = obs.image
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -301,6 +345,13 @@ class ImpalaSmall(ActorCriticNetwork):
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
         obs_embedding = x
+        
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
 
         # previous action embedding
         prev_action_embedding = jax.nn.one_hot(
@@ -309,7 +360,11 @@ class ImpalaSmall(ActorCriticNetwork):
         )
 
         # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+        embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
 
         # lstm block
         state, lstm_out = self._lstm_block(state, embedding)
@@ -347,7 +402,7 @@ class ReLUFF(ActorCriticNetwork):
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
-        x = jnp.ravel(obs)
+        x = jnp.ravel(obs.image)
         # at least one layer (to start the residual stream)
         x = nn.Dense(self.embedding_layer_width)(x)
         x = nn.relu(x)
@@ -357,6 +412,13 @@ class ReLUFF(ActorCriticNetwork):
             y = nn.relu(y)
             x = x + y
         obs_embedding = x
+        
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
 
         # previous action embedding
         prev_action_embedding = jax.nn.one_hot(
@@ -365,7 +427,11 @@ class ReLUFF(ActorCriticNetwork):
         )
 
         # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
+        embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
 
         # actor head
         logits = nn.Dense(self.num_actions)(embedding)

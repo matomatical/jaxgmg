@@ -128,6 +128,7 @@ app.add_typer(make_typer_app(
         parse.keys,
         parse.lava,
         parse.monsters,
+        parse.minimaze,
     ),
 ))
 
@@ -143,6 +144,7 @@ app.add_typer(make_typer_app(
         play.keys,
         play.lava,
         play.monsters,
+        play.minimaze,
     ),
 ))
 
@@ -222,6 +224,7 @@ app.add_typer(make_typer_app(
         train.keys,
         # train.lava,
         # train.monsters,
+        train.minimaze,
     ),
 ))
 

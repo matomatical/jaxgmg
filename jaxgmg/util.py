@@ -116,6 +116,21 @@ def print_img(im, colormap=None):
 
 
 # # # 
+# Transforming dictionaries
+
+
+def flatten_dict(nested_dict, separator='/'):
+    merged_dict = {}
+    for key, inner_dict in nested_dict.items():
+        if isinstance(inner_dict, dict):
+            for inner_key, value in flatten_dict(inner_dict).items():
+                merged_dict[key + separator + inner_key] = value
+        else:
+            merged_dict[key] = inner_dict
+    return merged_dict
+
+
+# # # 
 # Saving images or animations to disk
 
 
@@ -260,6 +275,27 @@ def wandb_gif(frames, fps=12):
         ),
         fps=fps,
     )
+            
+
+def wandb_flatten_and_wrap(metrics):
+    """
+    W&B expects certain data to be wrapped with their custom wrappers,
+    namely histograms, images, and videos. Also, nested dictionaries should
+    be flattened. This function prepares a nested dictionary with key
+    suffixes indicated the type for sending to wandb.
+    """
+    metrics_flat = flatten_dict(metrics)
+    metrics_wandb = {}
+    for key, val in metrics_flat.items():
+        if key.endswith("_hist"):
+            metrics_wandb[key] = wandb.Histogram(val)
+        elif key.endswith("_gif"):
+            metrics_wandb[key] = wandb_gif(val)
+        elif key.endswith("_img"):
+            metrics_wandb[key] = wandb_img(val)
+        else:
+            metrics_wandb[key] = val
+    return metrics_wandb
 
 
 # # # 
@@ -352,21 +388,6 @@ class RunFilesManager:
         path = os.path.join(self.path, suffix)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         return path
-
-
-# # # 
-# Transforming dictionaries
-
-
-def flatten_dict(nested_dict, separator='/'):
-    merged_dict = {}
-    for key, inner_dict in nested_dict.items():
-        if isinstance(inner_dict, dict):
-            for inner_key, value in flatten_dict(inner_dict).items():
-                merged_dict[key + separator + inner_key] = value
-        else:
-            merged_dict[key] = inner_dict
-    return merged_dict
 
 
 # # # 
