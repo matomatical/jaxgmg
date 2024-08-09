@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#SBATCH --job-name=plr.jobs
+#SBATCH --partition=high_priority
+#SBATCH --time=2:00:00
+#SBATCH --gpus-per-node=1
+
+
+conda activate jaxgmgmcondaenv
+
+#jaxgmg train corner --ued='plr' --prob-shift=0.05 --plr-regret-estimator='PVL' --num-total-env-steps=150_000_000 --wandb-name='PLR_PVL_150M_fixed_p0.05' 
+
+jaxgmg train corner --ued='plr' --prob-shift=0.05 --plr-regret-estimator='proxy_regret' --num-total-env-steps=150_000_000 --wandb-name='PLR_proxy_regret_150M_p0.05'
+
+#jaxgmg train corner --ued='plr' --prob-shift=0.05 --plr-regret-estimator='proxy_regret_weighted_dist' --num-total-env-steps=150_000_000 --wandb-name='PLR_proxy_regret_150M_p0.05'
+
+#jaxgmg train corner --ued='dr' --prob-shift=0.05 --num-total-env-steps=150_000_000 --wandb-name='dr_150M_p0.05'

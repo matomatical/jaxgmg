@@ -218,7 +218,8 @@ app.add_typer(make_typer_app(
     help=train.__doc__,
     subcommands=(
         train.corner,
-        # train.dish,
+        train.dish,
+        train.pile,
         # train.follow,
         train.keys,
         # train.lava,

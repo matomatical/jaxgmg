@@ -162,7 +162,7 @@ class Env:
         raise NotImplementedError
     
 
-    def _render_obs_bool(
+    def _render_obs_rgb(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],

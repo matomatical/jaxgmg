@@ -71,4 +71,5 @@ def load_spritesheet(lod: LevelOfDetail):
         'MOUSE_ON_LEADER':          _spritesheet[3,6],
         'BOTH_MICE_ON_BEACON_OFF':  _spritesheet[3,7],
     }
+    
 
