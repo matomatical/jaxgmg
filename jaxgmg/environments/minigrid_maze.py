@@ -544,8 +544,6 @@ class MemoryTestLevelGenerator(base.LevelGenerator):
             [
                 [ 1, 1, 1, 1, 1, 1, 1,],
                 [ 1, 0, 0, 0, 0, 0, 1,],
-                [ 1, 0, 0, 0, 0, 0, 1,],
-                [ 1, 0, 1, 0, 1, 0, 1,],
                 [ 1, 0, 1, 0, 1, 0, 1,],
                 [ 1, 0, 1, 0, 1, 0, 1,],
                 [ 1, 1, 1, 1, 1, 1, 1,],
@@ -556,12 +554,12 @@ class MemoryTestLevelGenerator(base.LevelGenerator):
         # random goal spawn position
         goal_pos = jax.random.choice(
             key=rng,
-            a=jnp.array([[5, 1], [5, 5]]),
+            a=jnp.array([[3, 1], [3, 5]]),
             axis=0,
         )
 
         # fixed hero spawn position and orientation
-        initial_hero_pos = jnp.array([5, 3])
+        initial_hero_pos = jnp.array([3, 3])
         initial_hero_dir = 0
 
         return Level(
