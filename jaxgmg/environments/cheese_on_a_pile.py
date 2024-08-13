@@ -37,6 +37,7 @@ from jaxgmg.environments import base
 
 from jaxgmg import util
 from jax import lax
+import jax.numpy as jnp
 
 
 @struct.dataclass
@@ -300,14 +301,16 @@ class Env(base.Env):
         proxy_pile_first = proxy_pile * got_pile_before_cheese
         
 
-
         if self.terminate_after_cheese_and_dish:
             if len(second_group_first_time_objects) > 0:
                 done = state.got_cheese & state.got_napkin
             else:
                 done = state.got_cheese
         else:
-            done = state.got_cheese
+            done = state.got_cheese | state.got_napkin
+
+        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
+        pile_rate = lax.cond(jnp.any(state.got_napkin), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -318,6 +321,8 @@ class Env(base.Env):
                     'proxy_pile': proxy_pile,
                     'proxy_pile_first': proxy_pile_first,
                     'proxy_cheese_first': proxy_cheese_first,
+                    'cheese_solve_rate': cheese_rate, 
+                    'pile_solve_rate': pile_rate,
                      #'proxy_cheese_second': proxy_cheese_second,
                      #'proxy_dish_second': proxy_dish_second,
                 },
@@ -660,11 +665,12 @@ class LevelGenerator(base.LevelGenerator):
          #   p=no_wall & no_mouse,
        # )
 
-        # cheese spawns in some remaining valid position near the dish
+        # cheese spawns in some remaining valid position near the napkin
         distance_to_napkin = maze_solving.maze_distances(wall_map)[
             napkin_pos[0],
             napkin_pos[1],
         ]
+
         near_napkin = (distance_to_napkin == self.max_cheese_radius).flatten()
 
         near_napkin_nowall = near_napkin | (near_napkin & no_wall)
@@ -677,6 +683,20 @@ class LevelGenerator(base.LevelGenerator):
             #p=no_wall & no_mouse & near_napkin,
             p=near_napkin_nowall & no_mouse,
         )
+
+        # distance_to_napkin = maze_solving.maze_distances(wall_map)[
+        #     napkin_pos[0],
+        #     napkin_pos[1],
+        # ]
+        # near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
+
+        # rng_spawn_cheese, rng = jax.random.split(rng)
+        # cheese_pos = jax.random.choice(
+        #     key=rng_spawn_cheese,
+        #     a=coords,
+        #     axis=0,
+        #     p=no_wall & no_mouse & near_napkin,
+        # )
 
         #second group
         #distance_to_cheese = maze_solving.maze_distances(wall_map)[
@@ -700,6 +720,7 @@ class LevelGenerator(base.LevelGenerator):
             final_spawn.append(pos)
 
         final_spawn.reverse()
+
 
         return Level(
             wall_map=wall_map,
@@ -875,7 +896,6 @@ class LevelParser: # I need to change dish for this new env, ops
 
 class LevelMetrics(base.LevelMetrics):
 
-
     @functools.partial(jax.jit, static_argnames=('self',))
     def compute_metrics(
         self,
@@ -960,6 +980,10 @@ class LevelMetrics(base.LevelMetrics):
         opt_dists_solvable_pile = solvable_pile * opt_dists_pile
         opt_dists_finite_pile = jnp.nan_to_num(opt_dists_pile, posinf=(h-2)*(w-2)/2)
 
+        #buffer
+        cheese_on_pile= (levels.cheese_pos[:, 0] == levels.napkin_pos[:, 0]) & (levels.cheese_pos[:, 1] == levels.napkin_pos[:, 1])
+        cheese_on_pile_avg =  cheese_on_pile.mean()
+
         #tracking elements on pile
         objects_on_cheese = (
             (levels.dish_pos == levels.cheese_pos).all(axis=1) +
@@ -1020,8 +1044,8 @@ class LevelMetrics(base.LevelMetrics):
                 'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
                 'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
                 'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
-                'dish_map_avg_img': util.viridis(dish_map.mean(axis=0)),
-                'dish_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
+                'pile_map_avg_img': util.viridis(dish_map.mean(axis=0)),
+                'pile_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
 
             },
             'distances': {
@@ -1030,24 +1054,26 @@ class LevelMetrics(base.LevelMetrics):
                 'solvable_avg': solvable.mean(),
                 'solvable_wavg': solvable @ weights,
                 # optimal dist mouse to cheese
-                'mouse_cheese_dist_finite_hist': opt_dists_finite_cheese,
-                'mouse_cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
-                'mouse_cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
-                'mouse_cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
-                'mouse_cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
-                # optimal dist from mouse to dish
-                'mouse_dish_dist_finite_hist': opt_dists_finite_pile,
-                'mouse_dish_dist_finite_avg': opt_dists_finite_pile.mean(),
-                'mouse_dish_dist_finite_wavg': (opt_dists_finite_pile @ weights),
-                'mouse_dish_dist_solvable_avg': opt_dists_solvable_pile.sum() / solvable_pile.sum(),
-                'mouse_dish_dist_solvable_wavg': (opt_dists_solvable_pile @ weights) / (solvable_pile @ weights),
+                'mouse-cheese_dist_finite_hist': opt_dists_finite_cheese,
+                'mouse-cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
+                'mouse-cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
+                'mouse-cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
+                'mouse-cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
+                # optimal dist from mouse to pile
+                'mouse-pile_dist_finite_hist': opt_dists_finite_pile,
+                'mouse-pile_dist_finite_avg': opt_dists_finite_pile.mean(),
+                'mouse-pile_dist_finite_wavg': (opt_dists_finite_pile @ weights),
+                'mouse-pile_dist_solvable_avg': opt_dists_solvable_pile.sum() / solvable_pile.sum(),
+                'mouse-pile_dist_solvable_wavg': (opt_dists_solvable_pile @ weights) / (solvable_pile @ weights),
                 # avg cheese-dish distance
-                'cheese_dish_dist_hist': cheese_pile_dists_finite,
-                'cheese_dish_dist_avg': avg_cheese_pile_dist,
-                'cheese_dish_dist_wavg': cheese_pile_dists_finite @ weights,
+                'cheese-pile_dist_hist': cheese_pile_dists_finite,
+                'cheese-pile_dist_avg': avg_cheese_pile_dist,
+                'cheese-pile_dist_wavg': cheese_pile_dists_finite @ weights,
                 # elements on cheese and pile
-                'objects_on_cheese': objects_on_cheese,
-                'objects_on_pile': objects_on_pile,
+                '#objects_on_cheese': objects_on_cheese,
+                '#objects_on_pile': objects_on_pile,
 
-            },
+                #buffer metrics
+                'levels_cheese_is_on_pile_avg':  cheese_on_pile_avg 
+            },  
         }

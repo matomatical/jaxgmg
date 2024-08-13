@@ -36,7 +36,8 @@ from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
 from jaxgmg import util
-
+import jax.numpy as jnp
+from jax import lax
 
 @struct.dataclass
 class Level(base.Level):
@@ -215,7 +216,11 @@ class Env(base.Env):
         if self.terminate_after_cheese_and_dish:
             done = state.got_cheese & state.got_dish
         else:
-            done = got_cheese
+            #done = got_cheese
+            done = state.got_cheese | state.got_dish
+        
+        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
+        dish_rate = lax.cond(jnp.any(state.got_dish), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -226,6 +231,8 @@ class Env(base.Env):
                     'proxy_dish': proxy_reward_dish,
                     'proxy_first_dish': proxy_dish_first,
                     'proxy_cheese_first': proxy_cheese_first,
+                    'cheese_solve_rate': cheese_rate, 
+                    'dish_solve_rate': dish_rate,
                      #'proxy_cheese_second': proxy_cheese_second,
                      #'proxy_dish_second': proxy_dish_second,
                 },
@@ -731,7 +738,11 @@ class LevelMetrics(base.LevelMetrics):
         opt_dists_solvable_dish = solvable_dish * opt_dists_dish
         opt_dists_finite_dish = jnp.nan_to_num(opt_dists_dish, posinf=(h-2)*(w-2)/2)
 
-        
+        #buffer
+        cheese_on_dish = (levels.cheese_pos[:, 0] == levels.dish_pos[:, 0]) & (levels.cheese_pos[:, 1] == levels.dish_pos[:, 1])
+        cheese_on_dish_avg =  cheese_on_dish.mean()
+
+
         # rendered levels in a grid
         def render_level(level):
             state = self.env._reset(level)
@@ -776,24 +787,23 @@ class LevelMetrics(base.LevelMetrics):
                 'solvable_avg': solvable.mean(),
                 'solvable_wavg': solvable @ weights,
                 # optimal dist mouse to cheese
-                'mouse_cheese_dist_finite_hist': opt_dists_finite_cheese,
-                'mouse_cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
-                'mouse_cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
-                'mouse_cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
-                'mouse_cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
-                ## optimal dist from cheese to dish
+                'mouse-cheese_dist_finite_hist': opt_dists_finite_cheese,
+                'mouse-cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
+                'mouse-cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
+                'mouse-cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
+                'mouse-cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
                 # optimal dist from mouse to dish
-                'mouse_dish_dist_finite_hist': opt_dists_finite_dish,
-                'mouse_dish_dist_finite_avg': opt_dists_finite_dish.mean(),
-                'mouse_dish_dist_finite_wavg': (opt_dists_finite_dish @ weights),
-                'mouse_dish_dist_solvable_avg': opt_dists_solvable_dish.sum() / solvable_dish.sum(),
-                'mouse_dish_dist_solvable_wavg': (opt_dists_solvable_dish @ weights) / (solvable_dish @ weights),
+                'mouse-dish_dist_finite_hist': opt_dists_finite_dish,
+                'mouse-dish_dist_finite_avg': opt_dists_finite_dish.mean(),
+                'mouse-dish_dist_finite_wavg': (opt_dists_finite_dish @ weights),
+                'mouse-dish_dist_solvable_avg': opt_dists_solvable_dish.sum() / solvable_dish.sum(),
+                'mouse-dish_dist_solvable_wavg': (opt_dists_solvable_dish @ weights) / (solvable_dish @ weights),
                 # avg cheese-dish distance
-                'cheese_dish_dist_hist': cheese_dish_dists_finite,
-                'cheese_dish_dist_avg': avg_cheese_dish_dist,
-                'cheese_dish_dist_wavg': cheese_dish_dists_finite @ weights,
-
-
+                'cheese-dish_dist_hist': cheese_dish_dists_finite,
+                'cheese-dish_dist_avg': avg_cheese_dish_dist,
+                'cheese-dish_dist_wavg': cheese_dish_dists_finite @ weights,
+                #buffer metrics
+                'levels_cheese_is_on_dish_avg':  cheese_on_dish_avg
 
             },
         }

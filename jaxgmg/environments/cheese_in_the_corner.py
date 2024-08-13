@@ -42,6 +42,8 @@ from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
 from jaxgmg import util
+import jax.numpy as jnp
+from jax import lax
 
 
 @struct.dataclass
@@ -205,6 +207,9 @@ class Env(base.Env):
             done = state.got_cheese & state.got_corner
         else:
             done = state.got_cheese
+        
+        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
+        corner_rate = lax.cond(jnp.any(state.got_corner), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -213,6 +218,8 @@ class Env(base.Env):
             {
                 'proxy_rewards': {
                     'corner': proxy_reward,
+                    'cheese_solve_rate': cheese_rate, 
+                    'corner_solve_rate': corner_rate,
                 },
             },
         )
@@ -878,6 +885,11 @@ class LevelMetrics(base.LevelMetrics):
         )
         avg_cheese_dist = cheese_dists_finite.mean()
 
+
+        #buffer
+        cheese_in_corner = (levels.cheese_pos[:, 0] == 1) & (levels.cheese_pos[:, 1] == 1)
+        cheese_in_corner_avg = cheese_in_corner.mean()
+
         # shortest path length and solvability
         opt_dists = dists[
             jnp.arange(num_levels),
@@ -931,16 +943,17 @@ class LevelMetrics(base.LevelMetrics):
                 'solvable_avg': solvable.mean(),
                 'solvable_wavg': solvable @ weights,
                 # optimal dist mouse to cheese
-                'mouse_dist_finite_hist': opt_dists_finite,
-                'mouse_dist_finite_avg': opt_dists_finite.mean(),
-                'mouse_dist_finite_wavg': (opt_dists_finite @ weights),
-                'mouse_dist_solvable_avg': opt_dists_solvable.sum() / solvable.sum(),
-                'mouse_dist_solvable_wavg': (opt_dists_solvable @ weights) / (solvable @ weights),
-                # optimal dist from cheese to mouse
-                'cheese_dist_hist': cheese_dists_finite,
-                'cheese_dist_avg': cheese_dists_finite.mean(),
-                'cheese_dist_wavg': cheese_dists_finite @ weights,
+                'mouse-cheese_dist_finite_hist': opt_dists_finite,
+                'mouse-cheese_dist_finite_avg': opt_dists_finite.mean(),
+                'mouse-cheese_dist_finite_wavg': (opt_dists_finite @ weights),
+                'mouse-cheese_dist_solvable_avg': opt_dists_solvable.sum() / solvable.sum(),
+                'mouse-cheese_dist_solvable_wavg': (opt_dists_solvable @ weights) / (solvable @ weights),
+                # optimal dist from cheese to corner
+                'cheese-corner_dist_hist': cheese_dists_finite,
+                'cheese-corne_dist_avg': cheese_dists_finite.mean(),
+                'cheese-corne_dist_wavg': cheese_dists_finite @ weights,
+                #buffer metrics
+                'levels_cheese_is_in_corner_avg':  cheese_in_corner_avg
             },
         }
-
 

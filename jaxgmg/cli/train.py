@@ -639,7 +639,7 @@ def dish(
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = False,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 16,
+    max_cheese_radius_shift: int = 12,
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     # policy config
     net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
@@ -663,7 +663,7 @@ def dish(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
@@ -921,11 +921,11 @@ def pile(
     # environment config
     env_size: int = 13,
     env_layout: str = 'blocks',
-    env_terminate_after_dish: bool = True,
+    env_terminate_after_pile: bool = False,
     split_elements_train:int = 0, # how many objects go on the cheese - not important cuz we want to train with both in the same position
-    split_elements_shift:int = 4,
+    split_elements_shift:int = 0,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 16,
+    max_cheese_radius_shift: int = 12,
     max_dish_radius: int = 0, # this is not relevant and can be ignored for now ( they may come useful in next implementations)
     max_dish_radius_shift: int= 0, # this is not relevant and can be ignored for now ( they may come useful in next implementations)
     env_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
@@ -952,7 +952,7 @@ def pile(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 300_000_000,
@@ -999,7 +999,7 @@ def pile(
     env = cheese_on_a_pile.Env(
         obs_level_of_detail=env_level_of_detail,
         penalize_time=False,
-        terminate_after_cheese_and_dish= env_terminate_after_dish,
+        terminate_after_cheese_and_dish= env_terminate_after_pile,
         split_object_firstgroup = split_elements_train, # check this, if it should be split_elements_train or split_elements_shift or 0
     )
 
@@ -1115,15 +1115,6 @@ def pile(
         num_steps=num_env_steps_per_eval,
         discount_rate=ppo_gamma,
         env=env,
-    )
-
-    shift_level_generator = cheese_on_a_pile.LevelGenerator(
-        height=env_size,
-        width=env_size,
-        maze_generator=maze_generator,
-        max_cheese_radius=max_cheese_radius_shift,
-        max_dish_radius = max_dish_radius_shift,
-        split_elements = split_elements_shift
     )
 
     rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
