@@ -448,6 +448,70 @@ class ReLUFF(ActorCriticNetwork):
         return None
 
 
+class ReLU(ActorCriticNetwork):
+    """
+    Simple MLP with ReLU activation and an LSTM
+    """
+    num_embedding_layers: int = 3
+    embedding_layer_width: int = 128
+    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=128)
+
+    
+    @nn.compact
+    def __call__(self, obs, state, prev_action):
+        # obs embedding
+        x = jnp.ravel(obs.image)
+        # at least one layer (to start the residual stream)
+        x = nn.Dense(self.embedding_layer_width)(x)
+        x = nn.relu(x)
+        # remaining residual layers (adding to residual stream)
+        for embedding_residual_block in range(self.num_embedding_layers-1):
+            y = nn.Dense(self.embedding_layer_width)(x)
+            y = nn.relu(y)
+            x = x + y
+        obs_embedding = x
+        
+        # optional further embeddings from obs
+        other_embeddings = [
+            getattr(obs, fieldname) # hack: assume it's a 1d array...?
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
+
+        # previous action embedding
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+
+        # combined embedding
+        embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
+
+        # lstm block
+        state, lstm_out = self._lstm_block(state, embedding)
+
+        # actor head
+        logits = nn.Dense(self.num_actions)(lstm_out)
+        pi = distrax.Categorical(logits=logits)
+
+        # critic head
+        v = nn.Dense(1)(lstm_out)
+        v = jnp.squeeze(v)
+
+        return pi, v, state
+
+
+    def initialize_state(self, rng):
+        return self._lstm_block.initialize_carry(
+            rng=rng,
+            input_shape=(128,)
+        )
+
+
 # # # 
 # Look-up a particular architecture
 
@@ -462,6 +526,8 @@ def get_architecture(spec: str, num_actions: int) -> ActorCriticNetwork:
         # relu net (optionally with a custom shape)
         case ["relu"]:
             return ReLUFF(num_actions=num_actions) # default layers x width
+        case ["relu", "lstm"]:
+            return ReLU(num_actions=num_actions)
         case ["relu", layers_by_width]:
             layers, width = layers_by_width.split("x")
             return ReLUFF(
