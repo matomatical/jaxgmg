@@ -1086,7 +1086,7 @@ def memory_test(
     num_env_steps_per_eval: int = 128,
     # logging
     num_cycles_per_log: int = 16,
-    console_log: bool = True,               # whether to log metrics to stdout
+    console_log: bool = False,              # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
     wandb_project: str = "test",
     wandb_entity: str = None,
