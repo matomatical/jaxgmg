@@ -296,7 +296,7 @@ def compute_single_rollout_metrics(
     """
     # compute episode lengths
     eps_per_step = rollout.transitions.done.mean()
-    steps_per_ep = 1 / (eps_per_step + 1e-10)
+    steps_per_ep = 1 / (eps_per_step + (1/256))
     # average return for episodes contained in the rollout
     avg_return = compute_average_return(
         rewards=rollout.transitions.reward,
@@ -372,7 +372,7 @@ def compute_rollout_metrics(
     eps_per_step = (
         rollouts.transitions.done.mean(axis=1)      # bool[L, S] -> float[L]
     )
-    steps_per_ep = 1 / (eps_per_step + 1e-10)
+    steps_per_ep = 1 / (eps_per_step + (1/256))
 
     # compute average reward
     reward_per_step = (
