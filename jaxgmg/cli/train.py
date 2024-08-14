@@ -1303,6 +1303,7 @@ def ppo_training_run(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
+    print(util.dict2str(jax.tree.map(lambda x: x.shape, net_init_params)))
 
 
     evals_dict = {}
