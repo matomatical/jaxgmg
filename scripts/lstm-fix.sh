@@ -83,5 +83,17 @@ for seed in 0 1 2 3 4 5 6 7 8 9; do
         --net relu:4x128 --seed $seed;
 done
 # yep about 80% of the time the relu:lstm run finds the expected solution
+
 # now let's try with the new architecture config method and GRU options
 # (is it suddenly slower somehow?)
+for seed in 0 1 2 3 4; do
+    jaxgmg train memory-test --wandb-log --wandb-project lstm-fix-6 \
+        --num-total-env-steps 2000000 --seed $seed \
+        --net-cnn-type mlp --net-rnn-type ff;
+    jaxgmg train memory-test --wandb-log --wandb-project lstm-fix-6 \
+        --num-total-env-steps 2000000 --seed $seed \
+        --net-cnn-type mlp --net-rnn-type lstm;
+    jaxgmg train memory-test --wandb-log --wandb-project lstm-fix-6 \
+        --num-total-env-steps 2000000 --seed $seed \
+        --net-cnn-type mlp --net-rnn-type gru;
+done

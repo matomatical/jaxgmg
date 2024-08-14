@@ -478,7 +478,9 @@ def evaluate_rollout(
     net_params: networks.ActorCriticParams,
     net_apply: networks.ActorCriticForwardPass,
     net_init_state: networks.ActorCriticState,
-    transitions: Transition, # Transition[num_steps]
+    obs_sequence: Observation,  # Observation[num_steps]
+    done_sequence: Array,       # bool[num_steps]
+    action_sequence: Array,     # int[num_steps]
 ) -> tuple[
     Array, # distrax.Categorical[num_steps] (action_distributions)
     Array, # float[num_steps] (values)
@@ -489,20 +491,26 @@ def evaluate_rollout(
         net_init_state,
         default_prev_action,
     )
+    transitions = (
+        obs_sequence,
+        done_sequence,
+        action_sequence,
+    )
     def _net_step(carry, transition):
         net_state, prev_action = carry
+        obs, done, chosen_action = transition
         # apply network
         action_distribution, critic_value, next_net_state = net_apply(
             net_params,
-            transition.obs,
+            obs,
             net_state,
             prev_action,
         )
         # reset to net_init_state and default_prev_action when done
         next_net_state, next_prev_action = jax.tree.map(
-            lambda r, s: jnp.where(transition.done, r, s),
+            lambda r, s: jnp.where(done, r, s),
             (net_init_state, default_prev_action),
-            (next_net_state, transition.action),
+            (next_net_state, chosen_action),
         )
         carry = (next_net_state, next_prev_action)
         output = (action_distribution, critic_value)
@@ -534,15 +542,17 @@ def ppo_rnn_loss(
     float,                      # loss
     dict[str, float],           # loss components and other diagnostics
 ]:
-    # run network to get current value/action predictions
+    # run latest network to get current value/action predictions
     action_distribution, value = jax.vmap(
         evaluate_rollout,
-        in_axes=(None, None, None, 0)
+        in_axes=(None, None, None, 0, 0, 0)
     )(
         params,
         net_apply,
         net_init_state,
-        transitions,
+        transitions.obs,
+        transitions.done,
+        transitions.action,
     )
 
     # actor loss
