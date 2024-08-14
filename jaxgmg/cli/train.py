@@ -32,7 +32,8 @@ def corner(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
+    net_cnn_type: str = "impala-large",
+    net_rnn_type: str = "lstm",
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -144,7 +145,8 @@ def corner(
         splayer=splayer,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -196,7 +198,8 @@ def dish(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -295,7 +298,8 @@ def dish(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -355,7 +359,8 @@ def pile(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -460,7 +465,8 @@ def pile(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -515,7 +521,8 @@ def keys(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -619,7 +626,8 @@ def keys(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -671,7 +679,8 @@ def minimaze(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -1011,7 +1020,8 @@ def minimaze(
         splayer=None,
         fixed_eval_levels=fixed_eval_levels,
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -1061,7 +1071,8 @@ def memory_test(
     img_level_of_detail: int = 1,
     env_penalize_time: bool = True,
     # policy config
-    net: str = "impala:small:lstm",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1125,7 +1136,8 @@ def memory_test(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued="dr",
         prob_shift=0.0,
         num_train_levels=None,
@@ -1175,7 +1187,8 @@ def ppo_training_run(
     splayer: Callable | None,
     fixed_eval_levels: dict[str, base.Level],
     # policy config
-    net: str,
+    net_cnn_type: str,
+    net_rnn_type: str,
     # ued config
     ued: str,
     prob_shift: float,
@@ -1292,9 +1305,14 @@ def ppo_training_run(
         raise ValueError(f"unknown UED algorithm: {ued!r}")
     
 
-    print(f"setting up agent with architecture {net!r}...")
+    print(f"setting up agent with architecture...")
     # select architecture
-    net = networks.get_architecture(net, num_actions=env.num_actions)
+    net = networks.Impala(
+        num_actions=env.num_actions,
+        cnn_type=net_cnn_type,
+        rnn_type=net_rnn_type,
+    )
+    print(net)
     # initialise the network
     rng_model_init, rng = jax.random.split(rng)
     rng_example_level, rng = jax.random.split(rng)
@@ -1303,7 +1321,6 @@ def ppo_training_run(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
-    print(util.dict2str(jax.tree.map(lambda x: x.shape, net_init_params)))
 
 
     evals_dict = {}

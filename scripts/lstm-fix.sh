@@ -68,9 +68,20 @@ jaxgmg train memory-test --no-console-log \
     --net relu:lstm --ppo-lr 3e-4 --num-total-env-steps 20_000_000;
 # didn't help
 
-# this worked:
-jaxgmg train memory-test --wandb-log --seed 0 \
+# this worked!
+jaxgmg train memory-test --wandb-log \
     --num-total-env-steps 2000000 \
     --net relu:lstm
 
 # confirm it with multiple experiments...!
+for seed in 0 1 2 3 4 5 6 7 8 9; do
+    jaxgmg train memory-test --wandb-log --wandb-project lstm-fix-5 \
+        --num-total-env-steps 2000000 \
+        --net relu:lstm --seed $seed;
+    jaxgmg train memory-test --wandb-log --wandb-project lstm-fix-5 \
+        --num-total-env-steps 2000000 \
+        --net relu:4x128 --seed $seed;
+done
+# yep about 80% of the time the relu:lstm run finds the expected solution
+# now let's try with the new architecture config method and GRU options
+# (is it suddenly slower somehow?)
