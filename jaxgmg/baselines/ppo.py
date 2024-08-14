@@ -504,9 +504,7 @@ def evaluate_rollout(
             (net_init_state, default_prev_action),
             (next_net_state, transition.action),
         )
-        # carry to next step
         carry = (next_net_state, next_prev_action)
-        # output
         output = (action_distribution, critic_value)
         return carry, output
     _final_carry, (action_distributions, critic_values) = jax.lax.scan(
