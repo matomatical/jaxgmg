@@ -100,10 +100,8 @@ class ImpalaLargeFF(ActorCriticNetwork):
     We replace the LSTM block with 256 output features with a dense ReLU
     layer with 256 output features.
     
-    Note: We also don't input the previous action or reward from the
-    environment.
+    Note: We also don't input the reward from the environment.
     """
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=256)
 
 
     @nn.compact
@@ -178,8 +176,7 @@ class ImpalaSmallFF(ActorCriticNetwork):
     We replace the LSTM block with 256 output features with a dense ReLU
     layer with 256 output features.
     
-    Note: We also don't input the previous action or reward from the
-    environment.
+    Note: We also don't input the reward from the environment.
     """
 
 
@@ -252,9 +249,8 @@ class ImpalaLarge(ActorCriticNetwork):
     Weighted Actor-Learner Architectures". See Figure 3 right (Large
     architecture).
 
-    Note: We don't input the previous action or reward from the environment.
+    Note: We don't input the reward from the environment.
     """
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=256)
 
 
     @nn.compact
@@ -302,7 +298,7 @@ class ImpalaLarge(ActorCriticNetwork):
         ])
 
         # lstm block
-        state, lstm_out = self._lstm_block(state, embedding)
+        state, lstm_out = nn.OptimizedLSTMCell(features=256)(state, embedding)
 
         # actor head
         logits = nn.Dense(self.num_actions)(lstm_out)
@@ -316,7 +312,10 @@ class ImpalaLarge(ActorCriticNetwork):
 
 
     def initialize_state(self, rng):
-        return self._lstm_block.initialize_carry(
+        return nn.OptimizedLSTMCell(
+            features=526,
+            parent=None,
+        ).initialize_carry(
             rng=rng,
             input_shape=(256,)
         )
@@ -328,9 +327,8 @@ class ImpalaSmall(ActorCriticNetwork):
     Weighted Actor-Learner Architectures". See Figure 3 left (Small
     architecture).
 
-    Note: We don't input the previous action or reward from the environment.
+    Note: We don't input the reward from the environment.
     """
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=256)
 
 
     @nn.compact
@@ -367,7 +365,7 @@ class ImpalaSmall(ActorCriticNetwork):
         ])
 
         # lstm block
-        state, lstm_out = self._lstm_block(state, embedding)
+        state, lstm_out = nn.OptimizedLSTMCell(features=256)(state, embedding)
 
         # actor head
         logits = nn.Dense(self.num_actions)(lstm_out)
@@ -381,7 +379,10 @@ class ImpalaSmall(ActorCriticNetwork):
 
     
     def initialize_state(self, rng):
-        return self._lstm_block.initialize_carry(
+        return nn.OptimizedLSTMCell(
+            features=256,
+            parent=None,
+        ).initialize_carry(
             rng=rng,
             input_shape=(256,)
         )
@@ -440,7 +441,7 @@ class ReLUFF(ActorCriticNetwork):
         # critic head
         v = nn.Dense(1)(embedding)
         v = jnp.squeeze(v)
-
+        
         return pi, v, state
 
 
@@ -450,23 +451,22 @@ class ReLUFF(ActorCriticNetwork):
 
 class ReLU(ActorCriticNetwork):
     """
-    Simple MLP with ReLU activation and an LSTM
+    Simple MLP with ReLU activation and an LSTM.
     """
     num_embedding_layers: int = 3
     embedding_layer_width: int = 128
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=128)
 
-    
+
     @nn.compact
     def __call__(self, obs, state, prev_action):
         # obs embedding
         x = jnp.ravel(obs.image)
         # at least one layer (to start the residual stream)
-        x = nn.Dense(self.embedding_layer_width)(x)
+        x = nn.Dense(features=self.embedding_layer_width)(x)
         x = nn.relu(x)
         # remaining residual layers (adding to residual stream)
-        for embedding_residual_block in range(self.num_embedding_layers-1):
-            y = nn.Dense(self.embedding_layer_width)(x)
+        for _residual_embedding_layer in range(self.num_embedding_layers-1):
+            y = nn.Dense(features=self.embedding_layer_width)(x)
             y = nn.relu(y)
             x = x + y
         obs_embedding = x
@@ -492,23 +492,29 @@ class ReLU(ActorCriticNetwork):
         ])
 
         # lstm block
-        state, lstm_out = self._lstm_block(state, embedding)
+        lstm_in = embedding
+        state, lstm_out = nn.OptimizedLSTMCell(
+            features=self.embedding_layer_width,
+        )(state, lstm_in)
 
         # actor head
-        logits = nn.Dense(self.num_actions)(lstm_out)
+        logits = nn.Dense(features=self.num_actions)(lstm_out)
         pi = distrax.Categorical(logits=logits)
 
         # critic head
-        v = nn.Dense(1)(lstm_out)
+        v = nn.Dense(features=1)(lstm_out)
         v = jnp.squeeze(v)
 
         return pi, v, state
 
 
     def initialize_state(self, rng):
-        return self._lstm_block.initialize_carry(
+        return nn.OptimizedLSTMCell(
+            features=self.embedding_layer_width,
+            parent=None,
+        ).initialize_carry(
             rng=rng,
-            input_shape=(128,)
+            input_shape=(self.embedding_layer_width,)
         )
 
 
