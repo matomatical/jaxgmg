@@ -261,9 +261,10 @@ def run(
         if log_cycle:
             ppo_start_time = time.perf_counter()
         # ppo step
-        train_state, ppo_metrics = ppo_update(
+        train_state, ppo_metrics = ppo_update_recurrent(
             rng=rng_update,
             train_state=train_state,
+            net_init_state=net_init_state,
             rollouts=valid_rollouts,
             advantages=valid_advantages,
             num_epochs=num_epochs_per_cycle,
@@ -352,7 +353,7 @@ def run(
 
 
 # # # 
-# PPO update
+# PPO update (recurrent)
 
 
 @functools.partial(
@@ -363,9 +364,10 @@ def run(
         'compute_metrics',
     ),
 )
-def ppo_update(
+def ppo_update_recurrent(
     rng: PRNGKey,
     train_state: TrainState,
+    net_init_state: networks.ActorCriticState,
     rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
     advantages: Array, # float[num_levels, num_steps]
     # ppo hyperparameters
@@ -384,28 +386,19 @@ def ppo_update(
     """
     Given a data set of rollouts, perform GAE followed by a few epochs of PPO
     loss updates on the transitions contained in those rollouts.
-
-    TODO: document inputs and outputs.
     """
-    
+    num_levels, num_steps = advantages.shape
     # value targets based on values + GAE estimates
     targets = advantages + rollouts.transitions.value  # -> float[num_levels, num_steps]
-
-    
     # compile data set
     data = (rollouts.transitions, advantages, targets)
-    data = jax.tree.map(
-        lambda x: einops.rearrange(x, 'lvls steps ... -> (lvls steps) ...'),
-        data,
-    )
-    num_examples, = data[1].shape
 
 
     # train on this data for a few epochs
     def _epoch(train_state, rng_epoch):
         # shuffle data
         rng_shuffle, rng_epoch = jax.random.split(rng_epoch)
-        permutation = jax.random.permutation(rng_shuffle, num_examples)
+        permutation = jax.random.permutation(rng_shuffle, num_levels)
         data_shuf = jax.tree.map(lambda x: x[permutation], data)
         # split into minibatches
         data_batched = jax.tree.map(
@@ -418,10 +411,11 @@ def ppo_update(
         )
         # process each minibatch
         def _minibatch(train_state, minibatch):
-            ppo_loss_aux_and_grad = jax.value_and_grad(ppo_loss, has_aux=True)
-            (loss, diagnostics), grads = ppo_loss_aux_and_grad(
+            loss_aux_grad = jax.value_and_grad(ppo_rnn_loss, has_aux=True)
+            (loss, diagnostics), grads = loss_aux_grad(
                 train_state.params,
-                apply_fn=train_state.apply_fn,
+                net_apply=train_state.apply_fn,
+                net_init_state=net_init_state,
                 transitions=minibatch[0],
                 advantages=minibatch[1],
                 targets=minibatch[2],
@@ -476,40 +470,93 @@ def ppo_update(
 
 
 # # # 
-# PPO loss function
+# PPO loss function (recurrent)
+
+
+@functools.partial(jax.jit, static_argnames=['net_apply'])
+def evaluate_rollout(
+    net_params: networks.ActorCriticParams,
+    net_apply: networks.ActorCriticForwardPass,
+    net_init_state: networks.ActorCriticState,
+    obs_sequence: Observation,  # Observation[num_steps]
+    done_sequence: Array,       # bool[num_steps]
+    action_sequence: Array,     # int[num_steps]
+) -> tuple[
+    Array, # distrax.Categorical[num_steps] (action_distributions)
+    Array, # float[num_steps] (values)
+]:
+    # scan through the trajectory
+    default_prev_action = -1
+    initial_carry = (
+        net_init_state,
+        default_prev_action,
+    )
+    transitions = (
+        obs_sequence,
+        done_sequence,
+        action_sequence,
+    )
+    def _net_step(carry, transition):
+        net_state, prev_action = carry
+        obs, done, chosen_action = transition
+        # apply network
+        action_distribution, critic_value, next_net_state = net_apply(
+            net_params,
+            obs,
+            net_state,
+            prev_action,
+        )
+        # reset to net_init_state and default_prev_action when done
+        next_net_state, next_prev_action = jax.tree.map(
+            lambda r, s: jnp.where(done, r, s),
+            (net_init_state, default_prev_action),
+            (next_net_state, chosen_action),
+        )
+        carry = (next_net_state, next_prev_action)
+        output = (action_distribution, critic_value)
+        return carry, output
+    _final_carry, (action_distributions, critic_values) = jax.lax.scan(
+        _net_step,
+        initial_carry,
+        transitions,
+    )
+    return action_distributions, critic_values
 
 
 @functools.partial(
     jax.jit,
-    static_argnames=('apply_fn', 'compute_diagnostics'),
+    static_argnames=('net_apply', 'compute_diagnostics'),
 )
-def ppo_loss(
-    params,
-    apply_fn,
-    transitions: Transition,    # Transition[minibatch_size]
-    advantages: Array,          # float[minibatch_size]
-    targets: Array,             # float[minibatch_size]
+def ppo_rnn_loss(
+    params: networks.ActorCriticParams,
+    net_apply: networks.ActorCriticForwardPass,
+    net_init_state: networks.ActorCriticState,
+    transitions: Transition,    # Transition[minibatch_size, num_steps]
+    advantages: Array,          # float[minibatch_size, num_steps]
+    targets: Array,             # float[minibatch_size, num_steps]
     clip_eps: float,
     critic_coeff: float,
     entropy_coeff: float,
-    compute_diagnostics: bool,  # if True, second return value is {}
+    compute_diagnostics: bool,  # if False, second return value is empty dict
 ) -> tuple[
     float,                      # loss
     dict[str, float],           # loss components and other diagnostics
 ]:
-    # run network to get current value/log_prob prediction
-    action_distribution, value, _net_state = jax.vmap(
-        apply_fn,
-        in_axes=(None, 0, 0, 0),
+    # run latest network to get current value/action predictions
+    action_distribution, value = jax.vmap(
+        evaluate_rollout,
+        in_axes=(None, None, None, 0, 0, 0)
     )(
         params,
+        net_apply,
+        net_init_state,
         transitions.obs,
-        transitions.net_state,
-        transitions.prev_action,
+        transitions.done,
+        transitions.action,
     )
-    log_prob = action_distribution.log_prob(transitions.action)
 
     # actor loss
+    log_prob = action_distribution.log_prob(transitions.action)
     logratio = log_prob - transitions.log_prob
     ratio = jnp.exp(logratio)
     clipped_ratio = jnp.clip(ratio, 1-clip_eps, 1+clip_eps)

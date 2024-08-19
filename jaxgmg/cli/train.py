@@ -32,7 +32,8 @@ def corner(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "impala:lstm",                      # e.g. 'impala:ff', 'impala:lstm'
+    net_cnn_type: str = "impala-large",
+    net_rnn_type: str = "lstm",
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -144,7 +145,8 @@ def corner(
         splayer=splayer,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -196,7 +198,8 @@ def dish(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -295,7 +298,8 @@ def dish(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -355,7 +359,8 @@ def pile(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -460,7 +465,8 @@ def pile(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -515,7 +521,8 @@ def keys(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -619,7 +626,8 @@ def keys(
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -671,7 +679,8 @@ def minimaze(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net: str = "relu",
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -1011,7 +1020,8 @@ def minimaze(
         splayer=None,
         fixed_eval_levels=fixed_eval_levels,
         # non-environment-specific stuff
-        net=net,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -1051,6 +1061,122 @@ def minimaze(
     )
 
 
+@util.wandb_run
+def memory_test(
+    # environment config
+    env_size: int = 6,
+    obs_height: int = 3,
+    obs_width: int = 3,
+    obs_level_of_detail: int = 0,
+    img_level_of_detail: int = 1,
+    env_penalize_time: bool = True,
+    # policy config
+    net_cnn_type: str = "mlp",
+    net_rnn_type: str = "ff",
+    # PPO hyperparameters
+    ppo_lr: float = 0.00005,                # learning rate
+    ppo_gamma: float = 0.999,               # discount rate
+    ppo_clip_eps: float = 0.1,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.001,
+    ppo_critic_coeff: float = 0.5,
+    ppo_max_grad_norm: float = 0.5,
+    ppo_lr_annealing: bool = False,
+    num_minibatches_per_epoch: int = 8,
+    num_epochs_per_cycle: int = 5,
+    # training dimensions
+    num_total_env_steps: int = 1000_000,
+    num_env_steps_per_cycle: int = 64,
+    num_parallel_envs: int = 64,
+    # training animation dimensions
+    train_gifs: bool = True,
+    train_gif_grid_width: int = 8,
+    # evals config
+    num_cycles_per_eval: int = 1024,
+    num_eval_levels: int = 8,
+    num_env_steps_per_eval: int = 128,
+    # logging
+    num_cycles_per_log: int = 16,
+    console_log: bool = False,              # whether to log metrics to stdout
+    wandb_log: bool = False,                # whether to log metrics to wandb
+    wandb_project: str = "test",
+    wandb_entity: str = None,
+    wandb_group: str = None,
+    wandb_name: str = None,
+    # checkpointing
+    checkpointing: bool = False,
+    keep_all_checkpoints: bool = False,
+    max_num_checkpoints: int = 1,
+    num_cycles_per_checkpoint: int = 512,
+    # other
+    seed: int = 42,
+):
+    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    util.print_config(config)
+
+    print("configuring environment...")
+    env = minigrid_maze.Env(
+        obs_height=obs_height,
+        obs_width=obs_width,
+        obs_level_of_detail=obs_level_of_detail,
+        img_level_of_detail=img_level_of_detail,
+        penalize_time=env_penalize_time,
+    )
+
+    print("configuring level generators...")
+    orig_level_generator = minigrid_maze.MemoryTestLevelGenerator()
+
+    ppo_training_run(
+        # environment-specific stuff
+        seed=seed,
+        env=env,
+        orig_level_generator=orig_level_generator,
+        shift_level_generator=None,
+        level_solver=None,
+        splayer=None,
+        fixed_eval_levels={},
+        # non-environment-specific stuff
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
+        ued="dr",
+        prob_shift=0.0,
+        num_train_levels=None,
+        plr_buffer_size=None,
+        plr_temperature=None,
+        plr_staleness_coeff=None,
+        plr_prob_replay=None,
+        plr_regret_estimator=None,
+        ppo_lr=ppo_lr,
+        ppo_gamma=ppo_gamma,
+        ppo_clip_eps=ppo_clip_eps,
+        ppo_gae_lambda=ppo_gae_lambda,
+        ppo_entropy_coeff=ppo_entropy_coeff,
+        ppo_critic_coeff=ppo_critic_coeff,
+        ppo_max_grad_norm=ppo_max_grad_norm,
+        ppo_lr_annealing=ppo_lr_annealing,
+        num_minibatches_per_epoch=num_minibatches_per_epoch,
+        num_epochs_per_cycle=num_epochs_per_cycle,
+        num_total_env_steps=num_total_env_steps,
+        num_env_steps_per_cycle=num_env_steps_per_cycle,
+        num_parallel_envs=num_parallel_envs,
+        train_gifs=train_gifs,
+        train_gif_grid_width=train_gif_grid_width,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_eval_levels=num_eval_levels,
+        num_env_steps_per_eval=num_env_steps_per_eval,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_big_eval=1024,
+        eval_gif_grid_width=4,
+        save_files_to="logs/",
+        console_log=console_log,
+        wandb_log=wandb_log,
+        checkpointing=checkpointing,
+        keep_all_checkpoints=keep_all_checkpoints,
+        max_num_checkpoints=max_num_checkpoints,
+        num_cycles_per_checkpoint=num_cycles_per_checkpoint,
+    )
+
+
 def ppo_training_run(
     # environment-specific stuff
     seed: int,
@@ -1061,7 +1187,8 @@ def ppo_training_run(
     splayer: Callable | None,
     fixed_eval_levels: dict[str, base.Level],
     # policy config
-    net: str,
+    net_cnn_type: str,
+    net_rnn_type: str,
     # ued config
     ued: str,
     prob_shift: float,
@@ -1095,7 +1222,6 @@ def ppo_training_run(
     num_cycles_per_eval: int,
     num_eval_levels: int,
     num_env_steps_per_eval: int,
-    # big evals config
     num_cycles_per_big_eval: int,
     eval_gif_grid_width: int,
     # logging
@@ -1179,9 +1305,14 @@ def ppo_training_run(
         raise ValueError(f"unknown UED algorithm: {ued!r}")
     
 
-    print(f"setting up agent with architecture {net!r}...")
+    print(f"setting up agent with architecture...")
     # select architecture
-    net = networks.get_architecture(net, num_actions=env.num_actions)
+    net = networks.Impala(
+        num_actions=env.num_actions,
+        cnn_type=net_cnn_type,
+        rnn_type=net_rnn_type,
+    )
+    print(net)
     # initialise the network
     rng_model_init, rng = jax.random.split(rng)
     rng_example_level, rng = jax.random.split(rng)
@@ -1190,6 +1321,9 @@ def ppo_training_run(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
+
+
+    evals_dict = {}
 
 
     print("generating on-distribution eval levels...")
@@ -1220,36 +1354,39 @@ def ppo_training_run(
             discount_rate=ppo_gamma,
             env=env,
         )
+    evals_dict[('on_dist_levels', num_cycles_per_eval)] = eval_on_level_set
 
     
-    print("generating off-distribution eval levels...")
-    rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
-    eval_off_levels = shift_level_generator.vsample(
-        rng_eval_off_levels,
-        num_levels=num_eval_levels,
-    )
-    if level_solver is not None:
-        print("  also solving them...")
-        eval_off_benchmark_returns = level_solver.vmap_level_value(
-            level_solver.vmap_solve(eval_off_levels),
-            eval_off_levels,
-        )
-        eval_off_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
+    if shift_level_generator is not None:
+        print("generating off-distribution eval levels...")
+        rng_eval_off_levels, rng_setup = jax.random.split(rng_setup)
+        eval_off_levels = shift_level_generator.vsample(
+            rng_eval_off_levels,
             num_levels=num_eval_levels,
-            num_steps=num_env_steps_per_eval,
-            discount_rate=ppo_gamma,
-            levels=eval_off_levels,
-            benchmarks=eval_off_benchmark_returns,
-            env=env,
         )
-    else:
-        eval_off_level_set = evals.FixedLevelsEval(
-            num_levels=num_eval_levels,
-            num_steps=num_env_steps_per_eval,
-            discount_rate=ppo_gamma,
-            levels=eval_off_levels,
-            env=env,
-        )
+        if level_solver is not None:
+            print("  also solving them...")
+            eval_off_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(eval_off_levels),
+                eval_off_levels,
+            )
+            eval_off_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
+                num_levels=num_eval_levels,
+                num_steps=num_env_steps_per_eval,
+                discount_rate=ppo_gamma,
+                levels=eval_off_levels,
+                benchmarks=eval_off_benchmark_returns,
+                env=env,
+            )
+        else:
+            eval_off_level_set = evals.FixedLevelsEval(
+                num_levels=num_eval_levels,
+                num_steps=num_env_steps_per_eval,
+                discount_rate=ppo_gamma,
+                levels=eval_off_levels,
+                env=env,
+            )
+        evals_dict[('off_dist_levels', num_cycles_per_eval)] = eval_off_level_set
 
     
     if fixed_eval_levels:
@@ -1264,8 +1401,7 @@ def ppo_training_run(
                 )
             for level_name, level in fixed_eval_levels.items()
         }
-    else:
-        fixed_evals = {}
+        evals_dict.update(fixed_evals) 
 
     
     print("configuring rollout recorders for those levels...")
@@ -1276,14 +1412,17 @@ def ppo_training_run(
         gif_grid_width=eval_gif_grid_width,
         env=env,
     )
-    eval_off_rollouts = evals.AnimatedRolloutsEval(
-        num_levels=num_eval_levels,
-        levels=eval_off_levels,
-        num_steps=env.max_steps_in_episode,
-        gif_grid_width=eval_gif_grid_width,
-        env=env,
-    )
-    
+    evals_dict[('on_dist_rollouts', num_cycles_per_big_eval)] = eval_on_rollouts
+    if shift_level_generator is not None:
+        eval_off_rollouts = evals.AnimatedRolloutsEval(
+            num_levels=num_eval_levels,
+            levels=eval_off_levels,
+            num_steps=env.max_steps_in_episode,
+            gif_grid_width=eval_gif_grid_width,
+            env=env,
+        )
+        evals_dict[('off_dist_rollouts', num_cycles_per_big_eval)] = eval_off_rollouts
+
 
     print("generating splayed eval level sets for heatmaps...")
     def make_heatmap_evals(level, name):
@@ -1305,24 +1444,23 @@ def ppo_training_run(
             }
         else:
             return {}
-    heatmap_evals = {
-        **make_heatmap_evals(
-            name="eval_on_0",
-            level=jax.tree.map(lambda x: x[0], eval_on_levels),
-        ),
-        **make_heatmap_evals(
-            name="eval_on_1",
-            level=jax.tree.map(lambda x: x[1], eval_on_levels),
-        ),
-        **make_heatmap_evals(
+    evals_dict.update(make_heatmap_evals(
+        name="eval_on_0",
+        level=jax.tree.map(lambda x: x[0], eval_on_levels),
+    ))
+    evals_dict.update(make_heatmap_evals(
+        name="eval_on_1",
+        level=jax.tree.map(lambda x: x[1], eval_on_levels),
+    ))
+    if shift_level_generator is not None:
+        evals_dict.update(make_heatmap_evals(
             name="eval_off_0",
             level=jax.tree.map(lambda x: x[0], eval_off_levels),
-        ),
-        **make_heatmap_evals(
+        ))
+        evals_dict.update(make_heatmap_evals(
             name="eval_off_1",
             level=jax.tree.map(lambda x: x[1], eval_off_levels),
-        ),
-    }
+        ))
     
     
     # launch the ppo training run
@@ -1339,16 +1477,7 @@ def ppo_training_run(
         net_init_params=net_init_params,
         net_init_state=net_init_state,
         # evals
-        evals_dict={
-            # small evals
-            ('on_dist_levels', num_cycles_per_eval): eval_on_level_set,
-            ('off_dist_levels', num_cycles_per_eval): eval_off_level_set,
-            # big evals
-            ('on_dist_rollouts', num_cycles_per_big_eval): eval_on_rollouts,
-            ('off_dist_rollouts', num_cycles_per_big_eval): eval_off_rollouts,
-            **heatmap_evals,
-            **fixed_evals,
-        },
+        evals_dict=evals_dict,
         # algorithm
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
