@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import keys_and_chests
+from jaxgmg.environments import minigrid_maze
 from jaxgmg.environments import monster_world
 from jaxgmg.environments import lava_land
 from jaxgmg.environments import follow_me
@@ -21,6 +22,10 @@ def corner(
     """
     Test the level parser from the Cheese in the Corner environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #
@@ -36,9 +41,9 @@ def corner(
     print("level:", level)
 
     print("rendering...")
-    env = cheese_in_the_corner.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    env = cheese_in_the_corner.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def dish(
@@ -47,6 +52,10 @@ def dish(
     """
     Test the level parser from the Cheese on a Dish environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #
@@ -65,9 +74,9 @@ def dish(
     print("level:", level)
 
     print("rendering...")
-    env = cheese_on_a_dish.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    env = cheese_on_a_dish.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def follow(
@@ -76,6 +85,10 @@ def follow(
     """
     Test the level parser from the Follow Me environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # # # #
         # @ # . . 1 #
@@ -98,9 +111,9 @@ def follow(
     print("level:", level)
 
     print("rendering...")
-    env = follow_me.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    env = follow_me.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def keys(
@@ -109,6 +122,10 @@ def keys(
     """
     Test the level parser from the Keys and Chests environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . k c #
@@ -130,9 +147,9 @@ def keys(
     print("level:", level)
 
     print("rendering...")
-    env = keys_and_chests.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    env = keys_and_chests.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def lava(
@@ -141,6 +158,10 @@ def lava(
     """
     Test the level parser from the Lava Land environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # . . . #
@@ -156,9 +177,9 @@ def lava(
     print("level:", level)
 
     print("rendering...")
-    env = lava_land.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    env = lava_land.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 
 def monsters(
@@ -167,6 +188,10 @@ def monsters(
     """
     Test the level parser from the Monster World environment.
     """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
     test_string = """
         # # # # #
         # s a m #
@@ -190,8 +215,47 @@ def monsters(
     print("level:", level)
 
     print("rendering...")
-    env = monster_world.Env(obs_level_of_detail=level_of_detail)
-    obs, state = env.reset_to_level(level)
-    print(util.img2str(obs))
+    env = monster_world.Env(img_level_of_detail=level_of_detail)
+    img = env.render_level(level)
+    print(util.img2str(img))
+
+
+def minimaze(
+    obs_height: int = 3,
+    obs_width: int = 3,
+    level_of_detail: int = 8,
+):
+    """
+    Test the level parser from the Maze environment.
+    """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
+    test_string = """
+        # # # # #
+        # . . . #
+        # . # . #
+        # ^ # * #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = minigrid_maze.LevelParser(
+        height=5,
+        width=5,
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = minigrid_maze.Env(
+        obs_height=obs_height,
+        obs_width=obs_width,
+        img_level_of_detail=level_of_detail,
+    )
+    img = env.render_level(level)
+    print(util.img2str(img))
 
 

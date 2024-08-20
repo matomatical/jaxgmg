@@ -2,29 +2,30 @@
 Actor-critic architectures for RL experiments.
 """
 
-from typing import Callable
+import functools
+from typing import Callable, Literal
 
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
 import distrax
 
+from chex import Array, ArrayTree, PRNGKey
+from jaxgmg.environments.base import Observation
+
 
 # # # 
+# Actor critic API
+
+
 # Types
-
-from chex import ArrayTree
-
 
 ActorCriticState = ArrayTree
 
-
 ActorCriticParams = ArrayTree
 
-
-# TODO: is this right?
 ActorCriticForwardPass = Callable[
-    [ActorCriticParams, ArrayTree, ActorCriticState, int],
+    [ActorCriticParams, Observation, ActorCriticState, int],
     tuple[distrax.Categorical, float, ActorCriticState],
 ]
 
@@ -62,6 +63,11 @@ class ActorCriticNetwork(nn.Module):
     num_actions: int
 
 
+    @property
+    def is_recurrent(self) -> bool:
+        raise NotImplementedError
+
+
     def init_params_and_state(self, rng, obs_type):
         rng_init_state, rng_init_params = jax.random.split(rng)
         init_state = self.initialize_state(rng=rng_init_state)
@@ -78,33 +84,244 @@ class ActorCriticNetwork(nn.Module):
         raise NotImplementedError
 
 
-    def __call__(self, obs, state, prev_action):
+    @functools.partial(jax.jit, static_argnames=['self'])
+    def __call__(
+        self,
+        obs: Observation,
+        state: ActorCriticState,
+        prev_action: int,
+    ) -> tuple[
+        distrax.Categorical,
+        float,
+        ActorCriticState,
+    ]:
         raise NotImplementedError
 
 
 # # # 
-# Impala feed-forward architectures
+# Pure function that works with an actor critic network
 
 
-class ImpalaLargeFF(ActorCriticNetwork):
+def evaluate_sequence_recurrent(
+    net_params: ActorCriticParams,
+    net_apply: ActorCriticForwardPass,
+    net_init_state: ActorCriticState,
+    obs_sequence: Observation,  # Observation[num_steps]
+    done_sequence: Array,       # bool[num_steps]
+    action_sequence: Array,     # int[num_steps]
+) -> tuple[
+    Array, # distrax.Categorical[num_steps] (action_distributions)
+    Array, # float[num_steps] (values)
+]:
+    # scan through the trajectory
+    default_prev_action = -1
+    initial_carry = (
+        net_init_state,
+        default_prev_action,
+    )
+    transitions = (
+        obs_sequence,
+        done_sequence,
+        action_sequence,
+    )
+    def _net_step(carry, transition):
+        net_state, prev_action = carry
+        obs, done, chosen_action = transition
+        # apply network
+        action_distribution, critic_value, next_net_state = net_apply(
+            net_params,
+            obs,
+            net_state,
+            prev_action,
+        )
+        # reset to net_init_state and default_prev_action when done
+        next_net_state, next_prev_action = jax.tree.map(
+            lambda r, s: jnp.where(done, r, s),
+            (net_init_state, default_prev_action),
+            (next_net_state, chosen_action),
+        )
+        carry = (next_net_state, next_prev_action)
+        output = (action_distribution, critic_value)
+        return carry, output
+    _final_carry, (action_distributions, critic_values) = jax.lax.scan(
+        _net_step,
+        initial_carry,
+        transitions,
+    )
+    return action_distributions, critic_values
+
+
+def evaluate_sequence_parallel(
+    net_params: ActorCriticParams,
+    net_apply: ActorCriticForwardPass,
+    obs_sequence: Observation,              # Observation[num_steps]
+    net_state_sequence: ActorCriticState,   # ActorCriticState[num_steps]
+    prev_action_sequence: Array,            # int[num_steps]
+) -> tuple[
+    Array, # distrax.Categorical[num_steps] (action_distributions)
+    Array, # float[num_steps] (values)
+]:
+    action_distributions, critic_values, _net_states = jax.vmap(
+        net_apply,
+        in_axes=(None, 0, 0, 0),
+    )(
+        net_params,
+        obs_sequence,
+        net_state_sequence,
+        prev_action_sequence,
+    )
+    return action_distributions, critic_values
+
+
+# # # 
+# IMPALA Architecture
+
+
+class Impala(ActorCriticNetwork):
     """
-    Architecture based on Esterholt et al., 2018, "IMPALA: Importance
-    Weighted Actor-Learner Architectures". See Figure 3 right (Large
-    architecture).
+    IMPALA Architecture based on Espeholt et al., 2018, "IMPALA: Importance
+    Weighted Actor-Learner Architectures" (see Figure 3).
 
-    We replace the LSTM block with 256 output features with a dense ReLU
-    layer with 256 output features.
+    Fields:
+
+    * cnn_type: "mlp", "small" or "large"
+            The size of the CNN for embedding observation images.
+            * "mlp", a small fully-connected residual ReLU network.
+            * "small", the CNN (from figure 3-right in the paper).
+            * "large", the CNN (from figure 3-left in the paper).
+    * rnn_type: "ff", "lstm", or "gru"
+            The type of RNN block to use for processing the embeddings.
+            * "ff": feed-forward block (does not use recurrence).
+            * "lstm": LSTM, as in Espeholt et al. (2018).
+            * "gru": Gated Recurrent Unit, which is supposed to work about
+              the same but with fewer parameters.
+
+    Note: There are small differences in the handling of auxiliary inputs.
     
-    Note: We also don't input the previous action or reward from the
-    environment.
+    * We don't take the previous timestep reward as input. The rationale is
+      that we want to train in settings where the reward is not always known.
+    * We don't have a 'blue ladder' input with its own embedding and LSTM.
+    * We support other aux inputs (e.g. orientation for partially observable
+      environments) which are fed directly into the LSTM (etc.) input.
+      * TODO: Understand what 'blue ladder' is and try more sophisticated
+        embeddings.
     """
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=256)
-
+    cnn_type: Literal["mlp", "small", "large"]
+    rnn_type: Literal["ff", "lstm", "gru"]
 
     @nn.compact
-    def __call__(self, obs, state, prev_action):
-        # obs embedding
-        x = obs
+    def __call__(
+        self,
+        obs: Observation,
+        state: ActorCriticState,
+        prev_action: int,
+    ) -> tuple[
+        distrax.Categorical,
+        float,
+        ActorCriticState,
+    ]:
+        # embed the image part of the observation
+        match self.cnn_type:
+            case "mlp":
+                obs_embedding = _DenseMLP()(obs.image)
+            case "small":
+                obs_embedding = _ImpalaSmallCNN()(obs.image)
+            case "large":
+                obs_embedding = _ImpalaLargeCNN()(obs.image)
+            case _:
+                raise ValueError(f"Unknown CNN type {self.cnn_type}")
+        # combine with everything other than the image
+        other_embeddings = [
+            # (hack: assume it's already encoded)
+            getattr(obs, fieldname).flatten()
+            for fieldname in obs.__dataclass_fields__
+            if fieldname != 'image'
+        ]
+        # one-hot embed the previous action
+        prev_action_embedding = jax.nn.one_hot(
+            x=prev_action,
+            num_classes=self.num_actions,
+        )
+        # stack all this into a single combined embedding vector
+        combined_embedding = jnp.concatenate([
+            obs_embedding,
+            prev_action_embedding,
+            *other_embeddings,
+        ])
+
+        # recurrent block (or not)
+        rnn_in = combined_embedding
+        match self.rnn_type:
+            case "ff":
+                rnn_out = nn.relu(nn.Dense(features=256)(rnn_in))
+                next_state = state
+            case "lstm":
+                next_state, rnn_out = nn.OptimizedLSTMCell(
+                    features=256,
+                )(state, rnn_in)
+            case "gru":
+                next_state, rnn_out = nn.GRUCell(
+                    features=256,
+                )(state, rnn_in)
+            case _:
+                raise ValueError(f"Unknown RNN type {self.rnn_type}")
+
+        # actor head -> action distribution
+        logits = nn.Dense(features=self.num_actions)(rnn_out)
+        pi = distrax.Categorical(logits=logits)
+
+        # critic head -> value
+        v = nn.Dense(features=1)(rnn_out)
+        v = jnp.squeeze(v)
+
+        return pi, v, next_state
+
+    
+    @property
+    def is_recurrent(self) -> bool:
+        match self.rnn_type:
+            case "ff":
+                return False
+            case "lstm":
+                return True
+            case "gru":
+                return True
+            case _:
+                raise ValueError(f"Unknown RNN type {self.rnn_type}")
+
+
+    @functools.partial(jax.jit, static_argnames=['self'])
+    def initialize_state(self, rng: PRNGKey) -> ActorCriticState:
+        match self.rnn_type:
+            case "ff":
+                return None
+            case "lstm":
+                return nn.OptimizedLSTMCell(
+                    features=256,
+                    parent=None,
+                ).initialize_carry(
+                    rng=rng,
+                    input_shape=(256,)
+                )
+            case "gru":
+                return nn.GRUCell(
+                    features=256,
+                    parent=None,
+                ).initialize_carry(
+                    rng=rng,
+                    input_shape=(256,)
+                )
+            case _:
+                raise ValueError(f"Unknown RNN type {self.rnn_type}")
+        
+
+# # # 
+# Helper modules (Observation embedding)
+
+
+class _ImpalaLargeCNN(nn.Module):
+    @nn.compact
+    def __call__(self, x):
         for ch in (16, 32, 32):
             x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
             x = nn.max_pool(
@@ -119,59 +336,16 @@ class ImpalaLargeFF(ActorCriticNetwork):
                 y = nn.relu(y)
                 y = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(y)
                 x = x + y
-        x = jnp.ravel(x)
         x = nn.relu(x)
+        x = jnp.ravel(x)
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
-        obs_embedding = x
-
-        # previous action embedding
-        prev_action_embedding = jax.nn.one_hot(
-            x=prev_action,
-            num_classes=self.num_actions,
-        )
-
-        # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
-        
-        # dense block in lieu of lstm
-        x = nn.Dense(features=256)(embedding)
-        lstm_out = nn.relu(x)
-
-        # actor head
-        logits = nn.Dense(self.num_actions)(lstm_out)
-        pi = distrax.Categorical(logits=logits)
-
-        # critic head
-        v = nn.Dense(1)(lstm_out)
-        v = jnp.squeeze(v)
-
-        return pi, v, state
+        return x
 
 
-    def initialize_state(self, rng):
-        return None
-
-
-class ImpalaSmallFF(ActorCriticNetwork):
-    """
-    Architecture based on Esterholt et al., 2018, "IMPALA: Importance
-    Weighted Actor-Learner Architectures". See Figure 3 left (Small
-    architecture).
-
-    We replace the LSTM block with 256 output features with a dense ReLU
-    layer with 256 output features.
-    
-    Note: We also don't input the previous action or reward from the
-    environment.
-    """
-
-
+class _ImpalaSmallCNN(nn.Module):
     @nn.compact
-    def __call__(self, obs, state, prev_action):
-
-        # obs embedding
-        x = obs
+    def __call__(self, x):
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
         x = nn.relu(x)
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
@@ -179,241 +353,23 @@ class ImpalaSmallFF(ActorCriticNetwork):
         x = jnp.ravel(x)
         x = nn.Dense(features=256)(x)
         x = nn.relu(x)
-        obs_embedding = x
-
-        # previous action embedding
-        prev_action_embedding = jax.nn.one_hot(
-            x=prev_action,
-            num_classes=self.num_actions,
-        )
-
-        # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
-        
-        # dense block in lieu of lstm
-        x = nn.Dense(features=256)(embedding)
-        lstm_out = nn.relu(x)
-
-        # actor head
-        logits = nn.Dense(self.num_actions)(lstm_out)
-        pi = distrax.Categorical(logits=logits)
-
-        # critic head
-        v = nn.Dense(1)(lstm_out)
-        v = jnp.squeeze(v)
-
-        return pi, v, state
-
-    
-    def initialize_state(self, rng):
-        return None
+        return x
 
 
-# # # 
-# Impala feed-forward architectures
-
-
-class ImpalaLarge(ActorCriticNetwork):
-    """
-    Architecture based on Esterholt et al., 2018, "IMPALA: Importance
-    Weighted Actor-Learner Architectures". See Figure 3 right (Large
-    architecture).
-
-    Note: We don't input the previous action or reward from the environment.
-    """
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=256)
-
-
+class _DenseMLP(nn.Module):
     @nn.compact
-    def __call__(self, obs, state, prev_action):
-        # obs embedding
-        x = obs
-        for ch in (16, 32, 32):
-            x = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(x)
-            x = nn.max_pool(
-                x,
-                window_shape=(3,3),
-                strides=(2,2),
-                padding='SAME',
-            )
-            for residual_block in (1,2):
-                y = nn.relu(x)
-                y = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(y)
-                y = nn.relu(y)
-                y = nn.Conv(features=ch, kernel_size=(3,3), strides=(1,1))(y)
-                x = x + y
+    def __call__(self, x):
+        # flatten for MLP
         x = jnp.ravel(x)
+        # start the residual stream
+        x = nn.Dense(features=128)(x)
         x = nn.relu(x)
-        x = nn.Dense(features=256)(x)
-        x = nn.relu(x)
-        obs_embedding = x
-        
-        # previous action embedding
-        prev_action_embedding = jax.nn.one_hot(
-            x=prev_action,
-            num_classes=self.num_actions,
-        )
-
-        # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
-
-        # lstm block
-        state, lstm_out = self._lstm_block(state, embedding)
-
-        # actor head
-        logits = nn.Dense(self.num_actions)(lstm_out)
-        pi = distrax.Categorical(logits=logits)
-
-        # critic head
-        v = nn.Dense(1)(lstm_out)
-        v = jnp.squeeze(v)
-
-        return pi, v, state
-
-
-    def initialize_state(self, rng):
-        return self._lstm_block.initialize_carry(
-            rng=rng,
-            input_shape=(256,)
-        )
-
-
-class ImpalaSmall(ActorCriticNetwork):
-    """
-    Architecture based on Esterholt et al., 2018, "IMPALA: Importance
-    Weighted Actor-Learner Architectures". See Figure 3 left (Small
-    architecture).
-
-    Note: We don't input the previous action or reward from the environment.
-    """
-    _lstm_block: nn.OptimizedLSTMCell = nn.OptimizedLSTMCell(features=256)
-
-
-    @nn.compact
-    def __call__(self, obs, state, prev_action):
-        # obs embedding
-        x = obs
-        x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
-        x = nn.relu(x)
-        x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
-        x = nn.relu(x)
-        x = jnp.ravel(x)
-        x = nn.Dense(features=256)(x)
-        x = nn.relu(x)
-        obs_embedding = x
-
-        # previous action embedding
-        prev_action_embedding = jax.nn.one_hot(
-            x=prev_action,
-            num_classes=self.num_actions,
-        )
-
-        # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
-
-        # lstm block
-        state, lstm_out = self._lstm_block(state, embedding)
-
-        # actor head
-        logits = nn.Dense(self.num_actions)(lstm_out)
-        pi = distrax.Categorical(logits=logits)
-
-        # critic head
-        v = nn.Dense(1)(lstm_out)
-        v = jnp.squeeze(v)
-
-        return pi, v, state
-
-    
-    def initialize_state(self, rng):
-        return self._lstm_block.initialize_carry(
-            rng=rng,
-            input_shape=(256,)
-        )
-
-
-# # # 
-# MLP architectures
-
-
-class ReLUFF(ActorCriticNetwork):
-    """
-    Simple MLP with ReLU activation. Not recurrent.
-    """
-    num_embedding_layers: int = 3
-    embedding_layer_width: int = 128
-
-    
-    @nn.compact
-    def __call__(self, obs, state, prev_action):
-        # obs embedding
-        x = jnp.ravel(obs)
-        # at least one layer (to start the residual stream)
-        x = nn.Dense(self.embedding_layer_width)(x)
-        x = nn.relu(x)
-        # remaining residual layers (adding to residual stream)
-        for embedding_residual_block in range(self.num_embedding_layers-1):
-            y = nn.Dense(self.embedding_layer_width)(x)
+        # add with more residual blocks
+        for _embedding_residual_block in range(2):
+            y = nn.Dense(features=128)(x)
             y = nn.relu(y)
             x = x + y
-        obs_embedding = x
-
-        # previous action embedding
-        prev_action_embedding = jax.nn.one_hot(
-            x=prev_action,
-            num_classes=self.num_actions,
-        )
-
-        # combined embedding
-        embedding = jnp.concatenate([obs_embedding, prev_action_embedding])
-
-        # actor head
-        logits = nn.Dense(self.num_actions)(embedding)
-        pi = distrax.Categorical(logits=logits)
-
-        # critic head
-        v = nn.Dense(1)(embedding)
-        v = jnp.squeeze(v)
-
-        return pi, v, state
-
-
-    def initialize_state(self, rng):
-        return None
-
-
-# # # 
-# Look-up a particular architecture
-
-
-def get_architecture(spec: str, num_actions: int) -> ActorCriticNetwork:
-    """
-    Parse a network specification string and instantiate the appropriate kind
-    of network.
-    """
-    spec = spec.lower().split(":")
-    match spec:
-        # relu net (optionally with a custom shape)
-        case ["relu"]:
-            return ReLUFF(num_actions=num_actions) # default layers x width
-        case ["relu", layers_by_width]:
-            layers, width = layers_by_width.split("x")
-            return ReLUFF(
-                num_actions=num_actions,
-                num_embedding_layers=int(layers),
-                embedding_layer_width=int(width),
-            )
-        # impala large (ff or lstm)
-        case ["impala"] | ["impala", "ff"]:
-            return ImpalaLargeFF(num_actions=num_actions)
-        case ["impala", "lstm"]:
-            return ImpalaLarge(num_actions=num_actions)
-        # impala small (default, lstm, or ff)
-        case ["impala"] | ["impala", "small", "ff"]:
-            return ImpalaSmallFF(num_actions=num_actions)
-        case ["impala", "small", "lstm"]:
-            return ImpalaSmall(num_actions=num_actions)
-        case _:
-            raise ValueError(f"Unknown net architecture spec: {name!r}.")
+        # done
+        return x
 
 

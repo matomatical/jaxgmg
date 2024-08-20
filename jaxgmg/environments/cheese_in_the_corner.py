@@ -82,6 +82,48 @@ class EnvState(base.EnvState):
 
 
 @struct.dataclass
+class Observation(base.Observation):
+    """
+    Observation for partially observable Maze environment.
+
+    * image : bool[h, w, c] or float[h, w, rgb]
+            The contents of the state. Comes in one of two formats:
+            * Boolean: a H by W by C bool array where each channel represents
+              the presence of one type of thing (walls, mouse, cheese).
+            * Pixels: an D.H by D.W by 3 array of RGB float values where each
+              D by D tile corresponds to one grid square. (D is level of
+              detail.)
+    """
+    image: chex.Array
+
+
+class Action(enum.IntEnum):
+    """
+    The environment has a discrete action space of size 4 with the following
+    meanings.
+    """
+    MOVE_UP     = 0
+    MOVE_LEFT   = 1
+    MOVE_DOWN   = 2
+    MOVE_RIGHT  = 3
+
+
+class Channel(enum.IntEnum):
+    """
+    The observations returned by the environment are an `h` by `w` by
+    `channel` Boolean array, where the final dimensions 0 through 4
+    indicate the following:
+
+    * `WALL`:   True in the locations where there is a wall.
+    * `MOUSE`:  True in the one location the mouse occupies.
+    * `CHEESE`: True in the one location the cheese occupies.
+    """
+    WALL    = 0
+    MOUSE   = 1
+    CHEESE  = 2
+
+
+@struct.dataclass
 class Env(base.Env):
     """
     Cheese in the Corner environment.
@@ -95,57 +137,27 @@ class Env(base.Env):
     * If the mouse would hit a wall it remains in place.
     * If the mouse hits the cheese, the agent gains reward and the episode
       ends.
-
-    Observations come in one of two formats:
-
-    * Boolean: a H by W by C bool array where each channel represents the
-      presence of one type of thing (walls, mouse, cheese).
-    * Pixels: an 8H by 8W by 3 array of RGB float values where each 8 by 8
-      tile corresponds to one grid square.
     """
     terminate_after_cheese_and_corner: bool = False
 
 
-    class Action(enum.IntEnum):
-        """
-        The environment has a discrete action space of size 4 with the following
-        meanings.
-        """
-        MOVE_UP     = 0
-        MOVE_LEFT   = 1
-        MOVE_DOWN   = 2
-        MOVE_RIGHT  = 3
-
-
     @property
     def num_actions(self) -> int:
-        return len(Env.Action)
+        return len(Action)
     
 
     def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
+        # TODO: only works for boolean observations...
         H, W = level.wall_map.shape
-        C = len(Env.Channel)
-        return jax.ShapeDtypeStruct(
-            shape=(H, W, C),
-            dtype=bool,
+        C = len(Channel)
+        return Observation(
+            image=jax.ShapeDtypeStruct(
+                shape=(H, W, C),
+                dtype=bool,
+            ),
         )
 
 
-    class Channel(enum.IntEnum):
-        """
-        The observations returned by the environment are an `h` by `w` by
-        `channel` Boolean array, where the final dimensions 0 through 4
-        indicate the following:
-
-        * `WALL`:   True in the locations where there is a wall.
-        * `MOUSE`:  True in the one location the mouse occupies.
-        * `CHEESE`: True in the one location the cheese occupies.
-        """
-        WALL    = 0
-        MOUSE   = 1
-        CHEESE  = 2
-
-    
     def _reset(
         self,
         level: Level,
@@ -226,55 +238,55 @@ class Env(base.Env):
 
     
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_bool(self, state: EnvState) -> chex.Array:
+    def _render_obs_bool(self, state: EnvState) -> Observation:
         """
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
-        C = len(Env.Channel)
-        obs = jnp.zeros((H, W, C), dtype=bool)
+        C = len(Channel)
+        image = jnp.zeros((H, W, C), dtype=bool)
 
         # render walls
-        obs = obs.at[:, :, Env.Channel.WALL].set(state.level.wall_map)
+        image = image.at[:, :, Channel.WALL].set(state.level.wall_map)
 
         # render mouse
-        obs = obs.at[
+        image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
-            Env.Channel.MOUSE,
+            Channel.MOUSE,
         ].set(True)
         
         # render cheese
-        obs = obs.at[
+        image = image.at[
             state.level.cheese_pos[0],
             state.level.cheese_pos[1],
-            Env.Channel.CHEESE,
+            Channel.CHEESE,
         ].set(~state.got_cheese)
 
-        return obs
+        return Observation(image=image)
 
 
     @functools.partial(jax.jit, static_argnames=('self',))
-    def _get_obs_rgb(
+    def _render_obs_rgb(
         self,
         state: EnvState,
         spritesheet: dict[str, chex.Array],
-    ) -> chex.Array:
+    ) -> Observation:
         """
         Return an RGB observation based on a grid of tiles from the given
         spritesheet.
         """
         # get the boolean grid representation of the state
-        obs = self._get_obs_bool(state)
-        H, W, _C = obs.shape
+        image_bool = self._render_obs_bool(state).image
+        H, W, _C = image_bool.shape
 
         # find out, for each position, which object to render
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # one object
-            obs[:, :, Env.Channel.WALL],
-            obs[:, :, Env.Channel.MOUSE],
-            obs[:, :, Env.Channel.CHEESE],
+            image_bool[:, :, Channel.WALL],
+            image_bool[:, :, Channel.MOUSE],
+            image_bool[:, :, Channel.CHEESE],
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -289,12 +301,29 @@ class Env(base.Env):
             # no objects
             spritesheet['PATH'],
         ])[chosen_sprites]
-        image = einops.rearrange(
+
+        image_rgb = einops.rearrange(
             spritemap,
             'h w th tw rgb -> (h th) (w tw) rgb',
         )
+        return Observation(image=image_rgb)
 
-        return image
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def _render_state_bool(
+        self,
+        state: EnvState,
+    ) -> chex.Array:
+        return self._render_obs_bool(state).image
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def _render_state_rgb(
+        self,
+        state: EnvState,
+        spritesheet: dict[str, chex.Array],
+    ) -> chex.Array:
+        return self._render_obs_rgb(state, spritesheet).image
 
 
 # # # 
@@ -401,7 +430,7 @@ class LevelGenerator(base.LevelGenerator):
 
 
 @struct.dataclass
-class LevelParser:
+class LevelParser(base.LevelParser):
     """
     Level parser for Cheese in the Corner environment. Given some parameters
     determining level shape, provides a `parse` method that converts an ASCII
@@ -419,19 +448,19 @@ class LevelParser:
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Env.Channel.WALL`.
-            * The character '@' maps to `Env.Channel.MOUSE`.
-            * The character '*' maps to `Env.Channel.CHEESE`.
-            * The character '.' maps to `len(Env.Channel)`, i.e. none of the
+            * The character '#' maps to `Channel.WALL`.
+            * The character '@' maps to `Channel.MOUSE`.
+            * The character '*' maps to `Channel.CHEESE`.
+            * The character '.' maps to `len(Channel)`, i.e. none of the
               above, representing the absence of an item.
     """
     height: int
     width: int
     char_map = {
-        '#': Env.Channel.WALL,
-        '@': Env.Channel.MOUSE,
-        '*': Env.Channel.CHEESE,
-        '.': len(Env.Channel), # PATH
+        '#': Channel.WALL,
+        '@': Channel.MOUSE,
+        '*': Channel.CHEESE,
+        '.': len(Channel), # PATH
     }
 
 
@@ -470,21 +499,21 @@ class LevelParser:
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Env.Channel.WALL)
+        wall_map = (level_map == Channel.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
         assert wall_map[:,-1].all(), "right border incomplete"
         
         # extract cheese position
-        cheese_map = (level_map == Env.Channel.CHEESE)
+        cheese_map = (level_map == Channel.CHEESE)
         assert cheese_map.sum() == 1, "there must be exactly one cheese"
         cheese_pos = jnp.concatenate(
             jnp.where(cheese_map, size=1)
         )
 
         # extract mouse spawn position
-        mouse_spawn_map = (level_map == Env.Channel.MOUSE)
+        mouse_spawn_map = (level_map == Channel.MOUSE)
         assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
         initial_mouse_pos = jnp.concatenate(
             jnp.where(mouse_spawn_map, size=1)
@@ -494,20 +523,6 @@ class LevelParser:
             wall_map=wall_map,
             cheese_pos=cheese_pos,
             initial_mouse_pos=initial_mouse_pos,
-        )
-
-
-    def parse_batch(self, level_strs):
-        """
-        Convert a list of ASCII string depiction of length `num_levels`
-        into a vectorised `Level[num_levels]` PyTree. See `parse` method for
-        the details of the string depiction.
-        """
-        levels = [self.parse(level_str) for level_str in level_strs]
-        return Level(
-            wall_map=jnp.stack([l.wall_map for l in levels]),
-            cheese_pos=jnp.stack([l.cheese_pos for l in levels]),
-            initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
         )
 
 
@@ -683,7 +698,7 @@ class LevelSolver(base.LevelSolver):
             
         Return:
 
-        * action : int                      # TODO: use the Env.Action enum?
+        * action : int                      # TODO: use the Action enum?
                 An optimal action from the given state.
                 
         Notes:
@@ -905,7 +920,7 @@ class LevelMetrics(base.LevelMetrics):
         # rendered levels in a grid
         def render_level(level):
             state = self.env._reset(level)
-            rgb = self.env.get_obs(state, force_lod=1)
+            rgb = self.env.render_state(state)
             return rgb
         rendered_levels = jax.vmap(render_level)(levels)
         rendered_levels_pad = jnp.pad(

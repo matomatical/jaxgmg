@@ -68,28 +68,17 @@ def run(
     num_parallel_envs: int,
     # logging config
     num_cycles_per_log: int,
-    save_files_to: str,                 # where to log metrics to disk
     console_log: bool,                  # whether to log metrics to stdout
     wandb_log: bool,                    # whether to log metrics to wandb
     # training animation dimensions
     train_gifs: bool,
     train_gif_grid_width: int,
-    train_gif_level_of_detail: int,
     # checkpointing config
     checkpointing: bool,
     keep_all_checkpoints: bool,
     max_num_checkpoints: int,
     num_cycles_per_checkpoint: int,
 ):
-
-
-    # initialising file manager
-    print("initialising run file manager")
-    fileman = util.RunFilesManager(root_path=save_files_to)
-    print("  run folder:", fileman.path)
-
-    
-    # TODO: Would be a good idea to save the config as a file again
 
 
     # TODO: Would be a good idea to checkpoint the training levels and eval
@@ -110,14 +99,20 @@ def run(
 
     
     # initialise the checkpointer
-    checkpoint_path = fileman.get_path("checkpoints")
-    checkpoint_manager = ocp.CheckpointManager(
-        directory=checkpoint_path,
-        options=ocp.CheckpointManagerOptions(
-            max_to_keep=None if keep_all_checkpoints else max_num_checkpoints,
-            save_interval_steps=num_cycles_per_checkpoint,
-        ),
-    )
+    if checkpointing and not wandb_log:
+        print("WARNING: checkpointing requested without wandb logging.")
+        print("WARNING: disabling checkpointing!")
+        checkpointing = False
+    elif checkpointing:
+        checkpoint_path = os.path.join(wandb.run.dir, "checkpoints/")
+        max_to_keep = None if keep_all_checkpoints else max_num_checkpoints
+        checkpoint_manager = ocp.CheckpointManager(
+            directory=checkpoint_path,
+            options=ocp.CheckpointManagerOptions(
+                max_to_keep=max_to_keep,
+                save_interval_steps=num_cycles_per_checkpoint,
+            ),
+        )
 
 
     # set up optimiser
@@ -222,7 +217,6 @@ def run(
             frames = experience.animate_rollouts(
                 rollouts=rollouts,
                 grid_width=train_gif_grid_width,
-                force_lod=train_gif_level_of_detail,
                 env=env,
             )
             metrics['env/train'].update({'rollouts_gif': frames})
@@ -266,6 +260,7 @@ def run(
         train_state, ppo_metrics = ppo_update(
             rng=rng_update,
             train_state=train_state,
+            net_init_state=net_init_state,
             rollouts=valid_rollouts,
             advantages=valid_advantages,
             num_epochs=num_epochs_per_cycle,
@@ -274,6 +269,7 @@ def run(
             clip_eps=ppo_clip_eps,
             entropy_coeff=ppo_entropy_coeff,
             critic_coeff=ppo_critic_coeff,
+            do_backprop_thru_time=net.is_recurrent,
             compute_metrics=log_cycle,
         )
         if log_cycle:
@@ -308,46 +304,16 @@ def run(
             
             # log to wandb
             if wandb_log:
-                metrics_wandb = util.flatten_dict(metrics)
-                for key, val in metrics_wandb.items():
-                    if key.endswith("_hist"):
-                        metrics_wandb[key] = wandb.Histogram(val)
-                    elif key.endswith("_gif"):
-                        metrics_wandb[key] = util.wandb_gif(val)
-                    elif key.endswith("_img"):
-                        metrics_wandb[key] = util.wandb_img(val)
-                    wandb.log(step=t, data=metrics_wandb)
-            
-            # either way, log to disk
-            metrics_disk = util.flatten_dict(metrics)
-            metrics_path = fileman.get_path(f"metrics/{t}/")
-            progress.write(f"saving metrics to {metrics_path}...")
-            skip_keys = []
-            for key, val in metrics_disk.items():
-                if key.endswith("_hist"):
-                    metrics_disk[key] = val.tolist()
-                elif key.endswith("_gif"):
-                    path = metrics_path + key[:-4].replace('/','-') + ".gif"
-                    util.save_gif(val, path)
-                    skip_keys.append(key)
-                elif key.endswith("_img"):
-                    path = metrics_path + key[:-4].replace('/','-') + ".png"
-                    util.save_image(val, path)
-                    skip_keys.append(key)
-                elif isinstance(val, jax.Array):
-                    metrics_disk[key] = val.item()
-            for key in skip_keys:
-                del metrics_disk[key]
-            util.save_json(metrics_disk, metrics_path + "metrics.json")
+                wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
 
         
         # periodic checkpointing
         if checkpointing and t % num_cycles_per_checkpoint == 0:
             checkpoint_manager.save(
                 t,
-                args=ocp.args.PyTreeSave(train_state),
+                args=ocp.args.PyTreeSave(train_state.params),
             )
-            progress.write(f"saving checkpoint to {checkpoint_path}/{t}...")
+            progress.write(f"saving checkpoint (wandb will sync at end)...")
 
 
         # ending cycle
@@ -356,9 +322,14 @@ def run(
 
     # ending run
     progress.close()
-    print("finishing checkpoints...")
-    checkpoint_manager.wait_until_finished()
-    checkpoint_manager.close()
+    if checkpointing:
+        print("finishing checkpoints...")
+        checkpoint_manager.wait_until_finished()
+        checkpoint_manager.close()
+        # for some reason I have to manually save these files (I thought
+        # they would be automatically saved since I put them in the run dir,
+        # and the docs say this, but it doesn't seem to be the case...)
+        wandb.save(checkpoint_path + "/**", base_path=wandb.run.dir)
 
 
 # # # 
@@ -370,12 +341,14 @@ def run(
     static_argnames=(
         'num_epochs',
         'num_minibatches_per_epoch',
+        'do_backprop_thru_time',
         'compute_metrics',
     ),
 )
 def ppo_update(
     rng: PRNGKey,
     train_state: TrainState,
+    net_init_state: networks.ActorCriticState,
     rollouts: Rollout, # Rollout[num_levels] (with Transition[num_steps])
     advantages: Array, # float[num_levels, num_steps]
     # ppo hyperparameters
@@ -385,6 +358,7 @@ def ppo_update(
     clip_eps: float,
     entropy_coeff: float,
     critic_coeff: float,
+    do_backprop_thru_time: bool,
     # metrics
     compute_metrics: bool,
 ) -> tuple[
@@ -394,28 +368,19 @@ def ppo_update(
     """
     Given a data set of rollouts, perform GAE followed by a few epochs of PPO
     loss updates on the transitions contained in those rollouts.
-
-    TODO: document inputs and outputs.
     """
-    
+    num_levels, num_steps = advantages.shape
     # value targets based on values + GAE estimates
     targets = advantages + rollouts.transitions.value  # -> float[num_levels, num_steps]
-
-    
     # compile data set
     data = (rollouts.transitions, advantages, targets)
-    data = jax.tree.map(
-        lambda x: einops.rearrange(x, 'lvls steps ... -> (lvls steps) ...'),
-        data,
-    )
-    num_examples, = data[1].shape
 
 
     # train on this data for a few epochs
     def _epoch(train_state, rng_epoch):
         # shuffle data
         rng_shuffle, rng_epoch = jax.random.split(rng_epoch)
-        permutation = jax.random.permutation(rng_shuffle, num_examples)
+        permutation = jax.random.permutation(rng_shuffle, num_levels)
         data_shuf = jax.tree.map(lambda x: x[permutation], data)
         # split into minibatches
         data_batched = jax.tree.map(
@@ -428,16 +393,18 @@ def ppo_update(
         )
         # process each minibatch
         def _minibatch(train_state, minibatch):
-            ppo_loss_aux_and_grad = jax.value_and_grad(ppo_loss, has_aux=True)
-            (loss, diagnostics), grads = ppo_loss_aux_and_grad(
+            loss_aux_grad = jax.value_and_grad(ppo_loss, has_aux=True)
+            (loss, diagnostics), grads = loss_aux_grad(
                 train_state.params,
-                apply_fn=train_state.apply_fn,
+                net_apply=train_state.apply_fn,
+                net_init_state=net_init_state,
                 transitions=minibatch[0],
                 advantages=minibatch[1],
                 targets=minibatch[2],
                 clip_eps=clip_eps,
                 critic_coeff=critic_coeff,
                 entropy_coeff=entropy_coeff,
+                do_backprop_thru_time=do_backprop_thru_time,
                 compute_diagnostics=compute_metrics,
             )
             train_state = train_state.apply_gradients(grads=grads)
@@ -491,35 +458,59 @@ def ppo_update(
 
 @functools.partial(
     jax.jit,
-    static_argnames=('apply_fn', 'compute_diagnostics'),
+    static_argnames=[
+        'net_apply',
+        'do_backprop_thru_time',
+        'compute_diagnostics',
+    ],
 )
 def ppo_loss(
-    params,
-    apply_fn,
-    transitions: Transition,    # Transition[minibatch_size]
-    advantages: Array,          # float[minibatch_size]
-    targets: Array,             # float[minibatch_size]
+    params: networks.ActorCriticParams,
+    net_apply: networks.ActorCriticForwardPass,
+    net_init_state: networks.ActorCriticState,
+    transitions: Transition,    # Transition[minibatch_size, num_steps]
+    advantages: Array,          # float[minibatch_size, num_steps]
+    targets: Array,             # float[minibatch_size, num_steps]
     clip_eps: float,
     critic_coeff: float,
     entropy_coeff: float,
-    compute_diagnostics: bool,  # if True, second return value is {}
+    do_backprop_thru_time: bool,
+    compute_diagnostics: bool,  # if False, second return value is empty dict
 ) -> tuple[
     float,                      # loss
     dict[str, float],           # loss components and other diagnostics
 ]:
-    # run network to get current value/log_prob prediction
-    action_distribution, value, _net_state = jax.vmap(
-        apply_fn,
-        in_axes=(None, 0, 0, 0),
-    )(
-        params,
-        transitions.obs,
-        transitions.net_state,
-        transitions.prev_action,
-    )
-    log_prob = action_distribution.log_prob(transitions.action)
+    # run latest network to get current value/action predictions
+    if do_backprop_thru_time:
+        # recompute hidden states to allow backpropagation thru time (BPTT)
+        print("[ppo_loss.trace] doing bptt")
+        action_distribution, value = jax.vmap(
+            networks.evaluate_sequence_recurrent,
+            in_axes=(None, None, None, 0, 0, 0)
+        )(
+            params,
+            net_apply,
+            net_init_state,
+            transitions.obs,
+            transitions.done,
+            transitions.action,
+        )
+    else:
+        # use cached inputs and run forward pass in parallel (no BPTT)
+        print("[ppo_loss.trace] not doing bptt")
+        action_distribution, value = jax.vmap(
+            networks.evaluate_sequence_parallel,
+            in_axes=(None, None, 0, 0, 0),
+        )(
+            params,
+            net_apply,
+            transitions.obs,
+            transitions.net_state,
+            transitions.prev_action,
+        )
 
     # actor loss
+    log_prob = action_distribution.log_prob(transitions.action)
     logratio = log_prob - transitions.log_prob
     ratio = jnp.exp(logratio)
     clipped_ratio = jnp.clip(ratio, 1-clip_eps, 1+clip_eps)
@@ -573,91 +564,5 @@ def ppo_loss(
         diagnostics = {}
 
     return total_loss, diagnostics
-
-
-# # # 
-# Restore and evaluate a checkpoint
-
-
-def eval_checkpoint(
-    rng: PRNGKey,
-    checkpoint_path: str,
-    checkpoint_number: int,
-    env: Env,
-    net_spec: str,
-    example_level: Level,
-    evals_dict: dict[str, Eval],
-    save_files_to: str,
-):
-    fileman = util.RunFilesManager(root_path=save_files_to)
-    print("  run folder:", fileman.path)
-    
-    # initialise the checkpointer
-    checkpoint_manager = ocp.CheckpointManager(
-        directory=os.path.abspath(checkpoint_path),
-        options=ocp.CheckpointManagerOptions(
-            max_to_keep=None,
-            save_interval_steps=0,
-        ),
-    )
-    
-    # select agent architecture
-    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
-    # initialise the network to get the example type
-    rng_model_init, rng = jax.random.split(rng, 2)
-    net_init_params, net_init_state = net.init_params_and_state(
-        rng=rng_model_init,
-        obs_type=env.obs_type(level=example_level),
-    )
-
-    # reload checkpoint of interest
-    train_state = TrainState.create(
-        apply_fn=net.apply,
-        params=net_init_params,
-        tx=optax.sgd(0), # dummy, will be overridden
-    )
-    train_state_dtype = jax.tree.map(
-        ocp.utils.to_shape_dtype_struct,
-        train_state,
-    )
-    train_state = checkpoint_manager.restore(
-        checkpoint_number,
-        args=ocp.args.PyTreeRestore(train_state_dtype),
-    )
-
-    # perform evals and log metrics
-    metrics = {}
-    for eval_name, eval_obj in evals_dict.items():
-        print("running eval", eval_name, "...")
-        rng_eval, rng = jax.random.split(rng)
-        metrics[eval_name] = eval_obj.eval(
-            rng=rng_eval,
-            train_state=train_state,
-            net_init_state=net_init_state,
-        )
-        print(util.dict2str(metrics[eval_name]))
-        print("=" * 59)
-        
-    # log the metrics disk
-    metrics_disk = util.flatten_dict(metrics)
-    metrics_path = fileman.get_path(f"metrics/")
-    print(f"saving metrics to {metrics_path}...")
-    skip_keys = []
-    for key, val in metrics_disk.items():
-        if key.endswith("_hist"):
-            metrics_disk[key] = val.tolist()
-        elif key.endswith("_gif"):
-            path = metrics_path + key[:-4].replace('/','-') + ".gif"
-            util.save_gif(val, path)
-            skip_keys.append(key)
-        elif key.endswith("_img"):
-            path = metrics_path + key[:-4].replace('/','-') + ".png"
-            util.save_image(val, path)
-            skip_keys.append(key)
-        elif isinstance(val, jax.Array):
-            metrics_disk[key] = val.item()
-    for key in skip_keys:
-        del metrics_disk[key]
-    util.save_json(metrics_disk, metrics_path + "metrics.json")
 
 
