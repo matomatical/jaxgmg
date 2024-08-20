@@ -33,7 +33,7 @@ def corner(
     env_penalize_time: bool = False,
     # policy config
     net_cnn_type: str = "large",
-    net_rnn_type: str = "lstm",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -54,7 +54,7 @@ def corner(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
@@ -196,8 +196,8 @@ def dish(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "impala",
-    net_rnn_type: str = "lstm",
+    net_cnn_type: str = "large",
+    net_rnn_type: str = "ff",
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -357,9 +357,9 @@ def pile(
     env_penalize_time: bool = False,
     # policy config
     net_cnn_type: str = "large",
-    net_rnn_type: str = "lstm",
+    net_rnn_type: str = "ff",
     # ued config
-    ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -516,10 +516,10 @@ def keys(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "mlp",
+    net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
     # ued config
-    ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -538,7 +538,7 @@ def keys(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
@@ -672,10 +672,10 @@ def minimaze(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "mlp",
+    net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
     # ued config
-    ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -694,7 +694,7 @@ def minimaze(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
@@ -1073,7 +1073,7 @@ def memory_test(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 1000_000,
