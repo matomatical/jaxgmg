@@ -38,7 +38,6 @@ def load_spritesheet(lod: LevelOfDetail):
         raise ValueError("No spritesheet for detail level 0 (BOOLEAN)")
     _spritesheet = _MIPMAP[lod]
     return {
-<<<<<<< HEAD
         'BLANK':                    _spritesheet[0,0],
         'PATH':                     _spritesheet[0,1],
         'WALL':                     _spritesheet[0,2],
