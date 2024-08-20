@@ -32,7 +32,7 @@ def corner(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "impala-large",
+    net_cnn_type: str = "large",
     net_rnn_type: str = "lstm",
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
@@ -44,7 +44,7 @@ def corner(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "proxy_regret",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_regret_estimator: str = "proxy_regret",
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -73,7 +73,6 @@ def corner(
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
-    save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = True,                # whether to log metrics to wandb
     wandb_project: str = "test_plr",
@@ -176,7 +175,6 @@ def corner(
         num_cycles_per_big_eval=num_cycles_per_big_eval,
         eval_gif_grid_width=eval_gif_grid_width,
         num_cycles_per_log=num_cycles_per_log,
-        save_files_to=save_files_to,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,
@@ -192,16 +190,16 @@ def dish(
     env_size: int = 13,
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = False,
-    max_cheese_radius: int = 1,
-    max_cheese_radius_shift: int = 6,
+    max_cheese_radius: int = 0,
+    max_cheese_radius_shift: int = 12,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "mlp",
-    net_rnn_type: str = "ff",
+    net_cnn_type: str = "impala",
+    net_rnn_type: str = "lstm",
     # ued config
-    ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -220,7 +218,7 @@ def dish(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
     num_total_env_steps: int = 20_000_000,
@@ -239,9 +237,8 @@ def dish(
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
-    save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
+    wandb_log: bool = True,                 # whether to log metrics to wandb
     wandb_project: str = "plr_dish",
     wandb_entity: str = None,
     wandb_group: str = None,
@@ -329,7 +326,6 @@ def dish(
         num_cycles_per_big_eval=num_cycles_per_big_eval,
         eval_gif_grid_width=eval_gif_grid_width,
         num_cycles_per_log=num_cycles_per_log,
-        save_files_to=save_files_to,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,
@@ -344,23 +340,24 @@ def pile(
     # environment config
     env_size: int = 13,
     env_layout: str = 'blocks',
+    # how many objects go on the cheese - not important cuz we want to train
+    # with both in the same position
     split_elements_train:int = 0,
-    split_elements_shift:int = 4,
+    split_elements_shift:int = 0,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 6,
-    # this is not relevant and can be ignored for now (they may come useful
-    # in next implementations)
+    max_cheese_radius_shift: int = 12,
+    # these two are not relevant and can be ignored for now (they may come
+    # useful in next implementations)
     max_dish_radius: int = 0,
-    # this is not relevant and can be ignored for now (they may come useful
-    # in next implementations)
     max_dish_radius_shift: int= 0,
+    # other env stuff
     env_terminate_after_dish: bool = True,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "mlp",
-    net_rnn_type: str = "ff",
+    net_cnn_type: str = "large",
+    net_rnn_type: str = "lstm",
     # ued config
     ued: str = "dr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -381,10 +378,10 @@ def pile(
     ppo_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 8,
+    num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
+    num_total_env_steps: int = 300_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
     # training animation dimensions
@@ -400,7 +397,6 @@ def pile(
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
-    save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
     wandb_project: str = "proxy_test_multiple_dish_final",
@@ -496,7 +492,6 @@ def pile(
         num_cycles_per_big_eval=num_cycles_per_big_eval,
         eval_gif_grid_width=eval_gif_grid_width,
         num_cycles_per_log=num_cycles_per_log,
-        save_files_to=save_files_to,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,
@@ -562,7 +557,6 @@ def keys(
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
-    save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
     wandb_project: str = "test",
@@ -657,7 +651,6 @@ def keys(
         num_cycles_per_big_eval=num_cycles_per_big_eval,
         eval_gif_grid_width=eval_gif_grid_width,
         num_cycles_per_log=num_cycles_per_log,
-        save_files_to=save_files_to,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,
@@ -720,7 +713,6 @@ def minimaze(
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
-    save_files_to: str = "logs/",
     console_log: bool = True,               # whether to log metrics to stdout
     wandb_log: bool = False,                # whether to log metrics to wandb
     wandb_project: str = "test",
@@ -1051,7 +1043,6 @@ def minimaze(
         num_cycles_per_big_eval=num_cycles_per_big_eval,
         eval_gif_grid_width=eval_gif_grid_width,
         num_cycles_per_log=num_cycles_per_log,
-        save_files_to=save_files_to,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,
@@ -1167,7 +1158,6 @@ def memory_test(
         num_cycles_per_log=num_cycles_per_log,
         num_cycles_per_big_eval=1024,
         eval_gif_grid_width=4,
-        save_files_to="logs/",
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,
@@ -1226,7 +1216,6 @@ def ppo_training_run(
     eval_gif_grid_width: int,
     # logging
     num_cycles_per_log: int,
-    save_files_to: str,
     console_log: bool,
     wandb_log: bool,
     # checkpointing
@@ -1498,7 +1487,6 @@ def ppo_training_run(
         train_gif_grid_width=train_gif_grid_width,
         # logging
         num_cycles_per_log=num_cycles_per_log,
-        save_files_to=save_files_to,
         console_log=console_log,
         wandb_log=wandb_log,
         # checkpointing
@@ -1509,4 +1497,4 @@ def ppo_training_run(
     )
     print("training run complete.")
 
-    
+

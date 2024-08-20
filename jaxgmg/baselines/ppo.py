@@ -68,7 +68,6 @@ def run(
     num_parallel_envs: int,
     # logging config
     num_cycles_per_log: int,
-    save_files_to: str,                 # where to log metrics to disk
     console_log: bool,                  # whether to log metrics to stdout
     wandb_log: bool,                    # whether to log metrics to wandb
     # training animation dimensions

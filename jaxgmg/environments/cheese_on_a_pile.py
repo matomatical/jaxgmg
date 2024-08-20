@@ -35,6 +35,10 @@ from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
+from jaxgmg import util
+from jax import lax
+import jax.numpy as jnp
+
 
 @struct.dataclass
 class Level(base.Level):
@@ -313,7 +317,10 @@ class Env(base.Env):
             else:
                 done = state.got_cheese
         else:
-            done = state.got_cheese
+            done = state.got_cheese | state.got_napkin
+
+        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
+        pile_rate = lax.cond(jnp.any(state.got_napkin), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -324,6 +331,8 @@ class Env(base.Env):
                     'proxy_pile': proxy_pile,
                     'proxy_pile_first': proxy_pile_first,
                     'proxy_cheese_first': proxy_cheese_first,
+                    'cheese_solve_rate': cheese_rate, 
+                    'pile_solve_rate': pile_rate,
                      #'proxy_cheese_second': proxy_cheese_second,
                      #'proxy_dish_second': proxy_dish_second,
                 },
@@ -476,7 +485,6 @@ class Env(base.Env):
             obs[:, :, Channel.GLASS],
             obs[:, :, Channel.MUG],
             obs[:, :, Channel.NAPKIN],
-
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -707,11 +715,12 @@ class LevelGenerator(base.LevelGenerator):
         #    p=no_wall & no_mouse,
         #)
 
-        # cheese spawns in some remaining valid position near the dish
+        # cheese spawns in some remaining valid position near the napkin
         distance_to_napkin = maze_solving.maze_distances(wall_map)[
             napkin_pos[0],
             napkin_pos[1],
         ]
+
         near_napkin = (distance_to_napkin == self.max_cheese_radius).flatten()
 
         near_napkin_nowall = near_napkin | (near_napkin & no_wall)
@@ -724,6 +733,20 @@ class LevelGenerator(base.LevelGenerator):
             #p=no_wall & no_mouse & near_napkin,
             p=near_napkin_nowall & no_mouse,
         )
+
+        # distance_to_napkin = maze_solving.maze_distances(wall_map)[
+        #     napkin_pos[0],
+        #     napkin_pos[1],
+        # ]
+        # near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
+
+        # rng_spawn_cheese, rng = jax.random.split(rng)
+        # cheese_pos = jax.random.choice(
+        #     key=rng_spawn_cheese,
+        #     a=coords,
+        #     axis=0,
+        #     p=no_wall & no_mouse & near_napkin,
+        # )
 
         #second group
         #distance_to_cheese = maze_solving.maze_distances(wall_map)[
@@ -748,6 +771,7 @@ class LevelGenerator(base.LevelGenerator):
 
         final_spawn.reverse()
 
+
         return Level(
             wall_map=wall_map,
             initial_mouse_pos=initial_mouse_pos,
@@ -760,153 +784,8 @@ class LevelGenerator(base.LevelGenerator):
             napkin_pos = final_spawn[5],
         )
 
-#  wall_map: chex.Array
-#     cheese_pos: chex.Array
-#     dish_pos: chex.Array
-#     #dish_positions: chex.Array
-#     initial_mouse_pos: chex.Array
-
-
-
-@struct.dataclass
-class LevelParser: # I need to change dish for this new env, ops
-    """
-    Level parser for Cheese on a Dish environment. Given some parameters
-    determining level shape, provides a `parse` method that converts an ASCII
-    depiction of a level into a Level struct. Also provides a `parse_batch`
-    method that parses a list of level strings into a single vectorised Level
-    PyTree object.
-
-    * height (int, >= 3):
-            The number of rows in the grid representing the maze
-            (including top and bottom boundary rows)
-    * width (int, >= 3):
-            The number of columns in the grid representing the maze
-            (including left and right boundary rows)
-    * char_map : optional, dict{str: int}
-            The keys in this dictionary are the symbols the parser will look
-            to define the location of the walls and each of the items. The
-            default map is as follows:
-            * The character '#' maps to `Channel.WALL`.
-            * The character '@' maps to `Channel.MOUSE`.
-            * The character 'd' maps to `Channel.DISH`.
-            * The character 'c' maps to `Channel.CHEESE`.
-            * The character 'b' maps to `len(Channel)`, i.e. none of the
-              above, representing *both* the cheese and the dish.
-            * The character '.' maps to `len(Channel)+1`, i.e. none of
-              the above, representing the absence of an item.
-    """
-    height: int
-    width: int
-    char_map = {
-        '#': Channel.WALL,
-        '@': Channel.MOUSE,
-        'd': Channel.DISH,
-        'c': Channel.CHEESE,
-        'b': len(Channel),   # BOTH
-        '.': len(Channel)+1, # PATH
-        # TODO: I should switch these to using a standalone enum...
-    }
-
-
-    def parse(self, level_str):
-        """
-        Convert an ASCII string depiction of a level into a Level struct.
-        For example:
-
-        >>> p = LevelParser(height=5, width=5)
-        >>> p.parse('''
-        ... # # # # #
-        ... # . . . #
-        ... # @ # d #
-        ... # . . c #
-        ... # # # # #
-        ... ''')
-        Level(
-            wall_map=Array([
-                [1,1,1,1,1],
-                [1,0,0,0,1],
-                [1,0,1,0,1],
-                [1,0,0,0,1],
-                [1,1,1,1,1],
-            ], dtype=bool),
-            cheese_pos=Array([3, 3], dtype=int32),
-            dish_pos=Array([2, 3], dtype=int32),
-            initial_mouse_pos=Array([2, 1], dtype=int32),
-        )
-        >>> p.parse('''
-        ... # # # # #
-        ... # . . @ #
-        ... # . # # #
-        ... # . . b #
-        ... # # # # #
-        ... ''')
-        Level(
-            wall_map=Array([
-                [1,1,1,1,1],
-                [1,0,0,0,1],
-                [1,0,1,1,1],
-                [1,0,0,0,1],
-                [1,1,1,1,1],
-            ], dtype=bool),
-            cheese_pos=Array([3, 3], dtype=int32),
-            dish_pos=Array([3, 3], dtype=int32),
-            initial_mouse_pos=Array([1, 3], dtype=int32),
-        )
-        """
-        # parse into grid of IntEnum elements
-        level_grid = [
-            [self.char_map[e] for e in line.split()]
-            for line in level_str.strip().splitlines()
-        ]
-        assert len(level_grid) == self.height, "wrong height"
-        assert all([len(r) == self.width for r in level_grid]), "wrong width"
-        level_map = jnp.asarray(level_grid)
-        
-        # extract wall map
-        wall_map = (level_map == Channel.WALL)
-        assert wall_map[0,:].all(), "top border incomplete"
-        assert wall_map[:,0].all(), "left border incomplete"
-        assert wall_map[-1,:].all(), "bottom border incomplete"
-        assert wall_map[:,-1].all(), "right border incomplete"
-        
-        # extract cheese position
-        cheese_map = (
-            (level_map == Channel.CHEESE)
-            | (level_map == len(Channel)) # both dish and cheese
-        )
-        assert cheese_map.sum() == 1, "there must be exactly one cheese"
-        cheese_pos = jnp.concatenate(
-            jnp.where(cheese_map, size=1)
-        )
-        
-        # extract dish position
-        dish_map = (
-            (level_map == Channel.DISH)
-            | (level_map == len(Channel)) # both dish and cheese
-        )
-        assert dish_map.sum() == 1, "there must be exactly one dish"
-        dish_pos = jnp.concatenate(
-            jnp.where(dish_map, size=1)
-        )
-
-        # extract mouse spawn position
-        mouse_spawn_map = (level_map == Channel.MOUSE)
-        assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
-        initial_mouse_pos = jnp.concatenate(
-            jnp.where(mouse_spawn_map, size=1)
-        )
-
-        return Level(
-            wall_map=wall_map,
-            cheese_pos=cheese_pos,
-            dish_pos=dish_pos,
-            initial_mouse_pos=initial_mouse_pos,
-        )
-
 
 class LevelMetrics(base.LevelMetrics):
-
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def compute_metrics(
@@ -992,6 +871,10 @@ class LevelMetrics(base.LevelMetrics):
         opt_dists_solvable_pile = solvable_pile * opt_dists_pile
         opt_dists_finite_pile = jnp.nan_to_num(opt_dists_pile, posinf=(h-2)*(w-2)/2)
 
+        #buffer
+        cheese_on_pile= (levels.cheese_pos[:, 0] == levels.napkin_pos[:, 0]) & (levels.cheese_pos[:, 1] == levels.napkin_pos[:, 1])
+        cheese_on_pile_avg =  cheese_on_pile.mean()
+
         #tracking elements on pile
         objects_on_cheese = (
             (levels.dish_pos == levels.cheese_pos).all(axis=1) +
@@ -999,18 +882,23 @@ class LevelMetrics(base.LevelMetrics):
             (levels.spoon_pos == levels.cheese_pos).all(axis=1) +
             (levels.glass_pos == levels.cheese_pos).all(axis=1) +
             (levels.mug_pos == levels.cheese_pos).all(axis=1) 
-            ).sum()
+            ).mean()
         objects_on_pile = (
             (levels.dish_pos == levels.napkin_pos).all(axis=1) +
             (levels.fork_pos == levels.napkin_pos).all(axis=1) +
             (levels.spoon_pos == levels.napkin_pos).all(axis=1) +
             (levels.glass_pos == levels.napkin_pos).all(axis=1) +
             (levels.mug_pos == levels.napkin_pos).all(axis=1) 
-            ).sum()
+            ).mean()
         
-        if levels.cheese_pos == levels.napkin_pos: #sufficient to check 5 + this because the napkin is always the last to be added
-            objects_on_cheese = 6
-            objects_on_pile = 0
+        dish_napkin_same = jnp.all(jnp.all(levels.dish_pos == levels.napkin_pos, axis=1))
+
+
+        objects_on_cheese, objects_on_pile = lax.cond(
+            dish_napkin_same,
+            lambda: (jnp.float32(6), jnp.float32(0)),
+            lambda: (objects_on_cheese, objects_on_pile)
+        )
 
 
         # rendered levels in a grid
@@ -1047,8 +935,8 @@ class LevelMetrics(base.LevelMetrics):
                 'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
                 'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
                 'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
-                'dish_map_avg_img': util.viridis(dish_map.mean(axis=0)),
-                'dish_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
+                'pile_map_avg_img': util.viridis(dish_map.mean(axis=0)),
+                'pile_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
 
             },
             'distances': {
@@ -1057,24 +945,26 @@ class LevelMetrics(base.LevelMetrics):
                 'solvable_avg': solvable.mean(),
                 'solvable_wavg': solvable @ weights,
                 # optimal dist mouse to cheese
-                'mouse_cheese_dist_finite_hist': opt_dists_finite_cheese,
-                'mouse_cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
-                'mouse_cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
-                'mouse_cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
-                'mouse_cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
-                # optimal dist from mouse to dish
-                'mouse_dish_dist_finite_hist': opt_dists_finite_pile,
-                'mouse_dish_dist_finite_avg': opt_dists_finite_pile.mean(),
-                'mouse_dish_dist_finite_wavg': (opt_dists_finite_pile @ weights),
-                'mouse_dish_dist_solvable_avg': opt_dists_solvable_pile.sum() / solvable_pile.sum(),
-                'mouse_dish_dist_solvable_wavg': (opt_dists_solvable_pile @ weights) / (solvable_pile @ weights),
+                'mouse-cheese_dist_finite_hist': opt_dists_finite_cheese,
+                'mouse-cheese_dist_finite_avg': opt_dists_finite_cheese.mean(),
+                'mouse-cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
+                'mouse-cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
+                'mouse-cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
+                # optimal dist from mouse to pile
+                'mouse-pile_dist_finite_hist': opt_dists_finite_pile,
+                'mouse-pile_dist_finite_avg': opt_dists_finite_pile.mean(),
+                'mouse-pile_dist_finite_wavg': (opt_dists_finite_pile @ weights),
+                'mouse-pile_dist_solvable_avg': opt_dists_solvable_pile.sum() / solvable_pile.sum(),
+                'mouse-pile_dist_solvable_wavg': (opt_dists_solvable_pile @ weights) / (solvable_pile @ weights),
                 # avg cheese-dish distance
-                'cheese_dish_dist_hist': cheese_pile_dists_finite,
-                'cheese_dish_dist_avg': avg_cheese_pile_dist,
-                'cheese_dish_dist_wavg': cheese_pile_dists_finite @ weights,
+                'cheese-pile_dist_hist': cheese_pile_dists_finite,
+                'cheese-pile_dist_avg': avg_cheese_pile_dist,
+                'cheese-pile_dist_wavg': cheese_pile_dists_finite @ weights,
                 # elements on cheese and pile
-                'objects_on_cheese': objects_on_cheese,
-                'objects_on_pile': objects_on_pile,
+                '#objects_on_cheese': objects_on_cheese,
+                '#objects_on_pile': objects_on_pile,
 
-            },
+                #buffer metrics
+                'levels_cheese_is_on_pile_avg':  cheese_on_pile_avg 
+            },  
         }
