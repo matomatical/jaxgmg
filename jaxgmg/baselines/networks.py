@@ -184,7 +184,7 @@ class Impala(ActorCriticNetwork):
 
     Fields:
 
-    * cnn_size: "mlp", "small" or "large"
+    * cnn_type: "mlp", "small" or "large"
             The size of the CNN for embedding observation images.
             * "mlp", a small fully-connected residual ReLU network.
             * "small", the CNN (from figure 3-right in the paper).
