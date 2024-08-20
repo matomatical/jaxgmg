@@ -377,19 +377,6 @@ def wandb_run(f):
     return g
 
 
-class RunFilesManager:
-    def __init__(self, root_path="out/"):
-        now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        self.path = os.path.abspath(os.path.join(root_path, f'run_{now}'))
-        os.makedirs(self.path, exist_ok=False)
-
-
-    def get_path(self, suffix):
-        path = os.path.join(self.path, suffix)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        return path
-
-
 # # # 
 # Colormaps
 

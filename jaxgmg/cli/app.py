@@ -24,7 +24,6 @@ from jaxgmg.cli import mazegen
 from jaxgmg.cli import mazesoln
 from jaxgmg.cli import parse
 from jaxgmg.cli import play
-from jaxgmg.cli import reevaluate
 from jaxgmg.cli import solve
 from jaxgmg.cli import speedtest
 from jaxgmg.cli import splay
@@ -145,21 +144,6 @@ app.add_typer(make_typer_app(
         play.lava,
         play.monsters,
         play.minimaze,
-    ),
-))
-
-
-# re-evaluation
-app.add_typer(make_typer_app(
-    name='reevaluate',
-    help=reevaluate.__doc__,
-    subcommands=(
-        reevaluate.corner,
-        # reevaluate.dish,
-        # reevaluate.follow,
-        # reevaluate.keys,
-        # reevaluate.lava,
-        # reevaluate.monsters,
     ),
 ))
 

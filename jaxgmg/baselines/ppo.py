@@ -82,15 +82,6 @@ def run(
 ):
 
 
-    # initialising file manager
-    print("initialising run file manager")
-    fileman = util.RunFilesManager(root_path=save_files_to)
-    print("  run folder:", fileman.path)
-
-    
-    # TODO: Would be a good idea to save the config as a file again
-
-
     # TODO: Would be a good idea to checkpoint the training levels and eval
     # levels...
 
@@ -109,14 +100,20 @@ def run(
 
     
     # initialise the checkpointer
-    checkpoint_path = fileman.get_path("checkpoints")
-    checkpoint_manager = ocp.CheckpointManager(
-        directory=checkpoint_path,
-        options=ocp.CheckpointManagerOptions(
-            max_to_keep=None if keep_all_checkpoints else max_num_checkpoints,
-            save_interval_steps=num_cycles_per_checkpoint,
-        ),
-    )
+    if checkpointing and not wandb_log:
+        print("WARNING: checkpointing requested without wandb logging.")
+        print("WARNING: disabling checkpointing!")
+        checkpointing = False
+    elif checkpointing:
+        checkpoint_path = os.path.join(wandb.run.dir, "checkpoints/")
+        max_to_keep = None if keep_all_checkpoints else max_num_checkpoints
+        checkpoint_manager = ocp.CheckpointManager(
+            directory=checkpoint_path,
+            options=ocp.CheckpointManagerOptions(
+                max_to_keep=max_to_keep,
+                save_interval_steps=num_cycles_per_checkpoint,
+            ),
+        )
 
 
     # set up optimiser
@@ -308,37 +305,15 @@ def run(
             # log to wandb
             if wandb_log:
                 wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
-            
-            # either way, log to disk
-            metrics_disk = util.flatten_dict(metrics)
-            metrics_path = fileman.get_path(f"metrics/{t}/")
-            progress.write(f"saving metrics to {metrics_path}...")
-            skip_keys = []
-            for key, val in metrics_disk.items():
-                if key.endswith("_hist"):
-                    metrics_disk[key] = val.tolist()
-                elif key.endswith("_gif"):
-                    path = metrics_path + key[:-4].replace('/','-') + ".gif"
-                    util.save_gif(val, path)
-                    skip_keys.append(key)
-                elif key.endswith("_img"):
-                    path = metrics_path + key[:-4].replace('/','-') + ".png"
-                    util.save_image(val, path)
-                    skip_keys.append(key)
-                elif isinstance(val, jax.Array):
-                    metrics_disk[key] = val.item()
-            for key in skip_keys:
-                del metrics_disk[key]
-            util.save_json(metrics_disk, metrics_path + "metrics.json")
 
         
         # periodic checkpointing
         if checkpointing and t % num_cycles_per_checkpoint == 0:
             checkpoint_manager.save(
                 t,
-                args=ocp.args.PyTreeSave(train_state),
+                args=ocp.args.PyTreeSave(train_state.params),
             )
-            progress.write(f"saving checkpoint to {checkpoint_path}/{t}...")
+            progress.write(f"saving checkpoint (wandb will sync at end)...")
 
 
         # ending cycle
@@ -347,9 +322,14 @@ def run(
 
     # ending run
     progress.close()
-    print("finishing checkpoints...")
-    checkpoint_manager.wait_until_finished()
-    checkpoint_manager.close()
+    if checkpointing:
+        print("finishing checkpoints...")
+        checkpoint_manager.wait_until_finished()
+        checkpoint_manager.close()
+        # for some reason I have to manually save these files (I thought
+        # they would be automatically saved since I put them in the run dir,
+        # and the docs say this, but it doesn't seem to be the case...)
+        wandb.save(checkpoint_path + "/**", base_path=wandb.run.dir)
 
 
 # # # 
@@ -610,91 +590,5 @@ def ppo_rnn_loss(
         diagnostics = {}
 
     return total_loss, diagnostics
-
-
-# # # 
-# Restore and evaluate a checkpoint
-
-
-def eval_checkpoint(
-    rng: PRNGKey,
-    checkpoint_path: str,
-    checkpoint_number: int,
-    env: Env,
-    net_spec: str,
-    example_level: Level,
-    evals_dict: dict[str, Eval],
-    save_files_to: str,
-):
-    fileman = util.RunFilesManager(root_path=save_files_to)
-    print("  run folder:", fileman.path)
-    
-    # initialise the checkpointer
-    checkpoint_manager = ocp.CheckpointManager(
-        directory=os.path.abspath(checkpoint_path),
-        options=ocp.CheckpointManagerOptions(
-            max_to_keep=None,
-            save_interval_steps=0,
-        ),
-    )
-    
-    # select agent architecture
-    net = networks.get_architecture(net_spec, num_actions=env.num_actions)
-    # initialise the network to get the example type
-    rng_model_init, rng = jax.random.split(rng, 2)
-    net_init_params, net_init_state = net.init_params_and_state(
-        rng=rng_model_init,
-        obs_type=env.obs_type(level=example_level),
-    )
-
-    # reload checkpoint of interest
-    train_state = TrainState.create(
-        apply_fn=net.apply,
-        params=net_init_params,
-        tx=optax.sgd(0), # dummy, will be overridden
-    )
-    train_state_dtype = jax.tree.map(
-        ocp.utils.to_shape_dtype_struct,
-        train_state,
-    )
-    train_state = checkpoint_manager.restore(
-        checkpoint_number,
-        args=ocp.args.PyTreeRestore(train_state_dtype),
-    )
-
-    # perform evals and log metrics
-    metrics = {}
-    for eval_name, eval_obj in evals_dict.items():
-        print("running eval", eval_name, "...")
-        rng_eval, rng = jax.random.split(rng)
-        metrics[eval_name] = eval_obj.eval(
-            rng=rng_eval,
-            train_state=train_state,
-            net_init_state=net_init_state,
-        )
-        print(util.dict2str(metrics[eval_name]))
-        print("=" * 59)
-        
-    # log the metrics disk
-    metrics_disk = util.flatten_dict(metrics)
-    metrics_path = fileman.get_path(f"metrics/")
-    print(f"saving metrics to {metrics_path}...")
-    skip_keys = []
-    for key, val in metrics_disk.items():
-        if key.endswith("_hist"):
-            metrics_disk[key] = val.tolist()
-        elif key.endswith("_gif"):
-            path = metrics_path + key[:-4].replace('/','-') + ".gif"
-            util.save_gif(val, path)
-            skip_keys.append(key)
-        elif key.endswith("_img"):
-            path = metrics_path + key[:-4].replace('/','-') + ".png"
-            util.save_image(val, path)
-            skip_keys.append(key)
-        elif isinstance(val, jax.Array):
-            metrics_disk[key] = val.item()
-    for key in skip_keys:
-        del metrics_disk[key]
-    util.save_json(metrics_disk, metrics_path + "metrics.json")
 
 
