@@ -2,6 +2,7 @@
 Actor-critic architectures for RL experiments.
 """
 
+import functools
 from typing import Callable, Literal
 
 import jax
@@ -9,7 +10,7 @@ import jax.numpy as jnp
 import flax.linen as nn
 import distrax
 
-from chex import ArrayTree, PRNGKey
+from chex import Array, ArrayTree, PRNGKey
 from jaxgmg.environments.base import Observation
 
 
@@ -62,6 +63,11 @@ class ActorCriticNetwork(nn.Module):
     num_actions: int
 
 
+    @property
+    def is_recurrent(self) -> bool:
+        raise NotImplementedError
+
+
     def init_params_and_state(self, rng, obs_type):
         rng_init_state, rng_init_params = jax.random.split(rng)
         init_state = self.initialize_state(rng=rng_init_state)
@@ -78,13 +84,93 @@ class ActorCriticNetwork(nn.Module):
         raise NotImplementedError
 
 
+    @functools.partial(jax.jit, static_argnames=['self'])
     def __call__(
         self,
         obs: Observation,
         state: ActorCriticState,
         prev_action: int,
-    ):
+    ) -> tuple[
+        distrax.Categorical,
+        float,
+        ActorCriticState,
+    ]:
         raise NotImplementedError
+
+
+# # # 
+# Pure function that works with an actor critic network
+
+
+def evaluate_sequence_recurrent(
+    net_params: ActorCriticParams,
+    net_apply: ActorCriticForwardPass,
+    net_init_state: ActorCriticState,
+    obs_sequence: Observation,  # Observation[num_steps]
+    done_sequence: Array,       # bool[num_steps]
+    action_sequence: Array,     # int[num_steps]
+) -> tuple[
+    Array, # distrax.Categorical[num_steps] (action_distributions)
+    Array, # float[num_steps] (values)
+]:
+    # scan through the trajectory
+    default_prev_action = -1
+    initial_carry = (
+        net_init_state,
+        default_prev_action,
+    )
+    transitions = (
+        obs_sequence,
+        done_sequence,
+        action_sequence,
+    )
+    def _net_step(carry, transition):
+        net_state, prev_action = carry
+        obs, done, chosen_action = transition
+        # apply network
+        action_distribution, critic_value, next_net_state = net_apply(
+            net_params,
+            obs,
+            net_state,
+            prev_action,
+        )
+        # reset to net_init_state and default_prev_action when done
+        next_net_state, next_prev_action = jax.tree.map(
+            lambda r, s: jnp.where(done, r, s),
+            (net_init_state, default_prev_action),
+            (next_net_state, chosen_action),
+        )
+        carry = (next_net_state, next_prev_action)
+        output = (action_distribution, critic_value)
+        return carry, output
+    _final_carry, (action_distributions, critic_values) = jax.lax.scan(
+        _net_step,
+        initial_carry,
+        transitions,
+    )
+    return action_distributions, critic_values
+
+
+def evaluate_sequence_parallel(
+    net_params: ActorCriticParams,
+    net_apply: ActorCriticForwardPass,
+    obs_sequence: Observation,              # Observation[num_steps]
+    net_state_sequence: ActorCriticState,   # ActorCriticState[num_steps]
+    prev_action_sequence: Array,            # int[num_steps]
+) -> tuple[
+    Array, # distrax.Categorical[num_steps] (action_distributions)
+    Array, # float[num_steps] (values)
+]:
+    action_distributions, critic_values, _net_states = jax.vmap(
+        net_apply,
+        in_axes=(None, 0, 0, 0),
+    )(
+        net_params,
+        obs_sequence,
+        net_state_sequence,
+        prev_action_sequence,
+    )
+    return action_distributions, critic_values
 
 
 # # # 
@@ -190,7 +276,21 @@ class Impala(ActorCriticNetwork):
 
         return pi, v, next_state
 
+    
+    @property
+    def is_recurrent(self) -> bool:
+        match self.rnn_type:
+            case "ff":
+                return False
+            case "lstm":
+                return True
+            case "gru":
+                return True
+            case _:
+                raise ValueError(f"Unknown RNN type {self.rnn_type}")
 
+
+    @functools.partial(jax.jit, static_argnames=['self'])
     def initialize_state(self, rng: PRNGKey) -> ActorCriticState:
         match self.rnn_type:
             case "ff":

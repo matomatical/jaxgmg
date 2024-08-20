@@ -258,7 +258,7 @@ def run(
         if log_cycle:
             ppo_start_time = time.perf_counter()
         # ppo step
-        train_state, ppo_metrics = ppo_update_recurrent(
+        train_state, ppo_metrics = ppo_update(
             rng=rng_update,
             train_state=train_state,
             net_init_state=net_init_state,
@@ -270,6 +270,7 @@ def run(
             clip_eps=ppo_clip_eps,
             entropy_coeff=ppo_entropy_coeff,
             critic_coeff=ppo_critic_coeff,
+            do_backprop_thru_time=net.is_recurrent,
             compute_metrics=log_cycle,
         )
         if log_cycle:
@@ -333,7 +334,7 @@ def run(
 
 
 # # # 
-# PPO update (recurrent)
+# PPO update
 
 
 @functools.partial(
@@ -341,10 +342,11 @@ def run(
     static_argnames=(
         'num_epochs',
         'num_minibatches_per_epoch',
+        'do_backprop_thru_time',
         'compute_metrics',
     ),
 )
-def ppo_update_recurrent(
+def ppo_update(
     rng: PRNGKey,
     train_state: TrainState,
     net_init_state: networks.ActorCriticState,
@@ -357,6 +359,7 @@ def ppo_update_recurrent(
     clip_eps: float,
     entropy_coeff: float,
     critic_coeff: float,
+    do_backprop_thru_time: bool,
     # metrics
     compute_metrics: bool,
 ) -> tuple[
@@ -391,7 +394,7 @@ def ppo_update_recurrent(
         )
         # process each minibatch
         def _minibatch(train_state, minibatch):
-            loss_aux_grad = jax.value_and_grad(ppo_rnn_loss, has_aux=True)
+            loss_aux_grad = jax.value_and_grad(ppo_loss, has_aux=True)
             (loss, diagnostics), grads = loss_aux_grad(
                 train_state.params,
                 net_apply=train_state.apply_fn,
@@ -402,6 +405,7 @@ def ppo_update_recurrent(
                 clip_eps=clip_eps,
                 critic_coeff=critic_coeff,
                 entropy_coeff=entropy_coeff,
+                do_backprop_thru_time=do_backprop_thru_time,
                 compute_diagnostics=compute_metrics,
             )
             train_state = train_state.apply_gradients(grads=grads)
@@ -450,64 +454,18 @@ def ppo_update_recurrent(
 
 
 # # # 
-# PPO loss function (recurrent)
-
-
-@functools.partial(jax.jit, static_argnames=['net_apply'])
-def evaluate_rollout(
-    net_params: networks.ActorCriticParams,
-    net_apply: networks.ActorCriticForwardPass,
-    net_init_state: networks.ActorCriticState,
-    obs_sequence: Observation,  # Observation[num_steps]
-    done_sequence: Array,       # bool[num_steps]
-    action_sequence: Array,     # int[num_steps]
-) -> tuple[
-    Array, # distrax.Categorical[num_steps] (action_distributions)
-    Array, # float[num_steps] (values)
-]:
-    # scan through the trajectory
-    default_prev_action = -1
-    initial_carry = (
-        net_init_state,
-        default_prev_action,
-    )
-    transitions = (
-        obs_sequence,
-        done_sequence,
-        action_sequence,
-    )
-    def _net_step(carry, transition):
-        net_state, prev_action = carry
-        obs, done, chosen_action = transition
-        # apply network
-        action_distribution, critic_value, next_net_state = net_apply(
-            net_params,
-            obs,
-            net_state,
-            prev_action,
-        )
-        # reset to net_init_state and default_prev_action when done
-        next_net_state, next_prev_action = jax.tree.map(
-            lambda r, s: jnp.where(done, r, s),
-            (net_init_state, default_prev_action),
-            (next_net_state, chosen_action),
-        )
-        carry = (next_net_state, next_prev_action)
-        output = (action_distribution, critic_value)
-        return carry, output
-    _final_carry, (action_distributions, critic_values) = jax.lax.scan(
-        _net_step,
-        initial_carry,
-        transitions,
-    )
-    return action_distributions, critic_values
+# PPO loss function
 
 
 @functools.partial(
     jax.jit,
-    static_argnames=('net_apply', 'compute_diagnostics'),
+    static_argnames=[
+        'net_apply',
+        'do_backprop_thru_time',
+        'compute_diagnostics',
+    ],
 )
-def ppo_rnn_loss(
+def ppo_loss(
     params: networks.ActorCriticParams,
     net_apply: networks.ActorCriticForwardPass,
     net_init_state: networks.ActorCriticState,
@@ -517,23 +475,40 @@ def ppo_rnn_loss(
     clip_eps: float,
     critic_coeff: float,
     entropy_coeff: float,
+    do_backprop_thru_time: bool,
     compute_diagnostics: bool,  # if False, second return value is empty dict
 ) -> tuple[
     float,                      # loss
     dict[str, float],           # loss components and other diagnostics
 ]:
     # run latest network to get current value/action predictions
-    action_distribution, value = jax.vmap(
-        evaluate_rollout,
-        in_axes=(None, None, None, 0, 0, 0)
-    )(
-        params,
-        net_apply,
-        net_init_state,
-        transitions.obs,
-        transitions.done,
-        transitions.action,
-    )
+    if do_backprop_thru_time:
+        # recompute hidden states to allow backpropagation thru time (BPTT)
+        print("[ppo_loss.trace] doing bptt")
+        action_distribution, value = jax.vmap(
+            networks.evaluate_sequence_recurrent,
+            in_axes=(None, None, None, 0, 0, 0)
+        )(
+            params,
+            net_apply,
+            net_init_state,
+            transitions.obs,
+            transitions.done,
+            transitions.action,
+        )
+    else:
+        # use cached inputs and run forward pass in parallel (no BPTT)
+        print("[ppo_loss.trace] not doing bptt")
+        action_distribution, value = jax.vmap(
+            networks.evaluate_sequence_parallel,
+            in_axes=(None, None, 0, 0, 0),
+        )(
+            params,
+            net_apply,
+            transitions.obs,
+            transitions.net_state,
+            transitions.prev_action,
+        )
 
     # actor loss
     log_prob = action_distribution.log_prob(transitions.action)
