@@ -377,6 +377,20 @@ def wandb_run(f):
     return g
 
 
+def wandb_define_metrics(
+    example_metrics: dict,
+    step_metric_prefix_mapping: str,
+):
+    for metric_name in flatten_dict(example_metrics):
+        for prefix in step_metric_prefix_mapping:
+            if metric_name.startswith(prefix):
+                wandb.define_metric(
+                    metric_name,
+                    step_metric=step_metric_prefix_mapping[prefix],
+                )
+                break
+
+
 # # # 
 # Colormaps
 

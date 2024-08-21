@@ -95,7 +95,8 @@ def run(
     num_updates_per_cycle = num_epochs_per_cycle * num_minibatches_per_epoch
     
 
-    # TODO: define wandb axes
+    # define wandb metrics at the end of the first loop (wandb sucks)
+    metrics_undefined = True
 
     
     # initialise the checkpointer
@@ -166,7 +167,7 @@ def run(
             metrics['step'].update({
                 'ppo-update': t_ppo_before,
                 'env-step': t_env_before,
-                'ppo-update-ater': t_ppo_after,
+                'ppo-update-after': t_ppo_after,
                 'env-step-after': t_env_after,
             })
 
@@ -304,6 +305,21 @@ def run(
             
             # log to wandb
             if wandb_log:
+                # first time: define metrics
+                if metrics_undefined:
+                    wandb.define_metric("step/env-step-after")
+                    wandb.define_metric("step/ppo-update-after")
+                    util.wandb_define_metrics(
+                        example_metrics=metrics,
+                        step_metric_prefix_mapping={
+                            "env/": "step/env-step-after",
+                            "eval/": "step/env-step-after",
+                            "ued/": "step/env-step-after",
+                            "ppo/": "step/ppo-update-after",
+                        },
+                    )
+                    metrics_undefined = False
+                # log metrics
                 wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
 
         
@@ -483,7 +499,6 @@ def ppo_loss(
     # run latest network to get current value/action predictions
     if do_backprop_thru_time:
         # recompute hidden states to allow backpropagation thru time (BPTT)
-        print("[ppo_loss.trace] doing bptt")
         action_distribution, value = jax.vmap(
             networks.evaluate_sequence_recurrent,
             in_axes=(None, None, None, 0, 0, 0)
@@ -497,7 +512,6 @@ def ppo_loss(
         )
     else:
         # use cached inputs and run forward pass in parallel (no BPTT)
-        print("[ppo_loss.trace] not doing bptt")
         action_distribution, value = jax.vmap(
             networks.evaluate_sequence_parallel,
             in_axes=(None, None, 0, 0, 0),
