@@ -44,7 +44,7 @@ def corner(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "proxy_regret",
+    plr_regret_estimator: str = "PVL",
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -120,6 +120,12 @@ def corner(
         env=env,
         discount_rate=ppo_gamma,
     )
+            
+    print("configuring level metrics...")
+    level_metrics = cheese_in_the_corner.LevelMetrics(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
 
     print("TODO: configure parser and fixed eval levels...")
 
@@ -141,6 +147,7 @@ def corner(
         orig_level_generator=orig_level_generator,
         shift_level_generator=shift_level_generator,
         level_solver=level_solver,
+        level_metrics=level_metrics,
         splayer=splayer,
         fixed_eval_levels={},
         # non-environment-specific stuff
@@ -281,6 +288,12 @@ def dish(
     
     print("TODO: implement level solver...")
     
+    print("configuring level metrics...")
+    level_metrics = cheese_on_a_dish.LevelMetrics(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
+
     print("TODO: implement level splayers for heatmap evals...")
     
     print("TODO: configure parser and fixed eval levels...")
@@ -292,6 +305,7 @@ def dish(
         orig_level_generator=orig_level_generator,
         shift_level_generator=shift_level_generator,
         level_solver=None,
+        level_metrics=level_metrics,
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
@@ -447,6 +461,12 @@ def pile(
     
     print("TODO: implement level solver...")
     
+    print("configuring level metrics...")
+    level_metrics = cheese_on_a_pile.LevelMetrics(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
+    
     print("TODO: implement level splayers for heatmap evals...")
     
     print("TODO: configure parser and fixed eval levels...")
@@ -458,6 +478,7 @@ def pile(
         orig_level_generator=orig_level_generator,
         shift_level_generator=shift_level_generator,
         level_solver=None,
+        level_metrics=level_metrics,
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
@@ -606,6 +627,8 @@ def keys(
     
     print("TODO: implement level solver...")
     
+    print("TODO: implement level metrics...")
+    
     print("TODO: implement level splayers for heatmap evals...")
     
     print("TODO: configure parser and fixed eval levels...")
@@ -617,6 +640,7 @@ def keys(
         orig_level_generator=orig_level_generator,
         shift_level_generator=shift_level_generator,
         level_solver=None,
+        level_metrics=None,
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
@@ -755,6 +779,12 @@ def minimaze(
     )
 
     print("TODO: implement level solver...")
+    
+    print("configuring level metrics...")
+    level_metrics = minigrid_maze.LevelMetrics(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
     
     print("TODO: implement level splayers for heatmap evals...")
     
@@ -1009,6 +1039,7 @@ def minimaze(
         orig_level_generator=orig_level_generator,
         shift_level_generator=shift_level_generator,
         level_solver=None,
+        level_metrics=level_metrics,
         splayer=None,
         fixed_eval_levels=fixed_eval_levels,
         # non-environment-specific stuff
@@ -1124,6 +1155,7 @@ def memory_test(
         orig_level_generator=orig_level_generator,
         shift_level_generator=None,
         level_solver=None,
+        level_metrics=None,
         splayer=None,
         fixed_eval_levels={},
         # non-environment-specific stuff
@@ -1174,6 +1206,7 @@ def ppo_training_run(
     orig_level_generator: base.LevelGenerator,
     shift_level_generator: base.LevelGenerator,
     level_solver: base.LevelSolver | None,
+    level_metrics: base.LevelMetrics | None,
     splayer: Callable | None,
     fixed_eval_levels: dict[str, base.Level],
     # policy config
@@ -1260,10 +1293,7 @@ def ppo_training_run(
     elif ued == "plr":
         gen = autocurricula.PrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_metrics=cheese_in_the_corner.LevelMetrics(
-                env=env,
-                discount_rate=ppo_gamma,
-            ),
+            level_metrics=level_metrics,
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
@@ -1277,10 +1307,7 @@ def ppo_training_run(
     elif ued == "plr-parallel":
         gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
             level_generator=train_level_generator,
-            level_metrics=cheese_in_the_corner.LevelMetrics(
-                env=env,
-                discount_rate=ppo_gamma,
-            ),
+            level_metrics=level_metrics,
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,

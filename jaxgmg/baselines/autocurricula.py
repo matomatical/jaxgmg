@@ -217,7 +217,7 @@ def plr_compute_scores(
         case "maxmc":
             raise NotImplementedError # TODO
         case _:
-            raise ValueError("Invalid return estimator.")
+            raise ValueError(f"Invalid regret estimator: {regret_estimator}")
 
 
 @struct.dataclass
