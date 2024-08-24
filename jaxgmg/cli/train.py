@@ -16,7 +16,10 @@ from jaxgmg.environments import minigrid_maze
 from jaxgmg.baselines import ppo
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import evals
-from jaxgmg.baselines import autocurricula
+from jaxgmg.baselines.autocurricula import domain_randomisation
+from jaxgmg.baselines.autocurricula import finite_domain_randomisation
+from jaxgmg.baselines.autocurricula import prioritised_level_replay
+from jaxgmg.baselines.autocurricula import parallel_prioritised_level_replay
 
 from jaxgmg import util
 
@@ -1106,6 +1109,13 @@ def memory_test(
     ppo_lr_annealing: bool = False,
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
+    # curriculum
+    ued: str = "dr",
+    plr_buffer_size: int = 2048,
+    plr_temperature: float = 0.1,
+    plr_staleness_coeff: float = 0.1,
+    plr_prob_replay: float = 0.5,
+    plr_regret_estimator: str = "PVL",
     # training dimensions
     num_total_env_steps: int = 1000_000,
     num_env_steps_per_cycle: int = 64,
@@ -1161,14 +1171,14 @@ def memory_test(
         # non-environment-specific stuff
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
-        ued="dr",
+        ued=ued,
         prob_shift=0.0,
-        num_train_levels=None,
-        plr_buffer_size=None,
-        plr_temperature=None,
-        plr_staleness_coeff=None,
-        plr_prob_replay=None,
-        plr_regret_estimator=None,
+        num_train_levels=plr_buffer_size,
+        plr_buffer_size=plr_buffer_size,
+        plr_temperature=plr_temperature,
+        plr_staleness_coeff=plr_staleness_coeff,
+        plr_prob_replay=plr_prob_replay,
+        plr_regret_estimator=plr_regret_estimator,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1277,7 +1287,7 @@ def ppo_training_run(
     print("configuring curriculum...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
-        gen = autocurricula.InfiniteDomainRandomisation(
+        gen = domain_randomisation.CurriculumGenerator(
             level_generator=train_level_generator,
         )
         gen_state = gen.init()
@@ -1286,12 +1296,12 @@ def ppo_training_run(
             rng_train_levels,
             num_levels=num_train_levels,
         )
-        gen = autocurricula.FiniteDomainRandomisation()
+        gen = finite_domain_randomisation.CurriculumGenerator()
         gen_state = gen.init(
             levels=train_levels,
         )
     elif ued == "plr":
-        gen = autocurricula.PrioritisedLevelReplay(
+        gen = prioritised_level_replay.CurriculumGenerator(
             level_generator=train_level_generator,
             level_metrics=level_metrics,
             buffer_size=plr_buffer_size,
@@ -1305,7 +1315,7 @@ def ppo_training_run(
             batch_size_hint=num_parallel_envs,
         )
     elif ued == "plr-parallel":
-        gen = autocurricula.ParallelRobustPrioritisedLevelReplay(
+        gen = parallel_prioritised_level_replay.CurriculumGenerator(
             level_generator=train_level_generator,
             level_metrics=level_metrics,
             buffer_size=plr_buffer_size,

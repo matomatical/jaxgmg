@@ -22,7 +22,6 @@ import wandb
 from jaxgmg import util
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import experience
-from jaxgmg.baselines import autocurricula
 
 
 # # # 
@@ -33,7 +32,8 @@ from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
 from jaxgmg.baselines.experience import Transition, Rollout
 from jaxgmg.baselines.evals import Eval
-from jaxgmg.baselines.autocurricula import CurriculumLevelGenerator
+from jaxgmg.baselines.autocurricula.base import CurriculumGenerator
+from jaxgmg.baselines.autocurricula.base import GeneratorState
 
 
 # # # 
@@ -43,8 +43,8 @@ from jaxgmg.baselines.autocurricula import CurriculumLevelGenerator
 def run(
     rng: PRNGKey,
     env: Env,
-    gen: CurriculumLevelGenerator,
-    gen_state: CurriculumLevelGenerator.State,
+    gen: CurriculumGenerator,
+    gen_state: GeneratorState,
     # network
     net: networks.ActorCriticNetwork,
     net_init_params: networks.ActorCriticParams,
