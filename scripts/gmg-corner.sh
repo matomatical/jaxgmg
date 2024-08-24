@@ -14,7 +14,6 @@ if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs01 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 1 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 1 ]; then
@@ -22,7 +21,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 1 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs01 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 1 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 2 ]; then
@@ -30,7 +28,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 2 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs02 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 2 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 3 ]; then
@@ -38,7 +35,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 3 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs02 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 2 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 4 ]; then
@@ -46,7 +42,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 4 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs03 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 3 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 5 ]; then
@@ -54,7 +49,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 5 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs03 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 3 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 6 ]; then
@@ -62,7 +56,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 6 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs04 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 4 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 7 ]; then
@@ -70,7 +63,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 7 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs04 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 4 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 8 ]; then
@@ -78,7 +70,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 8 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs05 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 5 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 9 ]; then
@@ -86,7 +77,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 9 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs05 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 5 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 10 ]; then
@@ -94,7 +84,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 10 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs06 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 6 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 11 ]; then
@@ -102,7 +91,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 11 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs06 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 6 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 12 ]; then
@@ -110,7 +98,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 12 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs07 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 7 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 13 ]; then
@@ -118,7 +105,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 13 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs07 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 7 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 14 ]; then
@@ -126,7 +112,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 14 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs08 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 8 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 15 ]; then
@@ -134,7 +119,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 15 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs08 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 8 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 16 ]; then
@@ -142,7 +126,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 16 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs09 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 9 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 17 ]; then
@@ -150,7 +133,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 17 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs09 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 9 --ued plr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 18 ]; then
@@ -158,7 +140,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 18 ]; then
         --wandb-log --no-console-log --wandb-name dr-cs10 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 10 --ued dr;
 elif [ $SLURM_ARRAY_TASK_ID -eq 19 ]; then
@@ -166,7 +147,6 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 19 ]; then
         --wandb-log --no-console-log --wandb-name plr-cs10 \
         --wandb-entity matthew-farrugia-roberts --wandb-project corner-gmg \
         --num-total-env-steps 200_000_000 --no-env-penalize-time \
-        --env-terminate-after-corner \
         --net-cnn-type large --net-rnn-type lstm \
         --env-corner-size 10 --ued plr;
 fi
