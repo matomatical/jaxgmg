@@ -27,7 +27,7 @@ class Transition:
     Captures data involved in one environment step, from the observation to
     the actor/critic response to the reward, termination, and info response
     from the environment. Note: the next env_state and observation etc. is
-    represented in the next transition (or the the final transition in the
+    represented in the next transition (or for the final transition in the
     rollout, it's represented in the rollout itself.
     """
     env_state: EnvState
@@ -481,17 +481,28 @@ def compute_average_return(
 
 @jax.jit
 def generalised_advantage_estimation(
-    rollout: Rollout, # Rollout (with Transition[num_steps])
+    rewards: Array,         # float[num_steps]
+    dones: Array,           # bool[num_steps]
+    values: Array,          # float[num_steps]
+    final_value: float,
     lambda_: float,
     discount_rate: float,
 ) -> Array:
     """
-    Given a rollouts, perform generalised advantage estimation.
+    Given a sequence of (reward, done, value) triples, estimate generalised
+    advantages.
 
     Inputs:
     
-    * rollout: Rollout (with Transition[num_steps] inside)
-            The rollout to score.
+    * rewards : float[num_steps]
+            Scalar rewards delivered at the conclusion of each timestep.
+    * dones : bool[num_steps]
+            True indicates that this timestep marks the end of an episode.
+    * values : float[num_steps]
+            Scalar value estimate from the critic of the state at this
+            timestep (before the transition).
+    * final_value : float
+            Scalar value estimate from the critic after the final timestep.
     * lambda : float
             Used in definition of GAE.
     * discount_rate : float
@@ -499,30 +510,39 @@ def generalised_advantage_estimation(
 
     Returns:
 
-    * advantages : float[num_steps]
+    * gaes : float[num_steps]
             The generalised advantage estimates across the trajectory.
+
+    Notes:
+
+    * The 'dones' flags indicate episode termination and also truncation.
+      When an episode is terminated it's fine to assume there is no value
+      left but when an episode is truncated this may not be correct.
+      Nevertheless, with the exception of the final episode represented in
+      the trajectory (for which we have `final_value` representing the value
+      from after the final step) we ignore this distinction for simplicity
+      (this also follows the original PPO implementation and PureJaxRL).
     """
     # reverse scan through num_steps axis
-    initial_carry = (0, rollout.final_value)
-    def _gae_accum(carry, transition):
-        gae, next_value = carry
-        reward = transition.reward
-        this_value = transition.value
-        done = transition.done
+    initial_gae_and_next_value = (0, final_value)
+    transitions = (rewards, values, dones)
+    def _gae_reverse_step(gae_and_next_value, transition):
+        gae, next_value = gae_and_next_value
+        reward, this_value, done = transition
         gae = (
             reward
             - this_value
             + (1-done) * discount_rate * (next_value + lambda_ * gae)
         )
         return (gae, this_value), gae
-    _final_carry, advantages = jax.lax.scan(
-        _gae_accum,
-        initial_carry,
-        rollout.transitions,
+    _final_carry, gaes = jax.lax.scan(
+        _gae_reverse_step,
+        initial_gae_and_next_value,
+        transitions,
         reverse=True,
         unroll=16, # TODO: seems to have no noticable effect on speed on cpu
     )
-    return advantages
+    return gaes
 
     
 # # # 

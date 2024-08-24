@@ -229,9 +229,12 @@ def run(
         # generalised advantage estimation
         advantages = jax.vmap(
             experience.generalised_advantage_estimation,
-            in_axes=(0,None,None),
+            in_axes=(0,0,0,0,None,None),
         )(
-            rollouts,
+            rollouts.transitions.reward,
+            rollouts.transitions.done,
+            rollouts.transitions.value,
+            rollouts.final_value,
             ppo_gae_lambda,
             ppo_gamma,
         )
