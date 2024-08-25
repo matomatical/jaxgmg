@@ -420,6 +420,16 @@ class MixtureLevelGenerator(LevelGenerator):
 
 
 # # # 
+# Level mutation
+
+
+@struct.dataclass
+class LevelMutator:
+    pass
+    # TODO
+
+
+# # # 
 # Level parsing
 
 

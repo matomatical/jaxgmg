@@ -27,12 +27,13 @@ from jaxgmg.baselines.autocurricula import dr_infinite
 from jaxgmg.baselines.autocurricula import dr_finite
 from jaxgmg.baselines.autocurricula import plr
 from jaxgmg.baselines.autocurricula import plr_parallel
+from jaxgmg.baselines.autocurricula import accel
 
 # types and abstract base classes used for type annotations
 from typing import Any, Callable
 from chex import Array, PRNGKey
 from jaxgmg.environments.base import EnvState, Env, Level, Observation
-from jaxgmg.environments.base import LevelGenerator
+from jaxgmg.environments.base import LevelGenerator, LevelMutator
 from jaxgmg.environments.base import LevelSolver, LevelMetrics
 from jaxgmg.baselines.experience import Transition, Rollout
 from jaxgmg.baselines.evals import Eval
@@ -49,6 +50,7 @@ def run(
     # environment-specific stuff
     env: Env,
     train_level_generator: LevelGenerator,
+    level_mutator: LevelMutator | None,
     level_solver: LevelSolver | None,
     level_metrics: LevelMetrics | None,
     eval_level_generators: dict[str, LevelGenerator],
@@ -149,6 +151,21 @@ def run(
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
             regret_estimator=plr_regret_estimator,
+        )
+        gen_state = gen.init(
+            rng=rng_train_levels,
+            batch_size_hint=num_parallel_envs,
+        )
+    elif ued == "accel":
+        assert level_mutator is not None, "accel requires mutator"
+        gen = accel.CurriculumGenerator(
+            level_generator=train_level_generator,
+            level_metrics=level_metrics,
+            level_mutator=level_mutator,
+            buffer_size=plr_buffer_size,
+            temperature=plr_temperature,
+            staleness_coeff=plr_staleness_coeff,
+            regret_estimator=regret_estimator,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
