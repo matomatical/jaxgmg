@@ -23,10 +23,10 @@ from jaxgmg.baselines import networks
 from jaxgmg.baselines import experience
 from jaxgmg.baselines import evals
 from jaxgmg.baselines.ppo import ProximalPolicyOptimisation
-from jaxgmg.baselines.autocurricula import domain_randomisation
-from jaxgmg.baselines.autocurricula import finite_domain_randomisation
-from jaxgmg.baselines.autocurricula import prioritised_level_replay
-from jaxgmg.baselines.autocurricula import parallel_prioritised_level_replay
+from jaxgmg.baselines.autocurricula import dr_infinite
+from jaxgmg.baselines.autocurricula import dr_finite
+from jaxgmg.baselines.autocurricula import plr
+from jaxgmg.baselines.autocurricula import plr_parallel
 
 # types and abstract base classes used for type annotations
 from typing import Any, Callable
@@ -114,7 +114,7 @@ def run(
     print(f"configuring curriculum with {ued=}...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
-        gen = domain_randomisation.CurriculumGenerator(
+        gen = dr_infinite.CurriculumGenerator(
             level_generator=train_level_generator,
         )
         gen_state = gen.init()
@@ -123,12 +123,12 @@ def run(
             rng_train_levels,
             num_levels=num_train_levels,
         )
-        gen = finite_domain_randomisation.CurriculumGenerator()
+        gen = dr_finite.CurriculumGenerator()
         gen_state = gen.init(
             levels=train_levels,
         )
     elif ued == "plr":
-        gen = prioritised_level_replay.CurriculumGenerator(
+        gen = plr.CurriculumGenerator(
             level_generator=train_level_generator,
             level_metrics=level_metrics,
             buffer_size=plr_buffer_size,
@@ -142,7 +142,7 @@ def run(
             batch_size_hint=num_parallel_envs,
         )
     elif ued == "plr-parallel":
-        gen = parallel_prioritised_level_replay.CurriculumGenerator(
+        gen = plr_parallel.CurriculumGenerator(
             level_generator=train_level_generator,
             level_metrics=level_metrics,
             buffer_size=plr_buffer_size,
