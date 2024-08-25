@@ -328,7 +328,7 @@ def compute_single_rollout_metrics(
         )
         proxy_reward_per_step = proxy_rewards.mean()
         metrics["proxy_"+proxy_name] = {
-            'avg_return': avg_proxy_returns,
+            'avg_return': avg_proxy_return,
             'reward_per_step': proxy_reward_per_step,
         }
     
