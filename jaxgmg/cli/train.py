@@ -13,7 +13,7 @@ from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import cheese_on_a_pile
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import minigrid_maze
-from jaxgmg.baselines import ppo
+from jaxgmg.baselines import train
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import evals
 from jaxgmg.baselines.autocurricula import domain_randomisation
@@ -1491,7 +1491,7 @@ def ppo_training_run(
     
     # launch the ppo training run
     # TODO: maybe this function should manage the wandb run?
-    ppo.run(
+    train.run(
         rng=rng_train,
         # environment
         env=env,
