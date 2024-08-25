@@ -178,66 +178,78 @@ def run(
                 level_solver.vmap_solve(levels),
                 levels,
             )
-            evals_dict[(levels_name + '_levels', num_cycles_per_eval)] = (
-                evals.FixedLevelsEvalWithBenchmarkReturns(
-                    num_levels=num_eval_levels,
-                    num_steps=num_env_steps_per_eval,
-                    discount_rate=ppo_gamma,
-                    levels=levels,
-                    benchmarks=benchmark_returns,
-                    env=env,
-                )
+            levels_eval = evals.FixedLevelsEvalWithBenchmarkReturns(
+                num_levels=num_eval_levels,
+                num_steps=num_env_steps_per_eval,
+                discount_rate=ppo_gamma,
+                levels=levels,
+                benchmarks=benchmark_returns,
+                env=env,
+                period=num_cycles_per_eval,
             )
         else:
             print("  not solving them (no solver provided)...")
-            evals_dict[(levels_name + '_levels', num_cycles_per_eval)] = (
-                evals.FixedLevelsEval(
-                    num_levels=num_eval_levels,
-                    num_steps=num_env_steps_per_eval,
-                    discount_rate=ppo_gamma,
-                    levels=levels,
-                    env=env,
-                )
-            )
-        evals_dict[(levels_name + "_rollouts", num_cycles_per_big_eval)] = (
-            evals.AnimatedRolloutsEval(
+            levels_eval = evals.FixedLevelsEval(
                 num_levels=num_eval_levels,
+                num_steps=num_env_steps_per_eval,
+                discount_rate=ppo_gamma,
                 levels=levels,
-                num_steps=env.max_steps_in_episode,
-                gif_grid_width=eval_gif_grid_width,
                 env=env,
+                period=num_cycles_per_eval,
             )
+        rollouts_eval = evals.AnimatedRolloutsEval(
+            num_levels=num_eval_levels,
+            levels=levels,
+            num_steps=env.max_steps_in_episode,
+            gif_grid_width=eval_gif_grid_width,
+            env=env,
+            period=num_cycles_per_big_eval,
+        )
+        evals_dict[levels_name] = evals.EvalList.create(
+            levels_eval,
+            rollouts_eval,
         )
 
     print(f"configuring evals for {len(fixed_eval_levels)} fixed eval levels...")
     for level_name, level in fixed_eval_levels.items():
         print(f"  registering fixed level {level_name!r}")
-        eval_name = 'fixed/' + level_name
-        evals_dict[(eval_name, num_cycles_per_eval)] = evals.SingleLevelEval(
+        solo_eval = evals.SingleLevelEval(
             num_steps=num_env_steps_per_eval,
             discount_rate=ppo_gamma,
             level=level,
             env=env,
+            period=num_cycles_per_eval,
         )
         if heatmap_splayer_fn is not None:
             print("  also splaying level for heatmap evals...")
-            splayset = heatmap_splayer_fn(level)
-            eval_name_static = 'heatmaps/static/' + level_name
-            eval_name_rollout = 'heatmaps/rollout/' + level_name
-            evals_dict[(eval_name_static, num_cycles_per_big_eval)] = (
-                evals.ActorCriticHeatmapVisualisationEval(
-                    *splayset,
-                    env=env,
-                )
+            levels, num_levels, levels_pos, grid_shape = (
+                heatmap_splayer_fn(level)
             )
-            evals_dict[(eval_name_rollout, num_cycles_per_big_eval)] = (
-                evals.RolloutHeatmapVisualisationEval(
-                    *splayset,
-                    env=env,
-                    discount_rate=ppo_gamma,
-                    num_steps=num_env_steps_per_eval,
-                )
+            spawn_heatmap_eval = evals.ActorCriticHeatmapVisualisationEval(
+                levels=levels,
+                num_levels=num_levels,
+                levels_pos=levels_pos,
+                grid_shape=grid_shape,
+                env=env,
+                period=num_cycles_per_big_eval,
             )
+            rollout_heatmap_eval = evals.RolloutHeatmapVisualisationEval(
+                levels=levels,
+                num_levels=num_levels,
+                levels_pos=levels_pos,
+                grid_shape=grid_shape,
+                env=env,
+                discount_rate=ppo_gamma,
+                num_steps=num_env_steps_per_eval,
+                period=num_cycles_per_big_eval,
+            )
+            evals_dict[level_name] = evals.EvalList.create(
+                solo_eval,
+                spawn_heatmap_eval,
+                rollout_heatmap_eval,
+            )
+        else:
+            evals_dict[level_name] = solo_eval
 
 
     print("configuring actor critic network...")
@@ -333,10 +345,9 @@ def run(
     )
     for t in range(num_total_cycles):
         rng_t, rng_train = jax.random.split(rng_train)
-        log_ever = (console_log or wandb_log) 
-        log_cycle = log_ever and t % num_cycles_per_log == 0
-        eval_cycle = log_ever and any(t % p == 0 for (n, p) in evals_dict)
-        metrics = collections.defaultdict(dict)
+        log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
+        if log_cycle:
+            metrics = collections.defaultdict(dict)
 
 
         # step counting
@@ -462,18 +473,19 @@ def run(
 
         # periodic evaluations
         rng_evals, rng_t = jax.random.split(rng_t)
-        for (eval_name, num_cycles_per_eval), eval_obj in evals_dict.items():
-            if t % num_cycles_per_eval == 0:
+        if log_cycle:
+            for eval_name, eval_obj in evals_dict.items():
                 rng_eval, rng_evals = jax.random.split(rng_evals)
-                metrics['eval'][eval_name] = eval_obj.eval(
+                metrics['eval'][eval_name] = eval_obj.periodic_eval(
                     rng=rng_eval,
+                    step=t,
                     train_state=train_state,
                     net_init_state=net_init_state,
                 )
 
 
         # periodic logging
-        if metrics:
+        if log_cycle:
             # log to console
             if console_log:
                 progress.write("\n".join([
@@ -481,7 +493,6 @@ def run(
                     util.dict2str(metrics),
                     "=" * 59,
                 ]))
-            
             # log to wandb
             if wandb_log:
                 # first time: define metrics
@@ -492,9 +503,9 @@ def run(
                         example_metrics=metrics,
                         step_metric_prefix_mapping={
                             "env/": "step/env-step-after",
-                            "eval/": "step/env-step-after",
-                            "ued/": "step/env-step-after",
                             "ppo/": "step/ppo-update-after",
+                            "ued/": "step/env-step-after",
+                            "eval/": "step/env-step-after",
                         },
                     )
                     metrics_undefined = False
