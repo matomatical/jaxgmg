@@ -1,6 +1,7 @@
 """
-Proximal policy optimisation for a given network, environment, and set of
-training/eval levels.
+Run proximal policy optimisation with unsupervised environment design for a
+given network, environment, and set of training/eval levels. Integrated with
+wandb.
 """
 
 import collections
@@ -47,10 +48,10 @@ def run(
     seed: int,
     # environment-specific stuff
     env: Env,
-    orig_level_generator: LevelGenerator,
-    shift_level_generator: LevelGenerator,
+    train_level_generator: LevelGenerator,
     level_solver: LevelSolver | None,
     level_metrics: LevelMetrics | None,
+    eval_level_generators: dict[str, LevelGenerator],
     fixed_eval_levels: dict[str, Level],
     heatmap_splayer_fn: Callable | None,
     # actor critic policy config
@@ -113,19 +114,6 @@ def run(
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
 
-
-    print(f"mixing training level distributions with {prob_shift=}...")
-    if prob_shift > 0.0:
-        print("  creating mixture generator...")
-        train_level_generator = MixtureLevelGenerator(
-            level_generator1=orig_level_generator,
-            level_generator2=shift_level_generator,
-            prob_level1=1.0-prob_shift,
-        )
-    else:
-        print("  proceeding with original generator unmixed.")
-        train_level_generator = orig_level_generator
-    
     
     print(f"configuring curriculum with {ued=}...")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
@@ -174,23 +162,82 @@ def run(
         raise ValueError(f"unknown UED algorithm: {ued!r}")
 
 
-    print("configuring periodic evals...")
+    evals_dict = {}
+    print(f"configuring eval batches from {len(eval_level_generators)} level generators...")
     rng_evals, rng_setup = jax.random.split(rng_setup)
-    evals_dict = configure_evals(
-        rng=rng_evals,
-        env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=shift_level_generator,
-        level_solver=level_solver,
-        fixed_eval_levels=fixed_eval_levels,
-        heatmap_splayer_fn=heatmap_splayer_fn,
-        discount_rate=ppo_gamma,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
-        eval_gif_grid_width=eval_gif_grid_width,
-    )
+    for levels_name, level_generator in eval_level_generators.items():
+        print(f"  generating {num_eval_levels} {levels_name!r} levels...")
+        rng_eval_levels, rng_evals = jax.random.split(rng_evals)
+        levels = level_generator.vsample(
+            rng_eval_levels,
+            num_levels=num_eval_levels,
+        )
+        if level_solver is not None:
+            print("  also solving generated levels...")
+            benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels,
+            )
+            evals_dict[(levels_name + '_levels', num_cycles_per_eval)] = (
+                evals.FixedLevelsEvalWithBenchmarkReturns(
+                    num_levels=num_eval_levels,
+                    num_steps=num_env_steps_per_eval,
+                    discount_rate=ppo_gamma,
+                    levels=levels,
+                    benchmarks=benchmark_returns,
+                    env=env,
+                )
+            )
+        else:
+            print("  not solving them (no solver provided)...")
+            evals_dict[(levels_name + '_levels', num_cycles_per_eval)] = (
+                evals.FixedLevelsEval(
+                    num_levels=num_eval_levels,
+                    num_steps=num_env_steps_per_eval,
+                    discount_rate=ppo_gamma,
+                    levels=levels,
+                    env=env,
+                )
+            )
+        evals_dict[(levels_name + "_rollouts", num_cycles_per_big_eval)] = (
+            evals.AnimatedRolloutsEval(
+                num_levels=num_eval_levels,
+                levels=levels,
+                num_steps=env.max_steps_in_episode,
+                gif_grid_width=eval_gif_grid_width,
+                env=env,
+            )
+        )
+
+    print(f"configuring evals for {len(fixed_eval_levels)} fixed eval levels...")
+    for level_name, level in fixed_eval_levels.items():
+        print(f"  registering fixed level {level_name!r}")
+        eval_name = 'fixed/' + level_name
+        evals_dict[(eval_name, num_cycles_per_eval)] = evals.SingleLevelEval(
+            num_steps=num_env_steps_per_eval,
+            discount_rate=ppo_gamma,
+            level=level,
+            env=env,
+        )
+        if heatmap_splayer_fn is not None:
+            print("  also splaying level for heatmap evals...")
+            splayset = heatmap_splayer_fn(level)
+            eval_name_static = 'heatmaps/static/' + level_name
+            eval_name_rollout = 'heatmaps/rollout/' + level_name
+            evals_dict[(eval_name_static, num_cycles_per_big_eval)] = (
+                evals.ActorCriticHeatmapVisualisationEval(
+                    *splayset,
+                    env=env,
+                )
+            )
+            evals_dict[(eval_name_rollout, num_cycles_per_big_eval)] = (
+                evals.RolloutHeatmapVisualisationEval(
+                    *splayset,
+                    env=env,
+                    discount_rate=ppo_gamma,
+                    num_steps=num_env_steps_per_eval,
+                )
+            )
 
 
     print("configuring actor critic network...")
@@ -481,152 +528,5 @@ def run(
         # they would be automatically saved since I put them in the run dir,
         # and the docs say this, but it doesn't seem to be the case...)
         wandb.save(checkpoint_path + "/**", base_path=wandb.run.dir)
-
-
-def configure_evals(
-    rng: PRNGKey,
-    env: Env,
-    orig_level_generator: LevelGenerator,
-    shift_level_generator: LevelGenerator | None,
-    level_solver: LevelSolver | None,
-    fixed_eval_levels: dict[str, Level],
-    heatmap_splayer_fn: Callable | None,
-    discount_rate: float,
-    num_cycles_per_eval: int,
-    num_eval_levels: int,
-    num_env_steps_per_eval: int,
-    num_cycles_per_big_eval: int,
-    eval_gif_grid_width: int,
-) -> dict[(str, int), Eval]:
-    """
-    Various config options allow 
-    """
-    evals_dict = {}
-
-
-    print("  configuring eval levels from orig level generator...")
-    rng_eval_on_levels, rng = jax.random.split(rng)
-    eval_on_levels = orig_level_generator.vsample(
-        rng_eval_on_levels,
-        num_levels=num_eval_levels,
-    )
-    if level_solver is not None:
-        print("    also solving them...")
-        eval_on_benchmark_returns = level_solver.vmap_level_value(
-            level_solver.vmap_solve(eval_on_levels),
-            eval_on_levels,
-        )
-        eval_on_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
-            num_levels=num_eval_levels,
-            levels=eval_on_levels,
-            benchmarks=eval_on_benchmark_returns,
-            num_steps=num_env_steps_per_eval,
-            discount_rate=discount_rate,
-            env=env,
-        )
-    else:
-        eval_on_level_set = evals.FixedLevelsEval(
-            num_levels=num_eval_levels,
-            levels=eval_on_levels,
-            num_steps=num_env_steps_per_eval,
-            discount_rate=discount_rate,
-            env=env,
-        )
-    evals_dict[('on_dist_levels', num_cycles_per_eval)] = eval_on_level_set
-
-    
-    print("  configuring eval levels from shift level generator...")
-    if shift_level_generator is not None:
-        rng_eval_off_levels, rng = jax.random.split(rng)
-        eval_off_levels = shift_level_generator.vsample(
-            rng_eval_off_levels,
-            num_levels=num_eval_levels,
-        )
-        if level_solver is not None:
-            print("    also solving them...")
-            eval_off_benchmark_returns = level_solver.vmap_level_value(
-                level_solver.vmap_solve(eval_off_levels),
-                eval_off_levels,
-            )
-            eval_off_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
-                num_levels=num_eval_levels,
-                num_steps=num_env_steps_per_eval,
-                discount_rate=discount_rate,
-                levels=eval_off_levels,
-                benchmarks=eval_off_benchmark_returns,
-                env=env,
-            )
-        else:
-            eval_off_level_set = evals.FixedLevelsEval(
-                num_levels=num_eval_levels,
-                num_steps=num_env_steps_per_eval,
-                discount_rate=discount_rate,
-                levels=eval_off_levels,
-                env=env,
-            )
-        evals_dict[('off_dist_levels', num_cycles_per_eval)] = eval_off_level_set
-
-    
-    print("  configuring rollout recorders for orig/shift levels...")
-    # orig
-    eval_on_rollouts = evals.AnimatedRolloutsEval(
-        num_levels=num_eval_levels,
-        levels=eval_on_levels,
-        num_steps=env.max_steps_in_episode,
-        gif_grid_width=eval_gif_grid_width,
-        env=env,
-    )
-    evals_dict[('on_dist_rollouts', num_cycles_per_big_eval)] = eval_on_rollouts
-    # shift (optional)
-    if shift_level_generator is not None:
-        eval_off_rollouts = evals.AnimatedRolloutsEval(
-            num_levels=num_eval_levels,
-            levels=eval_off_levels,
-            num_steps=env.max_steps_in_episode,
-            gif_grid_width=eval_gif_grid_width,
-            env=env,
-        )
-        evals_dict[('off_dist_rollouts', num_cycles_per_big_eval)] = eval_off_rollouts
-    
-
-    print(f"  configuring evals for {len(fixed_eval_levels)} levels...")
-    for level_name, level in fixed_eval_levels.items():
-        eval_name = 'fixed/' + level_name
-        eval_period = num_cycles_per_eval
-        evals_dict[(eval_name, eval_period)] = evals.SingleLevelEval(
-            num_steps=num_env_steps_per_eval,
-            discount_rate=discount_rate,
-            level=level,
-            env=env,
-        )
-
-
-    print(f"  configuring heatmap evals for {len(fixed_eval_levels)} levels...")
-    for level_name, level in fixed_eval_levels.items():
-        if heatmap_splayer_fn is None:
-            print("    n/a: no heatmap splayer provided.")
-            break
-        splayset = heatmap_splayer_fn(level)
-        eval_name_static = 'heatmaps/static/' + level_name
-        eval_name_rollout = 'heatmaps/rollout/' + level_name
-        eval_period = num_cycles_per_big_eval
-        evals_dict[(eval_name_static, eval_period)] = (
-            evals.ActorCriticHeatmapVisualisationEval(
-                *splayset,
-                env=env,
-            )
-        )
-        evals_dict[(eval_name_rollout, eval_period)] = (
-            evals.RolloutHeatmapVisualisationEval(
-                *splayset,
-                env=env,
-                discount_rate=discount_rate,
-                num_steps=num_env_steps_per_eval,
-            )
-        )
-
-    
-    # done!
-    return evals_dict
 
 

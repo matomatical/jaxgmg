@@ -108,6 +108,28 @@ def corner(
         maze_generator=maze_generator,
         corner_size=env_size-2,
     )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+    
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
     
     print("configuring level solver...")
     level_solver = cheese_in_the_corner.LevelSolver(
@@ -120,7 +142,7 @@ def corner(
         env=env,
         discount_rate=ppo_gamma,
     )
-
+    
     print("configuring fixed eval levels...")
     fixed_eval_levels = {
         "random0": orig_level_generator.sample(jax.random.key(0)),
@@ -141,16 +163,14 @@ def corner(
             raise ValueError(f'unknown level splayer {level_splayer!r}')
 
     train.run(
-        # environment-specific stuff
         seed=seed,
         env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=shift_level_generator,
+        train_level_generator=train_level_generator,
         level_solver=level_solver,
         level_metrics=level_metrics,
-        heatmap_splayer_fn=splayer_fn,
+        eval_level_generators=eval_level_generators,
         fixed_eval_levels=fixed_eval_levels,
-        # non-environment-specific stuff
+        heatmap_splayer_fn=splayer_fn,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         ued=ued,
@@ -285,6 +305,28 @@ def dish(
         maze_generator=maze_generator,
         max_cheese_radius=max_cheese_radius_shift,  
     )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+    
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
     
     print("TODO: implement level solver...")
     
@@ -299,16 +341,14 @@ def dish(
     print("TODO: configure parser and fixed eval levels...")
     
     train.run(
-        # environment-specific stuff
         seed=seed,
         env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=shift_level_generator,
+        train_level_generator=train_level_generator,
         level_solver=None,
         level_metrics=level_metrics,
-        heatmap_splayer_fn=None,
+        eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
-        # non-environment-specific stuff
+        heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         ued=ued,
@@ -458,6 +498,28 @@ def pile(
         max_dish_radius=max_dish_radius_shift,
         split_elements=split_elements_shift,
     )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+    
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
     
     print("TODO: implement level solver...")
     
@@ -472,16 +534,14 @@ def pile(
     print("TODO: configure parser and fixed eval levels...")
     
     train.run(
-        # environment-specific stuff
         seed=seed,
         env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=shift_level_generator,
+        train_level_generator=train_level_generator,
         level_solver=None,
         level_metrics=level_metrics,
-        heatmap_splayer_fn=None,
+        eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
-        # non-environment-specific stuff
+        heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         ued=ued,
@@ -624,6 +684,28 @@ def keys(
         num_chests_min=env_num_chests_min,
         num_chests_max=env_num_chests_max,
     )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+    
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
     
     print("TODO: implement level solver...")
     
@@ -634,16 +716,14 @@ def keys(
     print("TODO: configure parser and fixed eval levels...")
     
     train.run(
-        # environment-specific stuff
         seed=seed,
         env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=shift_level_generator,
+        train_level_generator=train_level_generator,
         level_solver=None,
         level_metrics=None,
-        heatmap_splayer_fn=None,
+        eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
-        # non-environment-specific stuff
+        heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         ued=ued,
@@ -777,6 +857,28 @@ def minimaze(
         height=env_size_shift,
         width=env_size_shift,
     )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+    
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
 
     print("TODO: implement level solver...")
     
@@ -1033,16 +1135,14 @@ def minimaze(
     }
 
     train.run(
-        # environment-specific stuff
         seed=seed,
         env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=shift_level_generator,
+        train_level_generator=train_level_generator,
         level_solver=None,
         level_metrics=level_metrics,
-        heatmap_splayer_fn=None,
+        eval_level_generators=eval_level_generators,
         fixed_eval_levels=fixed_eval_levels,
-        # non-environment-specific stuff
+        heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         ued=ued,
@@ -1156,16 +1256,14 @@ def memory_test(
     orig_level_generator = minigrid_maze.MemoryTestLevelGenerator()
 
     train.run(
-        # environment-specific stuff
         seed=seed,
         env=env,
-        orig_level_generator=orig_level_generator,
-        shift_level_generator=None,
+        train_level_generator=orig_level_generator,
         level_solver=None,
         level_metrics=None,
+        eval_level_generators={},
         fixed_eval_levels={},
         heatmap_splayer_fn=None,
-        # non-environment-specific stuff
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         ued=ued,
