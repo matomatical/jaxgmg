@@ -106,10 +106,6 @@ def run(
     num_updates_per_cycle = num_epochs_per_cycle * num_minibatches_per_epoch
 
 
-    # TODO: Would also be a good idea for this program to initialise and
-    # manage the WANDB run. But that means going back to config hell?
-
-
     print(f"seeding random number generator with {seed=}...")
     rng = jax.random.PRNGKey(seed=seed)
     rng_setup, rng_train = jax.random.split(rng)
@@ -188,7 +184,6 @@ def run(
                 period=num_cycles_per_eval,
             )
         else:
-            print("  not solving them (no solver provided)...")
             levels_eval = evals.FixedLevelsEval(
                 num_levels=num_eval_levels,
                 num_steps=num_env_steps_per_eval,
@@ -329,10 +324,6 @@ def run(
     )
 
 
-    # define wandb metrics at the end of the first loop (wandb sucks)
-    metrics_undefined = True
-
-
     # on-policy training loop
     print("begin training loop!")
     print("(note: first two cycles are slow due to compilation)")
@@ -346,6 +337,7 @@ def run(
     for t in range(num_total_cycles):
         rng_t, rng_train = jax.random.split(rng_train)
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
+        first_cycle = (t == 0)
         if log_cycle:
             metrics = collections.defaultdict(dict)
 
@@ -483,34 +475,31 @@ def run(
                     net_init_state=net_init_state,
                 )
 
+        
+        # define metrics
+        if first_cycle and wandb_log:
+            wandb.define_metric("step/env-step-after")
+            wandb.define_metric("step/ppo-update-after")
+            util.wandb_define_metrics(
+                example_metrics=metrics,
+                step_metric_prefix_mapping={
+                    "env/": "step/env-step-after",
+                    "ppo/": "step/ppo-update-after",
+                    "ued/": "step/env-step-after",
+                    "eval/": "step/env-step-after",
+                },
+            )
+
 
         # periodic logging
-        if log_cycle:
-            # log to console
-            if console_log:
-                progress.write("\n".join([
-                    "=" * 59,
-                    util.dict2str(metrics),
-                    "=" * 59,
-                ]))
-            # log to wandb
-            if wandb_log:
-                # first time: define metrics
-                if metrics_undefined:
-                    wandb.define_metric("step/env-step-after")
-                    wandb.define_metric("step/ppo-update-after")
-                    util.wandb_define_metrics(
-                        example_metrics=metrics,
-                        step_metric_prefix_mapping={
-                            "env/": "step/env-step-after",
-                            "ppo/": "step/ppo-update-after",
-                            "ued/": "step/env-step-after",
-                            "eval/": "step/env-step-after",
-                        },
-                    )
-                    metrics_undefined = False
-                # log metrics
-                wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
+        if log_cycle and console_log:
+            progress.write("\n".join([
+                "=" * 59,
+                util.dict2str(metrics),
+                "=" * 59,
+            ]))
+        if log_cycle and wandb_log:
+            wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
 
         
         # periodic checkpointing

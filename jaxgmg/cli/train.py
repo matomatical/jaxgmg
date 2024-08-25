@@ -81,7 +81,7 @@ def corner(
     # other
     seed: int = 42,
 ):
-    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    config = locals()
     util.print_config(config)
 
     print("configuring environment...")
@@ -278,7 +278,7 @@ def dish(
     # other
     seed: int = 42,
 ):
-    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    config = locals()
     util.print_config(config)
 
     print("configuring environment...")
@@ -465,7 +465,7 @@ def pile(
     # other
     seed: int = 42,
 ):
-    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    config = locals()
     util.print_config(config)
 
     print("configuring environment...")
@@ -652,7 +652,7 @@ def keys(
     # other
     seed: int = 42,
 ):
-    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    config = locals()
     util.print_config(config)
 
     print("configuring environment...")
@@ -831,7 +831,7 @@ def minimaze(
     # other
     seed: int = 42,
 ):
-    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    config = locals()
     util.print_config(config)
 
     print("configuring environment...")
@@ -1240,7 +1240,7 @@ def memory_test(
     # other
     seed: int = 42,
 ):
-    config = locals() # TODO: pass this to w&b instead of using the wrapper
+    config = locals()
     util.print_config(config)
 
     print("configuring environment...")
