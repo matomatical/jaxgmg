@@ -104,6 +104,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             ),
             prev_batch_type=BatchType.GENERATE, # white lie
             prev_batch_level_ids=jnp.arange(batch_size_hint),
+            prev_batch_mutate_counts=jnp.zeros(batch_size_hint, dtype=int),
             num_generate_batches=0,
             num_replay_batches=0,
             num_mutate_batches=0,
@@ -151,13 +152,13 @@ class CurriculumGenerator(base.CurriculumGenerator):
 
         # mutate the previous(! not current?) batch of replay levels
         prev_replay_levels, prev_mutate_counts = jax.tree.map(
-            lambda x: x[self.prev_batch_level_ids],
-            (state.buffer.level, state.buffer_num_mutations),
+            lambda x: x[state.prev_batch_level_ids],
+            (state.buffer.level, state.buffer.num_mutations),
         )
         rng_mutate, rng = jax.random.split(rng)
-        mutated_levels = self.level_mutator.vmutate(
-            rng_mutate,
-            prev_replay_levels,
+        mutated_levels = self.level_mutator.mutate_levels(
+            rng=rng_mutate,
+            levels=prev_replay_levels,
         )
         mutate_counts = prev_mutate_counts + 1
 
@@ -169,7 +170,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             [0, 0, 1],
             # mutate -> generate (1-p) or replay (p)
             [1-self.prob_replay, self.prob_replay, 0],
-        ], dtype=jnp.float)
+        ], dtype=float)
         rng_choice, rng = jax.random.split(rng)
         batch_type = jax.random.choice(
             key=rng_choice,
@@ -330,7 +331,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             last_visit_time=time_now,
             first_visit_time=time_now,
             num_replays=count_zero,
-            num_mutates=mutate_counts,
+            num_mutations=mutate_counts,
         )
 
         # concatenate the low-potential levels and the challenger levels
@@ -362,7 +363,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 staleness_coeff=self.staleness_coeff,
                 scores=state.buffer.last_score,
                 last_visit_times=state.buffer.last_visit_time,
-                current_time=state.num_batches,
+                current_time=state.num_replay_batches,
             )
             buffer_metrics = self.level_metrics.compute_metrics( 
                 levels=state.buffer.level,

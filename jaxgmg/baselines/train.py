@@ -18,7 +18,6 @@ import tqdm
 import wandb
 
 from jaxgmg import util
-from jaxgmg.environments.base import MixtureLevelGenerator
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import experience
 from jaxgmg.baselines import evals
@@ -165,7 +164,8 @@ def run(
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
-            regret_estimator=regret_estimator,
+            prob_replay=plr_prob_replay,
+            regret_estimator=plr_regret_estimator,
         )
         gen_state = gen.init(
             rng=rng_train_levels,

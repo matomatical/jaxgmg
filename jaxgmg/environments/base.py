@@ -365,9 +365,6 @@ class LevelGenerator:
         raise NotImplementedError
 
 
-    # pre-vectorised
-        
-
     @functools.partial(jax.jit, static_argnames=('self', 'num_levels'))
     def vsample(
         self,
@@ -425,8 +422,74 @@ class MixtureLevelGenerator(LevelGenerator):
 
 @struct.dataclass
 class LevelMutator:
-    pass
-    # TODO
+    
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(
+        self,
+        rng: chex.PRNGKey,
+        level: Level,
+    ) -> Level:
+        raise NotImplementedError
+
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_levels(
+        self,
+        rng: chex.PRNGKey,
+        levels: Level,      # Level[num_levels]
+    ) -> Level:             # Level[num_levels]
+        num_levels, *_ = jax.tree.leaves(levels)[0].shape
+        vmapped_mutate_level = jax.vmap(self.mutate_level, in_axes=(0, 0))
+        return vmapped_mutate_level(
+            jax.random.split(rng, num_levels),
+            levels,
+        )
+
+
+# # # 
+# Level mutator combinators
+
+
+@struct.dataclass
+class MixtureLevelMutator(LevelMutator):
+    mutators: tuple[LevelMutator, ...]
+
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        rng_mutate, rng_choice = jax.random.split(rng)
+        # perform each type of mutation
+        rng_mutates = jax.random.split(rng_mutate, len(self.mutators))
+        levels = [
+            child.mutate_level(rng_, level)
+            for child, rng_ in zip(self.mutators, rng_mutates)
+        ]
+        which = jax.random.choice(rng_choice, len(self.mutators))
+        return jax.tree.map(
+            lambda *xs: jax.lax.select_n(which, *xs),
+            *levels,
+        )
+
+
+@struct.dataclass
+class IteratedLevelMutator(LevelMutator):
+    mutator: LevelMutator
+    num_steps: int
+
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(
+        self,
+        rng: chex.PRNGKey,
+        level: Level,
+    ) -> Level:
+        level, _ = jax.lax.scan(
+            lambda level, rng: (self.mutator.mutate_level(rng, level), None),
+            level,
+            jax.random.split(rng, self.num_steps),
+        )
+        return level
 
 
 # # # 

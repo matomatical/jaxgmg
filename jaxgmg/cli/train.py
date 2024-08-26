@@ -12,6 +12,9 @@ from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import minigrid_maze
 from jaxgmg.baselines import train
 
+from jaxgmg.environments.base import MixtureLevelGenerator
+from jaxgmg.environments.base import MixtureLevelMutator, IteratedLevelMutator
+
 from jaxgmg import util
 
 
@@ -39,6 +42,7 @@ def corner(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
+    num_mutate_steps: int = 6,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -130,6 +134,17 @@ def corner(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
+
+    print("configuring level mutator...")
+    level_mutator = IteratedLevelMutator(
+        mutator=MixtureLevelMutator(mutators=(
+            cheese_in_the_corner.ToggleWallLevelMutator(),
+            cheese_in_the_corner.StepCheeseLevelMutator(),
+            cheese_in_the_corner.StepMouseLevelMutator(),
+            # TODO: also scatter mutators
+        )),
+        num_steps=num_mutate_steps,
+    )
     
     print("configuring level solver...")
     level_solver = cheese_in_the_corner.LevelSolver(
@@ -167,7 +182,7 @@ def corner(
         env=env,
         train_level_generator=train_level_generator,
         level_solver=level_solver,
-        level_mutator=None,
+        level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
         fixed_eval_levels=fixed_eval_levels,

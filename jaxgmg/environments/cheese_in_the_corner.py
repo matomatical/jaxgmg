@@ -426,6 +426,237 @@ class LevelGenerator(base.LevelGenerator):
 
 
 # # # 
+# Level mutation
+
+
+@struct.dataclass
+class ToggleWallLevelMutator(base.LevelMutator):
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+        # TODO: assuming (h-2)*(w-2) > 2 or something
+        
+        # which walls are available to toggle?
+        valid_map = jnp.ones((h, w), dtype=bool)
+        # exclude border
+        valid_map = valid_map.at[(0, h-1), :].set(False)
+        valid_map = valid_map.at[:, (0, w-1)].set(False)
+        # exclude current cheese and mouse spawn positions
+        valid_map = valid_map.at[
+            (level.cheese_pos[0], level.initial_mouse_pos[0]),
+            (level.cheese_pos[1], level.initial_mouse_pos[1]),
+        ].set(False)
+        valid_mask = valid_map.flatten()
+
+        # pick a random valid position
+        coords = einops.rearrange(jnp.indices((h, w)), 'c h w -> (h w) c')
+        toggle_pos = jax.random.choice(
+            key=rng,
+            a=coords,
+            axis=0,
+            p=valid_mask,
+        )
+
+        # toggle the wall there
+        hit_wall = level.wall_map[toggle_pos[0], toggle_pos[1]]
+        new_wall_map = level.wall_map.at[
+            toggle_pos[0],
+            toggle_pos[1],
+        ].set(~hit_wall)
+
+        return level.replace(wall_map=new_wall_map)
+
+
+@struct.dataclass
+class StepCheeseLevelMutator(base.LevelMutator):
+    # TODO: restrict to a designated region
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+        assert h > 3, "level too small to step cheese"
+        assert w > 3, "level too small to step cheese"
+
+        # move the cheese in a random direction (within bounds)
+        steps = jnp.array((
+            (-1,  0),   # up
+            ( 0, -1),   # left
+            (+1,  0),   # down
+            ( 0, +1),   # right
+        ))
+        valid_mask = jnp.array((
+            level.cheese_pos[0] >= 2,
+            level.cheese_pos[1] >= 2,
+            level.cheese_pos[0] <= h-3,
+            level.cheese_pos[1] <= w-3,
+        ))
+        chosen_step = jax.random.choice(
+            key=rng,
+            a=steps,
+            p=valid_mask,
+        )
+        new_cheese_pos = level.cheese_pos + chosen_step
+
+        # carve through walls
+        new_wall_map = level.wall_map.at[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ].set(False)
+
+        # upon collision with mouse, transpose cheese with mouse
+        hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
+        new_initial_mouse_pos = jax.lax.select(
+            hit_mouse,
+            level.cheese_pos,
+            level.initial_mouse_pos,
+        )
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_mouse_pos=new_initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+        )
+
+
+@struct.dataclass
+class StepMouseLevelMutator(base.LevelMutator):
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+        assert h > 3, "level too small to step mouse"
+        assert w > 3, "level too small to step mouse"
+
+        # move the mouse in a random direction (within bounds)
+        steps = jnp.array((
+            (-1,  0),   # up
+            ( 0, -1),   # left
+            (+1,  0),   # down
+            ( 0, +1),   # right
+        ))
+        valid_mask = jnp.array((
+            level.initial_mouse_pos[0] >= 2,
+            level.initial_mouse_pos[1] >= 2,
+            level.initial_mouse_pos[0] <= h-3,
+            level.initial_mouse_pos[1] <= w-3,
+        ))
+        chosen_step = jax.random.choice(
+            key=rng,
+            a=steps,
+            p=valid_mask,
+        )
+        new_initial_mouse_pos = level.initial_mouse_pos + chosen_step
+
+        # carve through walls
+        new_wall_map = level.wall_map.at[
+            new_initial_mouse_pos[0],
+            new_initial_mouse_pos[1],
+        ].set(False)
+
+        # upon collision with cheese, transpose mouse with cheese
+        hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
+        new_cheese_pos = jax.lax.select(
+            hit_cheese,
+            level.initial_mouse_pos,
+            level.cheese_pos,
+        )
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_mouse_pos=new_initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+        )
+
+
+@struct.dataclass
+class ScatterCheeseLevelMutator(base.LevelMutator):
+    # TODO: restrict to a designated region
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+
+        # teleport the cheese to a random location within bounds
+        rng_row, rng_col = jax.random.split(rng)
+        new_cheese_row = jax.random.choice(
+            key=rng_row,
+            a=jnp.arange(1, h-1),
+        )
+        new_cheese_col = jax.random.choice(
+            key=rng_col,
+            a=jnp.arange(1, w-1),
+        )
+        new_cheese_pos = jnp.array((
+            new_cheese_row,
+            new_cheese_col,
+        ))
+
+        # carve through walls
+        new_wall_map = level.wall_map.at[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ].set(False)
+
+        # upon collision with mouse, transpose cheese with mouse
+        hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
+        new_initial_mouse_pos = jax.lax.select(
+            hit_mouse,
+            level.cheese_pos,
+            level.initial_mouse_pos,
+        )
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_mouse_pos=new_initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+        )
+
+
+@struct.dataclass
+class ScatterMouseLevelMutator(base.LevelMutator):
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+
+        # teleport the cheese to a random location within bounds
+        rng_row, rng_col = jax.random.split(rng)
+        new_mouse_row = jax.random.choice(
+            key=rng_row,
+            a=jnp.arange(1, h-1),
+        )
+        new_mouse_col = jax.random.choice(
+            key=rng_col,
+            a=jnp.arange(1, w-1),
+        )
+        new_initial_mouse_pos = jnp.array((
+            new_mouse_row,
+            new_mouse_col,
+        ))
+
+        # carve through walls
+        new_wall_map = level.wall_map.at[
+            new_initial_mouse_pos[0],
+            new_initial_mouse_pos[1],
+        ].set(False)
+
+        # upon collision with cheese, transpose mouse with cheese
+        hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
+        new_cheese_pos = jax.lax.select(
+            hit_cheese,
+            level.initial_mouse_pos,
+            level.cheese_pos,
+        )
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_mouse_pos=new_initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+        )
+
+
+# # # 
 # Level parsing
 
 
