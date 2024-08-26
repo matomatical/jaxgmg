@@ -6,7 +6,7 @@
 #SBATCH --chdir=/data/matthew_farrugia_roberts
 #SBATCH --output=out/%A-%a-gmg-maze.stdout
 #SBATCH --error=out/%A-%a-gmg-maze.stderr
-#SBATCH --array 0-5
+#SBATCH --array 6-8
 
 source jaxgmg.venv/bin/activate
 if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
@@ -51,5 +51,26 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 5 ]; then
         --num-total-env-steps 100_000_000 \
         --no-env-penalize-time --ued plr --plr-regret-estimator PVL \
         --net-cnn-type large --net-rnn-type gru;
+elif [ $SLURM_ARRAY_TASK_ID -eq 6 ]; then
+    jaxgmg train minimaze \
+        --wandb-log --no-console-log --wandb-name ff-accel \
+        --wandb-entity matthew-farrugia-roberts --wandb-project gmg-maze \
+        --num-total-env-steps 100_000_000 \
+        --no-env-penalize-time --ued accel --plr-regret-estimator PVL \
+        --net-cnn-type large --net-rnn-type ff;
+elif [ $SLURM_ARRAY_TASK_ID -eq 7 ]; then
+    jaxgmg train minimaze \
+        --wandb-log --no-console-log --wandb-name lstm-accel \
+        --wandb-entity matthew-farrugia-roberts --wandb-project gmg-maze \
+        --num-total-env-steps 100_000_000 \
+        --no-env-penalize-time --ued accel --plr-regret-estimator PVL \
+        --net-cnn-type large --net-rnn-type lstm;
+elif [ $SLURM_ARRAY_TASK_ID -eq 8 ]; then
+    jaxgmg train minimaze \
+        --wandb-log --no-console-log --wandb-name ff-accel \
+        --wandb-entity matthew-farrugia-roberts --wandb-project gmg-maze \
+        --num-total-env-steps 100_000_000 \
+        --no-env-penalize-time --ued accel --plr-regret-estimator PVL \
+        --net-cnn-type large --net-rnn-type ff;
 fi
 deactivate
