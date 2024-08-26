@@ -296,7 +296,6 @@ def dish(
     # big evals config
     num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
     eval_gif_grid_width: int = 16,
-    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
     console_log: bool = True,               # whether to log metrics to stdout
@@ -509,7 +508,6 @@ def pile(
     # big evals config
     num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
     eval_gif_grid_width: int = 16,
-    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
     console_log: bool = True,               # whether to log metrics to stdout
@@ -697,7 +695,6 @@ def keys(
     # big evals config
     num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
     eval_gif_grid_width: int = 16,
-    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
     console_log: bool = True,               # whether to log metrics to stdout
@@ -852,6 +849,11 @@ def minimaze(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    # for accel
+    num_mutate_steps: int = 6,
+    prob_mutate_wall: float = 0.60,
+    prob_mutate_step_or_turn: float = 0.95,
+    prob_mutate_goal: float = 0.50,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -877,7 +879,6 @@ def minimaze(
     # big evals config
     num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
     eval_gif_grid_width: int = 16,
-    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # logging
     num_cycles_per_log: int = 64,
     console_log: bool = True,               # whether to log metrics to stdout
@@ -942,6 +943,29 @@ def minimaze(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
+
+    print("configuring level mutator...")
+    level_mutator = IteratedLevelMutator(
+        mutator=MixtureLevelMutator(
+            mutators=(
+                minigrid_maze.ToggleWallLevelMutator(),
+                minigrid_maze.StepHeroLevelMutator(),
+                minigrid_maze.TurnHeroLevelMutator(),
+                minigrid_maze.ScatterHeroLevelMutator(),
+                minigrid_maze.StepGoalLevelMutator(),
+                minigrid_maze.ScatterGoalLevelMutator(),
+            ),
+            mixing_probs=(
+                prob_mutate_wall,
+                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
+                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
+                (1-prob_mutate_wall)*(1-prob_mutate_goal)*(1-prob_mutate_step_or_turn),
+                (1-prob_mutate_wall)*prob_mutate_goal*prob_mutate_step_or_turn,
+                (1-prob_mutate_wall)*prob_mutate_goal*(1-prob_mutate_step_or_turn),
+            ),
+        ),
+        num_steps=num_mutate_steps,
+    )
 
     print("TODO: implement level solver...")
     
@@ -1202,7 +1226,7 @@ def minimaze(
         env=env,
         train_level_generator=train_level_generator,
         level_solver=None,
-        level_mutator=None,
+        level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
         fixed_eval_levels=fixed_eval_levels,

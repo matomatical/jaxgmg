@@ -543,10 +543,10 @@ class ToggleWallLevelMutator(base.LevelMutator):
         # exclude border
         valid_map = valid_map.at[(0, h-1), :].set(False)
         valid_map = valid_map.at[:, (0, w-1)].set(False)
-        # exclude current cheese and mouse spawn positions
+        # exclude current cheese, dish, mouse spawn positions
         valid_map = valid_map.at[
-            (level.cheese_pos[0], level.initial_mouse_pos[0]),
-            (level.cheese_pos[1], level.initial_mouse_pos[1]),
+            (level.cheese_pos[0],level.dish_pos[0],level.initial_mouse_pos[0]),
+            (level.cheese_pos[1],level.dish_pos[1],level.initial_mouse_pos[1]),
         ].set(False)
         valid_mask = valid_map.flatten()
 
