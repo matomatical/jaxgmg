@@ -454,6 +454,7 @@ class LevelMutator:
 @struct.dataclass
 class MixtureLevelMutator(LevelMutator):
     mutators: tuple[LevelMutator, ...]
+    mixing_probs: tuple[float, ...]
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
@@ -465,7 +466,13 @@ class MixtureLevelMutator(LevelMutator):
             child.mutate_level(rng_, level)
             for child, rng_ in zip(self.mutators, rng_mutates)
         ]
-        which = jax.random.choice(rng_choice, len(self.mutators))
+        # select which one to keep
+        which = jax.random.choice(
+            key=rng_choice,
+            a=len(self.mutators),
+            p=jnp.array(self.mixing_probs),
+        )
+        # return that mutated level
         return jax.tree.map(
             lambda *xs: jax.lax.select_n(which, *xs),
             *levels,

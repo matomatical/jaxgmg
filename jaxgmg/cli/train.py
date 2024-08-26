@@ -42,7 +42,11 @@ def corner(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
+    # for accel
     num_mutate_steps: int = 6,
+    prob_mutate_wall: float = 0.60,
+    prob_mutate_step: float = 0.95,
+    prob_mutate_cheese: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -137,14 +141,26 @@ def corner(
 
     print("configuring level mutator...")
     level_mutator = IteratedLevelMutator(
-        mutator=MixtureLevelMutator(mutators=(
-            cheese_in_the_corner.ToggleWallLevelMutator(),
-            cheese_in_the_corner.StepCheeseLevelMutator(),
-            cheese_in_the_corner.StepMouseLevelMutator(),
-            # TODO: also scatter mutators
-        )),
+        mutator=MixtureLevelMutator(
+            mutators=(
+                cheese_in_the_corner.ToggleWallLevelMutator(),
+                cheese_in_the_corner.StepMouseLevelMutator(),
+                cheese_in_the_corner.ScatterMouseLevelMutator(),
+                cheese_in_the_corner.StepCheeseLevelMutator(),
+                cheese_in_the_corner.ScatterCheeseLevelMutator(),
+            ),
+            mixing_probs=(
+                prob_mutate_wall,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*prob_mutate_step,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese*(1-prob_mutate_step),
+            ),
+        ),
         num_steps=num_mutate_steps,
     )
+    print(level_mutator)
+    return
     
     print("configuring level solver...")
     level_solver = cheese_in_the_corner.LevelSolver(
