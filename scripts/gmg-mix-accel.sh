@@ -6,7 +6,7 @@
 #SBATCH --chdir=/data/matthew_farrugia_roberts
 #SBATCH --output=out/%A-%a-gmg-mix2.stdout
 #SBATCH --error=out/%A-%a-gmg-mix2.stderr
-#SBATCH --array 0-9
+#SBATCH --array 0-14
 
 source jaxgmg.venv/bin/activate
 if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
@@ -79,5 +79,40 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 9 ]; then
         --num-total-env-steps 100_000_000 --no-env-penalize-time \
         --net-cnn-type large --net-rnn-type lstm \
         --prob-shift 0.03 --ued accel --num-mutate-steps 9;
+elif [ $SLURM_ARRAY_TASK_ID -eq 10 ]; then
+    jaxgmg train corner \
+        --wandb-log --no-console-log --wandb-name accel1-mix00 \
+        --wandb-entity matthew-farrugia-roberts --wandb-project mix-gmg2 \
+        --num-total-env-steps 100_000_000 --no-env-penalize-time \
+        --net-cnn-type large --net-rnn-type lstm \
+        --prob-shift 0.00 --ued accel --num-mutate-steps 1;
+elif [ $SLURM_ARRAY_TASK_ID -eq 11 ]; then
+    jaxgmg train corner \
+        --wandb-log --no-console-log --wandb-name accel2-mix00 \
+        --wandb-entity matthew-farrugia-roberts --wandb-project mix-gmg2 \
+        --num-total-env-steps 100_000_000 --no-env-penalize-time \
+        --net-cnn-type large --net-rnn-type lstm \
+        --prob-shift 0.00 --ued accel --num-mutate-steps 2;
+elif [ $SLURM_ARRAY_TASK_ID -eq 12 ]; then
+    jaxgmg train corner \
+        --wandb-log --no-console-log --wandb-name accel16-mix00 \
+        --wandb-entity matthew-farrugia-roberts --wandb-project mix-gmg2 \
+        --num-total-env-steps 100_000_000 --no-env-penalize-time \
+        --net-cnn-type large --net-rnn-type lstm \
+        --prob-shift 0.00 --ued accel --num-mutate-steps 16;
+elif [ $SLURM_ARRAY_TASK_ID -eq 13 ]; then
+    jaxgmg train corner \
+        --wandb-log --no-console-log --wandb-name accel32-mix00 \
+        --wandb-entity matthew-farrugia-roberts --wandb-project mix-gmg2 \
+        --num-total-env-steps 100_000_000 --no-env-penalize-time \
+        --net-cnn-type large --net-rnn-type lstm \
+        --prob-shift 0.00 --ued accel --num-mutate-steps 32;
+elif [ $SLURM_ARRAY_TASK_ID -eq 14 ]; then
+    jaxgmg train corner \
+        --wandb-log --no-console-log --wandb-name accel64-mix00 \
+        --wandb-entity matthew-farrugia-roberts --wandb-project mix-gmg2 \
+        --num-total-env-steps 100_000_000 --no-env-penalize-time \
+        --net-cnn-type large --net-rnn-type lstm \
+        --prob-shift 0.00 --ued accel --num-mutate-steps 64;
 fi
 deactivate
