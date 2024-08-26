@@ -13,7 +13,7 @@ if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
     jaxgmg train corner \
         --wandb-log --no-console-log --wandb-name accel-mut00 \
         --wandb-entity matthew-farrugia-roberts \
-        --wandb-project gmg-wts \
+        --wandb-project gmg-accel-weighted \
         --num-total-env-steps 100_000_000 --no-env-penalize-time \
         --net-cnn-type large --net-rnn-type lstm \
         --prob-shift 0.00 --num-mutate-steps 6 \
