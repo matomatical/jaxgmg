@@ -27,17 +27,13 @@ import jax
 import jax.numpy as jnp
 import einops
 from flax import struct
-
 import chex
 from jaxtyping import PyTree
 
 from jaxgmg.procgen import maze_generation as mg
 from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
-
 from jaxgmg import util
-from jax import lax
-import jax.numpy as jnp
 
 
 @struct.dataclass
@@ -319,8 +315,8 @@ class Env(base.Env):
         else:
             done = state.got_cheese | state.got_napkin
 
-        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
-        pile_rate = lax.cond(jnp.any(state.got_napkin), lambda _: 1.0, lambda _: 0.0, operand=None)
+        cheese_rate = jax.lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
+        pile_rate = jax.lax.cond(jnp.any(state.got_napkin), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -894,7 +890,7 @@ class LevelMetrics(base.LevelMetrics):
         dish_napkin_same = jnp.all(jnp.all(levels.dish_pos == levels.napkin_pos, axis=1))
 
 
-        objects_on_cheese, objects_on_pile = lax.cond(
+        objects_on_cheese, objects_on_pile = jax.lax.cond(
             dish_napkin_same,
             lambda: (jnp.float32(6), jnp.float32(0)),
             lambda: (objects_on_cheese, objects_on_pile)
