@@ -22,6 +22,7 @@ from jaxgmg.cli import heatmaps
 from jaxgmg.cli import noisegen
 from jaxgmg.cli import mazegen
 from jaxgmg.cli import mazesoln
+from jaxgmg.cli import mutate
 from jaxgmg.cli import parse
 from jaxgmg.cli import play
 from jaxgmg.cli import solve
@@ -112,6 +113,17 @@ app.add_typer(make_typer_app(
         mazesoln.distances,
         mazesoln.directions,
         mazesoln.distances_and_directions,
+    ),
+))
+
+
+# level mutation
+app.add_typer(make_typer_app(
+    name='mutate',
+    help=mutate.__doc__,
+    subcommands=(
+        mutate.corner,
+        mutate.dish,
     ),
 ))
 
