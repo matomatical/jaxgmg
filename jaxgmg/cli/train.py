@@ -159,8 +159,6 @@ def corner(
         ),
         num_steps=num_mutate_steps,
     )
-    print(level_mutator)
-    return
     
     print("configuring level solver...")
     level_solver = cheese_in_the_corner.LevelSolver(
