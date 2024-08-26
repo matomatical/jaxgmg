@@ -67,10 +67,11 @@ elif [ $SLURM_ARRAY_TASK_ID -eq 7 ]; then
         --net-cnn-type large --net-rnn-type lstm;
 elif [ $SLURM_ARRAY_TASK_ID -eq 8 ]; then
     jaxgmg train minimaze \
-        --wandb-log --no-console-log --wandb-name ff-accel \
+        --wandb-log --no-console-log --wandb-name gru-accel \
+    jaxgmg train minimaze --no-wandb-log \
         --wandb-entity matthew-farrugia-roberts --wandb-project gmg-maze \
         --num-total-env-steps 100_000_000 \
         --no-env-penalize-time --ued accel --plr-regret-estimator PVL \
-        --net-cnn-type large --net-rnn-type ff;
+        --net-cnn-type large --net-rnn-type gru;
 fi
 deactivate
