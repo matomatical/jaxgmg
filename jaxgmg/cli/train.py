@@ -266,6 +266,11 @@ def dish(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    # for accel
+    num_mutate_steps: int = 6,
+    prob_mutate_wall: float = 0.60,
+    prob_mutate_step: float = 0.95,
+    prob_mutate_cheese_or_dish: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -358,6 +363,31 @@ def dish(
             "shift": shift_level_generator,
         }
     
+    print("configuring level mutator...")
+    level_mutator = IteratedLevelMutator(
+        mutator=MixtureLevelMutator(
+            mutators=(
+                cheese_on_a_dish.ToggleWallLevelMutator(),
+                cheese_on_a_dish.StepMouseLevelMutator(),
+                cheese_on_a_dish.ScatterMouseLevelMutator(),
+                cheese_on_a_dish.StepDishLevelMutator(),
+                cheese_on_a_dish.ScatterDishLevelMutator(),
+                cheese_on_a_dish.StepCheeseLevelMutator(),
+                cheese_on_a_dish.ScatterCheeseLevelMutator(),
+            ),
+            mixing_probs=(
+                prob_mutate_wall,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_dish)*prob_mutate_step,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_dish)*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*(1-prob_mutate_step),
+            ),
+        ),
+        num_steps=num_mutate_steps,
+    )
+    
     print("TODO: implement level solver...")
     
     print("configuring level metrics...")
@@ -375,6 +405,7 @@ def dish(
         env=env,
         train_level_generator=train_level_generator,
         level_solver=None,
+        level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
