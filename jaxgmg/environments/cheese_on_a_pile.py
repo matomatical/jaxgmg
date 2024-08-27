@@ -958,9 +958,6 @@ class LevelSolver(base.LevelSolver):
 
         proxy_rewards = {}
         for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
-              'proxy_pile': proxy_pile,
-                    'proxy_first_pile': proxy_pile_first,
-                    'proxy_first_cheese': proxy_cheese_first,
             if proxy_name == 'proxy_pile':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
