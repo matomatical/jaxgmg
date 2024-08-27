@@ -1364,10 +1364,15 @@ def ppo_training_run(
             level_solver.vmap_solve(eval_on_levels),
             eval_on_levels,
         )
+        #eval_on_benchmark_proxies = level_solver.vmap_level_value_proxy(
+            #level_solver.vmap_solve_proxies(eval_on_levels),
+            #eval_on_levels,
+        #)
         eval_on_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
             num_levels=num_eval_levels,
             levels=eval_on_levels,
             benchmarks=eval_on_benchmark_returns,
+            benchmark_proxies = None, # to be changed if we want to keep track of the benchmark proxies, should substitute with eval_on_benchmark_proxies when all are ready...
             num_steps=num_env_steps_per_eval,
             discount_rate=ppo_gamma,
             env=env,
@@ -1396,12 +1401,17 @@ def ppo_training_run(
                 level_solver.vmap_solve(eval_off_levels),
                 eval_off_levels,
             )
+            # eval_off_benchmark_proxies = level_solver.vmap_level_value_proxy(
+            #     level_solver.vmap_solve_proxies(eval_off_levels),
+            #     eval_off_levels,
+            # )
             eval_off_level_set = evals.FixedLevelsEvalWithBenchmarkReturns(
                 num_levels=num_eval_levels,
                 num_steps=num_env_steps_per_eval,
                 discount_rate=ppo_gamma,
                 levels=eval_off_levels,
                 benchmarks=eval_off_benchmark_returns,
+                benchmark_proxies = None, # to be changed if we want to keep track of the benchmark proxies, should substitute with eval_off_benchmark_proxies
                 env=env,
             )
         else:

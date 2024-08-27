@@ -220,8 +220,6 @@ class Env(base.Env):
         else:
             done = state.got_cheese
         
-        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
-        corner_rate = lax.cond(jnp.any(state.got_corner), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -230,8 +228,6 @@ class Env(base.Env):
             {
                 'proxy_rewards': {
                     'corner': proxy_reward,
-                    'cheese_solve_rate': cheese_rate, 
-                    'corner_solve_rate': corner_rate,
                 },
             },
         )
@@ -535,6 +531,11 @@ class LevelSolution(base.LevelSolution):
     level: Level
     directional_distance_to_cheese: chex.Array
 
+@struct.dataclass
+class LevelSolutionProxies(base.LevelSolutionProxies):
+    level: Level
+    #you have a dictionary of proxies, and have an entry for each proxy. so create a dict of proxies, where each entry has a name for a proxy and a corresponding chex.array
+    directional_distance_to_proxies: dict[str, chex.Array]
 
 @struct.dataclass
 class LevelSolver(base.LevelSolver):
@@ -580,6 +581,53 @@ class LevelSolver(base.LevelSolver):
             directional_distance_to_cheese=dir_dist_to_cheese,
         )
 
+    @functools.partial(jax.jit, static_argnames=('self',)) #proxies is a list with a name of strings for various proxies
+    def solve_proxy(self, level: Level) -> LevelSolutionProxies:
+        """
+        Compute the distance from each possible mouse position to the cheese
+        position a given level. From this information one can easy compute
+        the optimal action or value from any state of this level.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+
+        Returns:
+
+        * soln : LevelSolution
+                The necessary precomputed (directional) distances for later
+                computing optimal values and actions from states.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        """
+        proxies = ['corner'] #where you define your proxies...
+        # compute distance between mouse and cheese
+        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
+        # calculate the distance for each proxy
+        proxy_directions = {}
+        # first, get the name of each proxy
+        for proxy_name in proxies:
+            if proxy_name == 'corner':
+                dir_dist_to_corner = dir_dist[
+                    :,
+                    :,
+                    1,
+                    1,
+                    :,
+                ]
+                proxy_directions[proxy_name] = dir_dist_to_corner
+            else:
+                raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment
+        return LevelSolutionProxies(
+            level=level,
+            directional_distance_to_proxies=proxy_directions,
+        )
     
     @functools.partial(jax.jit, static_argnames=('self',))
     def state_value(self, soln: LevelSolution, state: EnvState) -> float:
@@ -624,6 +672,54 @@ class LevelSolver(base.LevelSolver):
 
         return discounted_reward
 
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_value_proxies(self,soln: LevelSolutionProxies, state: EnvState) -> dict[str, float]:
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolutionProxies
+                The output of `solve` method for this level for the proxies.
+        * state : EnvState
+                The state to compute the value for.
+        
+        Return:
+
+        * dict of rewards for each proxy: dict[str, float]
+                The optimal value of this state for each proxy.
+        """
+
+        proxy_rewards = {}
+        for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
+            if proxy_name == 'corner':
+                optimal_dist = proxy_directions[
+                    state.mouse_pos[0],
+                    state.mouse_pos[1],
+                    4, # stay here
+                ]
+                # reward when we get to the corner is 1 iff the corner is still there
+                reward = (1.0 - state.got_corner)
+                # maybe we apply a time penalty
+                time_of_reward = state.steps + optimal_dist
+                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+                penalized_reward = jnp.where(
+                    self.env.penalize_time,
+                    penalty * reward,
+                    reward,
+                )
+                # mask out rewards beyond the end of the episode
+                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+                valid_reward = penalized_reward * episode_still_valid
+
+                # discount the reward
+                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+                proxy_rewards[proxy_name] = discounted_reward
+            else:
+                raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment, did not implement any other
+        
+        return proxy_rewards
     
     @functools.partial(jax.jit, static_argnames=('self',))
     def state_action_values(

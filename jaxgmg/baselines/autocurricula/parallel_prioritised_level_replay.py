@@ -144,6 +144,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             regret_estimator=self.regret_estimator,
             rollouts=rollouts,
             advantages=advantages,
+            level=levels,
         )
         num_levels = scores.shape[0] // 2
 

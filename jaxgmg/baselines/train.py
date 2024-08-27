@@ -212,6 +212,7 @@ def run(
                 rollouts=rollouts,
                 discount_rate=ppo_gamma,
                 benchmark_returns=None,
+                benchmark_proxies=None,
             )
             env_elapsed_time = time.perf_counter() - env_start_time
             metrics['env/train'].update(env_metrics)
