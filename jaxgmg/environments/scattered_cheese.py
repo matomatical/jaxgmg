@@ -36,8 +36,9 @@ from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
 from jaxgmg import util
-import jax.numpy as jnp
 from jax import lax
+import jax.numpy as jnp
+
 
 @struct.dataclass
 class Level(base.Level):
@@ -56,7 +57,13 @@ class Level(base.Level):
     wall_map: chex.Array
     cheese_pos: chex.Array
     dish_pos: chex.Array
+    #dish_positions: chex.Array
     initial_mouse_pos: chex.Array
+    fork_pos: chex.Array
+    spoon_pos: chex.Array
+    glass_pos: chex.Array
+    mug_pos: chex.Array
+    napkin_pos: chex.Array
 
 
 @struct.dataclass
@@ -75,6 +82,15 @@ class EnvState(base.EnvState):
     mouse_pos: chex.Array
     got_cheese: bool
     got_dish: bool
+    got_fork: bool
+    got_spoon: bool
+    got_glass: bool
+    got_mug: bool
+    got_napkin: bool
+
+    #got_items_groupone: bool
+    #got_items_grouptwo: bool
+    #collected_dishes: chex.Array
 
 @struct.dataclass
 class Env(base.Env):
@@ -100,6 +116,7 @@ class Env(base.Env):
       tile corresponds to one grid square.
     """
     terminate_after_cheese_and_dish: bool = False
+    split_object_firstgroup: int=6
 
     class Action(enum.IntEnum):
         """
@@ -141,6 +158,11 @@ class Env(base.Env):
         MOUSE   = 1
         CHEESE  = 2
         DISH    = 3
+        FORK    = 4
+        SPOON   = 5
+        GLASS   = 6
+        MUG     = 7
+        NAPKIN  = 8
 
     
     def _reset(
@@ -151,6 +173,11 @@ class Env(base.Env):
             mouse_pos=level.initial_mouse_pos,
             got_cheese=False,
             got_dish=False,
+            got_fork=False,
+            got_spoon=False,
+            got_glass=False,
+            got_mug=False,
+            got_napkin=False,
             level=level,
             steps=0,
             done=False,
@@ -184,23 +211,85 @@ class Env(base.Env):
                 ahead_pos,
             )
         )
+            #got_dish=False,
+            #got_fork=False,
+            # got_spoon=False,
+            # got_glass=False,
+            # got_mug=False,
+            # got_napkin=False,
+            # got_table=False,
+            # got_oven=False,
 
-        # check if mouse got to cheese
         got_cheese = (state.mouse_pos == state.level.cheese_pos).all()
         got_cheese_first_time = got_cheese & ~state.got_cheese
         state = state.replace(got_cheese=state.got_cheese | got_cheese)
         
-        # check if mouse got to dish
         got_dish = (state.mouse_pos == state.level.dish_pos).all()
+        got_fork = (state.mouse_pos == state.level.fork_pos).all()
+        got_spoon = (state.mouse_pos == state.level.spoon_pos).all()
+        got_glass = (state.mouse_pos == state.level.glass_pos).all()
+        got_mug = (state.mouse_pos == state.level.mug_pos).all()
+        got_napkin = (state.mouse_pos == state.level.napkin_pos).all()
+
         got_dish_first_time = got_dish & ~state.got_dish
         state = state.replace(got_dish=state.got_dish | got_dish)
 
+        got_fork_first_time = got_fork & ~state.got_fork
+        state = state.replace(got_fork=state.got_fork | got_fork)
+
+        got_spoon_first_time = got_spoon & ~state.got_spoon
+        state = state.replace(got_spoon=state.got_spoon | got_spoon)
+
+        got_glass_first_time = got_glass & ~state.got_glass
+        state = state.replace(got_glass=state.got_glass | got_glass)
+
+        got_mug_first_time = got_mug & ~state.got_mug
+        state = state.replace(got_mug=state.got_mug | got_mug)
+
+        got_napkin_first_time = got_napkin & ~state.got_napkin
+        state = state.replace(got_napkin=state.got_napkin | got_napkin)
+        
+        got_objects = [got_dish, got_fork, got_spoon, got_glass, got_mug, got_napkin]
+
+        first_time_objects = [got_dish_first_time, got_fork_first_time, got_spoon_first_time, got_glass_first_time, got_mug_first_time, got_napkin_first_time]
+
+        state_objects = [state.got_dish, state.got_fork, state.got_spoon, state.got_glass, state.got_mug, state.got_napkin ]
+
+        objects_positions = [state.level.dish_pos, state.level.fork_pos, state.level.spoon_pos, state.level.glass_pos, state.level.mug_pos, state.level.napkin_pos]
+
+
         # reward and done
         reward = got_cheese_first_time.astype(float)
-        proxy_reward_dish = got_dish_first_time.astype(float)
+        first_group_got_objects = got_objects[:self.split_object_firstgroup]
+        first_group_first_time_objects= first_time_objects[:self.split_object_firstgroup]
+        first_group_state_objects= state_objects[:self.split_object_firstgroup]
+        first_group_objects_positions= objects_positions[:self.split_object_firstgroup]
+        if self.split_object_firstgroup > len(got_objects) - 1:
+            second_group_got_objects = []
+            second_group_first_time_objects = []
+            second_group_objects_positions = []
+            second_group_state_objects = []
+        else:
+            second_group_got_objects= got_objects[self.split_object_firstgroup:]
+            second_group_first_time_objects= first_time_objects[self.split_object_firstgroup:]
+            second_group_state_objects= state_objects[self.split_object_firstgroup:]
+            second_group_objects_positions= objects_positions[self.split_object_firstgroup:]
+        
 
-        got_dish_before_cheese = state.got_dish & ~state.got_cheese
-        got_cheese_before_dish = state.got_cheese & ~state.got_dish
+        #proxy_first_group= first_group_first_time_objects[0].asytype(float)
+        if len(second_group_first_time_objects) > 0:
+            proxy_pile = got_napkin_first_time.astype(float)
+            got_pile_before_cheese = got_napkin_first_time & ~state.got_cheese
+            got_cheese_before_pile = state.got_cheese & ~state.got_napkin
+        else:
+            proxy_pile = got_cheese_first_time.astype(float)
+            got_pile_before_cheese = 0
+            got_cheese_before_pile = 0
+
+
+        #proxy_reward_dish = got_dish_first_time.astype(float)
+
+        
 
         #got_dish_after_cheese = state.got_dish & state.got_cheese
         #got_cheese_after_dish = state.got_cheese & state.got_dish
@@ -208,19 +297,20 @@ class Env(base.Env):
         #proxy_cheese_second = reward * got_dish_after_cheese
         #proxy_dish_second = proxy_reward_dish * got_cheese_after_dish
         
-        proxy_cheese_first = reward * got_cheese_before_dish
-        proxy_dish_first = proxy_reward_dish * got_dish_before_cheese
+        proxy_cheese_first = reward * got_cheese_before_pile
+        proxy_pile_first = proxy_pile * got_pile_before_cheese
         
-
 
         if self.terminate_after_cheese_and_dish:
-            done = state.got_cheese & state.got_dish
+            if len(second_group_first_time_objects) > 0:
+                done = state.got_cheese & state.got_napkin
+            else:
+                done = state.got_cheese
         else:
-            #done = got_cheese
-            done = state.got_cheese | state.got_dish
-        
-        #cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
-        #dish_rate = lax.cond(jnp.any(state.got_dish), lambda _: 1.0, lambda _: 0.0, operand=None)
+            done = state.got_cheese | state.got_napkin
+
+        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
+        pile_rate = lax.cond(jnp.any(state.got_napkin), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -228,11 +318,11 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'dish': proxy_reward_dish,
-                    #'proxy_first_dish': proxy_dish_first, to implement solving
-                    #'proxy_cheese_first': proxy_cheese_first,
-                    #'cheese_solve_rate': cheese_rate, 
-                    #'dish_solve_rate': dish_rate,
+                    'proxy_pile': proxy_pile,
+                    'proxy_pile_first': proxy_pile_first,
+                    'proxy_cheese_first': proxy_cheese_first,
+                    'cheese_solve_rate': cheese_rate, 
+                    'pile_solve_rate': pile_rate,
                      #'proxy_cheese_second': proxy_cheese_second,
                      #'proxy_dish_second': proxy_dish_second,
                 },
@@ -273,6 +363,39 @@ class Env(base.Env):
             Env.Channel.DISH,
         ].set(~state.got_dish)
 
+        #render other objects
+        obs = obs.at[
+            state.level.fork_pos[0],
+            state.level.fork_pos[1],
+            Env.Channel.FORK,
+        ].set(~state.got_fork)
+
+        obs = obs.at[
+            state.level.spoon_pos[0],
+            state.level.spoon_pos[1],
+            Env.Channel.SPOON,
+        ].set(~state.got_spoon)
+
+        obs = obs.at[
+            state.level.glass_pos[0],
+            state.level.glass_pos[1],
+            Env.Channel.GLASS,
+        ].set(~state.got_glass)
+
+        obs = obs.at[
+            state.level.mug_pos[0],
+            state.level.mug_pos[1],
+            Env.Channel.MUG,
+        ].set(~state.got_mug)
+
+        obs = obs.at[
+            state.level.napkin_pos[0],
+            state.level.napkin_pos[1],
+            Env.Channel.NAPKIN,
+        ].set(~state.got_napkin)
+        
+
+
         return obs
 
 
@@ -293,13 +416,42 @@ class Env(base.Env):
         # find out, for each position, which object to render
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
+            #seven objects
+            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.MUG] & obs[:, :, Env.Channel.NAPKIN],
+            #six objects
+            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.MUG],
+
+            obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.MUG] & obs[:, :, Env.Channel.NAPKIN],
+            #five objects
+            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.GLASS],
+
+            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG]& obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.SPOON] & obs[:, :, Env.Channel.FORK],
+            #four objects
+            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK] & obs[:, :, Env.Channel.SPOON],
+
+            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG]& obs[:, :, Env.Channel.GLASS] & obs[:, :, Env.Channel.SPOON],
+
+            #three objects
+
+            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG]& obs[:, :, Env.Channel.GLASS],
+
+            obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH] & obs[:, :, Env.Channel.FORK],
+
             # two objects
+            obs[:, :, Env.Channel.NAPKIN] & obs[:, :, Env.Channel.MUG],
+
             obs[:, :, Env.Channel.CHEESE] & obs[:, :, Env.Channel.DISH],
             # one object
             obs[:, :, Env.Channel.WALL],
             obs[:, :, Env.Channel.MOUSE],
             obs[:, :, Env.Channel.CHEESE],
             obs[:, :, Env.Channel.DISH],
+            obs[:, :, Env.Channel.FORK],
+            obs[:, :, Env.Channel.SPOON],
+            obs[:, :, Env.Channel.GLASS],
+            obs[:, :, Env.Channel.MUG],
+            obs[:, :, Env.Channel.NAPKIN],
+
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -307,13 +459,34 @@ class Env(base.Env):
 
         # put the corresponding sprite into each square
         spritemap = jnp.stack([
+            #seven objects
+            spritesheet['Seven_obj'],
+            #six objects
+            spritesheet['Six_obj_cheese'],
+            spritesheet['Six_no_cheese'],
+            #five objects
+            spritesheet['Five_obj_cheese'],
+            spritesheet['Five_no_cheese'],
+            #four objects
+            spritesheet['Four_obj_cheese'],
+            spritesheet['Four_no_cheese'],
+            #three objects
+            spritesheet['Three_no_cheese'],
+            spritesheet['Three_obj_cheese'],
+
             # two objects
-            spritesheet['CHEESE_ON_DISH'],
+            spritesheet['Two_no_cheese'],
+            spritesheet['Two_obj_cheese'],
             # one object
             spritesheet['WALL'],
             spritesheet['MOUSE'],
-            spritesheet['SMALL_CHEESE'],
-            spritesheet['DISH'],
+            spritesheet['CHEESE'],
+            spritesheet['One_no_cheese'],
+            spritesheet['One_no_cheese'],
+            spritesheet['One_no_cheese'],
+            spritesheet['One_no_cheese'],
+            spritesheet['One_no_cheese'],
+            spritesheet['One_no_cheese'],
             # no objects
             spritesheet['PATH'],
         ])[chosen_sprites]
@@ -323,7 +496,6 @@ class Env(base.Env):
         )
 
         return image
-
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def optimal_value(
@@ -418,6 +590,8 @@ class LevelGenerator(base.LevelGenerator):
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     max_cheese_radius: int = 0
+    max_dish_radius: int = 0
+    split_elements: int = 0 # how many items should be placed with the cheese, max is six
     
     def __post_init__(self):
         # validate cheese radius
@@ -447,6 +621,7 @@ class LevelGenerator(base.LevelGenerator):
         # mouse spawns in some random valid position
         no_wall = ~wall_map.flatten()
 
+
         rng_spawn_mouse, rng = jax.random.split(rng)
         initial_mouse_pos = jax.random.choice(
             key=rng_spawn_mouse,
@@ -455,52 +630,150 @@ class LevelGenerator(base.LevelGenerator):
             p=no_wall,
         )
         
-        # dish spawns in some remaining valid position
+        
         no_mouse = jnp.ones_like(wall_map).at[
             initial_mouse_pos[0],
             initial_mouse_pos[1],
         ].set(False).flatten()
 
-        rng_spawn_dish, rng = jax.random.split(rng)
-        dish_pos = jax.random.choice(
-            key=rng_spawn_dish,
-            a=coords,
-            axis=0,
-            p=no_wall & no_mouse,
-        )
+        av_pos = no_wall & no_mouse
 
-        # cheese spawns in some remaining valid position near the dish
-        distance_to_dish = maze_solving.maze_distances(wall_map)[
-            dish_pos[0],
-            dish_pos[1],
-        ]
+   
 
-        near_dish = (distance_to_dish == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
-        #remove the walls from the near_dish mask
-        near_dish_nowall = near_dish | (near_dish & no_wall)
+        # List of objects to spawn
+        objects = ['dish', 'fork', 'spoon', 'glass', 'mug', 'napkin']  # Add more objects as needed
 
+        final_spawn = {}
+
+        # Spawn all other objects
+        for obj in objects:
+            rng_spawn, rng = jax.random.split(rng)
+            pos = jax.random.choice(
+                key=rng_spawn,
+                a=coords,
+                axis=0,
+                p=av_pos,
+            )
+            # Update available positions
+            no_obj = jnp.ones_like(wall_map).at[
+                pos[0], 
+                pos[1],
+            ].set(False).flatten()
+            
+            av_pos = av_pos & no_obj
+
+            final_spawn[obj] = pos
+
+      
+        objects = ['dish', 'fork', 'spoon', 'glass', 'mug', 'napkin']
+
+        no_objects = jnp.ones_like(wall_map).flatten()
+
+        for obj in objects:
+            no_objects &= jnp.ones_like(wall_map).at[
+                final_spawn[obj][0],
+                final_spawn[obj][1]
+            ].set(False).flatten()
+        #cheese spawns where no other object is - there is no minimum distance requirement
+        #create a boolean array with the available positions
+       
+        
 
         rng_spawn_cheese, rng = jax.random.split(rng)
         cheese_pos = jax.random.choice(
             key=rng_spawn_cheese,
             a=coords,
             axis=0,
-            #p=no_wall & no_mouse & near_dish,
-            p = no_mouse & near_dish_nowall,
+            #p=no_wall & no_mouse & near_napkin,
+            p= no_objects & no_wall & no_mouse,
         )
 
-        wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
+        # distance_to_napkin = maze_solving.maze_distances(wall_map)[
+        #     napkin_pos[0],
+        #     napkin_pos[1],
+        # ]
+        # near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
+
+        # rng_spawn_cheese, rng = jax.random.split(rng)
+        # cheese_pos = jax.random.choice(
+        #     key=rng_spawn_cheese,
+        #     a=coords,
+        #     axis=0,
+        #     p=no_wall & no_mouse & near_napkin,
+        # )
+
+        #second group
+        #distance_to_cheese = maze_solving.maze_distances(wall_map)[
+         #   cheese_pos[0],
+          #  cheese_pos[1],
+        #]
+
+        #near_cheese = (distance_to_cheese <= self.max_dish_radius).flatten()
+
+        #rng_spawn_second, rng = jax.random.split(rng)
+
+        #second_pos = jax.random.choice(
+         #   key=rng_spawn_second,
+          #  a=coords,
+           # axis=0,
+            #p=no_wall & no_mouse & near_dish & near_cheese,
+        #)
+
+        if self.max_cheese_radius == 0:
+            rng_spawn_first, rng = jax.random.split(rng)
+            napkin_pos = jax.random.choice(
+                key=rng_spawn_first,
+                a=coords,
+                axis=0,
+                p=no_wall & no_mouse,
+            )
+            for obj in objects:
+                pos = napkin_pos
+                final_spawn[obj] = pos
+
+            distance_to_napkin = maze_solving.maze_distances(wall_map)[
+                napkin_pos[0],
+                napkin_pos[1],
+            ]
+
+            near_napkin = (distance_to_napkin == self.max_cheese_radius).flatten()
+
+            near_napkin_nowall = near_napkin | (near_napkin & no_wall)
+
+            rng_spawn_cheese, rng = jax.random.split(rng)
+            cheese_pos = jax.random.choice(
+                key=rng_spawn_cheese,
+                a=coords,
+                axis=0,
+                #p=no_wall & no_mouse & near_napkin,
+                p=near_napkin_nowall & no_mouse,
+            )
+        else:
+            pass
+
 
         return Level(
             wall_map=wall_map,
             initial_mouse_pos=initial_mouse_pos,
-            dish_pos=dish_pos,
             cheese_pos=cheese_pos,
+            dish_pos=final_spawn['dish'],
+            fork_pos = final_spawn['fork'],
+            spoon_pos = final_spawn['spoon'],
+            glass_pos = final_spawn['glass'],
+            mug_pos = final_spawn['mug'],
+            napkin_pos = final_spawn['napkin'],
         )
+
+#  wall_map: chex.Array
+#     cheese_pos: chex.Array
+#     dish_pos: chex.Array
+#     #dish_positions: chex.Array
+#     initial_mouse_pos: chex.Array
+
 
 
 @struct.dataclass
-class LevelParser:
+class LevelParser: # I need to change dish for this new env, ops
     """
     Level parser for Cheese on a Dish environment. Given some parameters
     determining level shape, provides a `parse` method that converts an ASCII
@@ -649,325 +922,9 @@ class LevelParser:
             dish_pos=jnp.stack([l.dish_pos for l in levels]),
             initial_mouse_pos=jnp.stack([l.initial_mouse_pos for l in levels]),
         )
-
-
-
-
-
-
-# # # 
-# Level solving
-
-
-@struct.dataclass
-class LevelSolution(base.LevelSolution):
-    level: Level
-    directional_distance_to_cheese: chex.Array
-
-@struct.dataclass
-class LevelSolutionProxies(base.LevelSolutionProxies):
-    level: Level
-    #you have a dictionary of proxies, and have an entry for each proxy. so create a dict of proxies, where each entry has a name for a proxy and a corresponding chex.array
-    directional_distance_to_proxies: dict[str, chex.Array]
-
-
-@struct.dataclass
-class LevelSolver(base.LevelSolver):
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def solve(self, level: Level) -> LevelSolution:
-        """
-        Compute the distance from each possible mouse position to the cheese
-        position a given level. From this information one can easy compute
-        the optimal action or value from any state of this level.
-
-        Parameters:
-
-        * level : Level
-                The level to compute the optimal value for.
-
-        Returns:
-
-        * soln : LevelSolution
-                The necessary precomputed (directional) distances for later
-                computing optimal values and actions from states.
-
-        TODO:
-
-        * Solving the mazes currently uses all pairs shortest paths
-          algorithm, which is not efficient enough to work for very large
-          mazes. If we wanted to solve very large mazes, we could by changing
-          to a single source shortest path algorithm.
-        """
-        # compute distance between mouse and cheese
-        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
-        dir_dist_to_cheese = dir_dist[
-            :,
-            :,
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-            :,
-        ]
-
-        return LevelSolution(
-            level=level,
-            directional_distance_to_cheese=dir_dist_to_cheese,
-        )
-
-    @functools.partial(jax.jit, static_argnames=('self',)) #proxies is a list with a name of strings for various proxies
-    def solve_proxy(self, level: Level) -> LevelSolutionProxies:
-        """
-        Compute the distance from each possible mouse position to the cheese
-        position a given level. From this information one can easy compute
-        the optimal action or value from any state of this level.
-
-        Parameters:
-
-        * level : Level
-                The level to compute the optimal value for.
-
-        Returns:
-
-        * soln : LevelSolution
-                The necessary precomputed (directional) distances for later
-                computing optimal values and actions from states.
-
-        TODO:
-
-        * Solving the mazes currently uses all pairs shortest paths
-          algorithm, which is not efficient enough to work for very large
-          mazes. If we wanted to solve very large mazes, we could by changing
-          to a single source shortest path algorithm.
-        """
-        proxies = ['dish'] #where you define your proxies...
-        # compute distance between mouse and cheese
-        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
-        # calculate the distance for each proxy
-        proxy_directions = {}
-        # first, get the name of each proxy
-        for proxy_name in proxies:
-            if proxy_name == 'dish':
-                dir_dist_to_corner = dir_dist[
-                    :,
-                    :,
-                    level.dish_pos[0],
-                    level.dish_pos[1],
-                    :,
-                ]
-                proxy_directions[proxy_name] = dir_dist_to_corner
-            else:
-                raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment
-        return LevelSolutionProxies(
-            level=level,
-            directional_distance_to_proxies=proxy_directions,
-        )
-            
-        
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
-        """
-        Optimal return value from a given state.
-
-        Parameters:
-
-        * soln : LevelSolution
-                The output of `solve` method for this level.
-        * state : EnvState
-                The state to compute the value for.
-
-        Return:
-
-        * value : float
-                The optimal value of this state.
-        """
-        # steps to get to the cheese: look up in distance cache
-        optimal_dist = soln.directional_distance_to_cheese[
-            state.mouse_pos[0],
-            state.mouse_pos[1],
-            4, # stay here
-        ]
-
-        # reward when we get to the cheese is 1 iff the cheese is still there
-        reward = (1.0 - state.got_cheese)
-        # maybe we apply a time penalty
-        time_of_reward = state.steps + optimal_dist
-        penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
-        penalized_reward = jnp.where(
-            self.env.penalize_time,
-            penalty * reward,
-            reward,
-        )
-        # mask out rewards beyond the end of the episode
-        episode_still_valid = time_of_reward < self.env.max_steps_in_episode
-        valid_reward = penalized_reward * episode_still_valid
-
-        # discount the reward
-        discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
-
-        return discounted_reward
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_value_proxies(self,soln: LevelSolutionProxies, state: EnvState) -> dict[str, float]:
-        """
-        Optimal return value from a given state.
-
-        Parameters:
-
-        * soln : LevelSolutionProxies
-                The output of `solve` method for this level for the proxies.
-        * state : EnvState
-                The state to compute the value for.
-        
-        Return:
-
-        * dict of rewards for each proxy: dict[str, float]
-                The optimal value of this state for each proxy.
-        """
-
-        proxy_rewards = {}
-        for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
-            if proxy_name == 'dish':
-                optimal_dist = proxy_directions[
-                    state.mouse_pos[0],
-                    state.mouse_pos[1],
-                    4, # stay here
-                ]
-                # reward when we get to the corner is 1 iff the corner is still there
-                reward = (1.0 - state.got_dish)
-                # maybe we apply a time penalty
-                time_of_reward = state.steps + optimal_dist
-                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
-                penalized_reward = jnp.where(
-                    self.env.penalize_time,
-                    penalty * reward,
-                    reward,
-                )
-                # mask out rewards beyond the end of the episode
-                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
-                valid_reward = penalized_reward * episode_still_valid
-
-                # discount the reward
-                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
-                proxy_rewards[proxy_name] = discounted_reward
-            else:
-                raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment, did not implement any other
-        
-        return proxy_rewards
     
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_action_values(
-        self,
-        soln: LevelSolution,
-        state: EnvState,
-    ) -> chex.Array: # float[4]
-        """
-        Optimal return value from a given state.
-
-        Parameters:
-
-        * soln : LevelSolution
-                The output of `solve` method for this level.
-        * state : EnvState
-                The state to compute the value for.
-            
-        Notes:
-
-        * With a steep discount rate or long episodes, this algorithm might
-          run into minor numerical issues where small contributions to the
-          return from late into the episode are lost.
-        """
-        # steps to get to the cheese for adjacent squares: look up in cache
-        dir_dists = soln.directional_distance_to_cheese[
-            state.mouse_pos[0],
-            state.mouse_pos[1],
-        ] # -> float[5] (up left down right stay)
-        # steps after taking each action, taking collisions into account:
-        # replace inf values with stay-still values
-        action_dists = jnp.where(
-            jnp.isinf(dir_dists[:4]),
-            dir_dists[4],
-            dir_dists[:4],
-        )
-
-        # reward when we get to the cheese is 1 iff the cheese is still there
-        reward = (1.0 - state.got_cheese)
-        # maybe we apply a time penalty
-        times_of_reward = state.steps + action_dists
-        penalties = (
-            1.0 - 0.9 * times_of_reward / self.env.max_steps_in_episode
-        )
-        penalized_rewards = jnp.where(
-            self.env.penalize_time,
-            penalties * reward,
-            reward,
-        )
-        # mask out rewards beyond the end of the episode
-        episode_still_valids = times_of_reward < self.env.max_steps_in_episode
-        valid_rewards = penalized_rewards * episode_still_valids
-
-        # discount the reward
-        discounted_rewards = (
-            (self.discount_rate ** action_dists) * valid_rewards
-        )
-
-        return discounted_rewards
-
-
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
-        """
-        Optimal action from a given state.
-
-        Parameters:
-
-        * soln : LevelSolution
-                The output of `solve` method for this level.
-        * state : EnvState
-                The state to compute the optimal action for.
-            
-        Return:
-
-        * action : int                      # TODO: use the Env.Action enum?
-                An optimal action from the given state.
-                
-        Notes:
-
-        * If there are multiple equally optimal actions, this method will
-          return the first according to the order up (0), left (1), down (2),
-          or right (3).
-        * As a special case of this, if the cheese is unreachable, the
-          returned action will be up (0).
-        * If the cheese is on the current square, the returned action is
-          arbitrary, and in fact it might even be suboptimal, since if there
-          is a wall the optimal action is to move into that wall.
-        * If the cheese has already been gotten then there is no more reward
-          available, but this method will still direct the mouse towards the
-          cheese position.
-        * If the cheese is too far away to reach by the end of the episode,
-          this method will still direct the mouse towards the cheese.
-
-        TODO: 
-
-        * Make all environments have a 'stay action' will simplify these
-          solutions a fair bit. The mouse could stay when on the cheese, or
-          when the cheese is unreachable, or when the cheese is already
-          gotten.
-        """
-        action = jnp.argmin(soln.directional_distance_to_cheese[
-            state.mouse_pos[0],
-            state.mouse_pos[1],
-            :4,
-        ])
-        return action
-
-
-
-
-
 
 class LevelMetrics(base.LevelMetrics):
-
 
     @functools.partial(jax.jit, static_argnames=('self',))
     def compute_metrics(
@@ -1001,20 +958,20 @@ class LevelMetrics(base.LevelMetrics):
         
         # cheese - dish distance
 
-        cheese_dish_dists = dists[
+        cheese_pile_dists = dists[
             jnp.arange(num_levels),
             levels.cheese_pos[:, 0],
             levels.cheese_pos[:, 1],
-            levels.dish_pos[:, 0],
-            levels.dish_pos[:, 1],
+            levels.napkin_pos[:, 0],
+            levels.napkin_pos[:, 1],
         ]
 
-        cheese_dish_dists_finite = jnp.nan_to_num(
-            cheese_dish_dists,
+        cheese_pile_dists_finite = jnp.nan_to_num(
+            cheese_pile_dists,
             posinf=(h-2)*(w-2)/2,
         )
 
-        avg_cheese_dish_dist = cheese_dish_dists_finite.mean()
+        avg_cheese_pile_dist = cheese_pile_dists_finite.mean()
 
         # cheese_dists = dists[
         #     jnp.arange(num_levels),
@@ -1041,21 +998,46 @@ class LevelMetrics(base.LevelMetrics):
         opt_dists_solvable_cheese = solvable * opt_dists_cheese
         opt_dists_finite_cheese = jnp.nan_to_num(opt_dists_cheese, posinf=(h-2)*(w-2)/2)
 
-        # shortest path length and solvability - mouse to dish
-        opt_dists_dish = dists[
+        # shortest path length and solvability - mouse to pile
+        opt_dists_pile = dists[
             jnp.arange(num_levels),
             levels.initial_mouse_pos[:, 0],
             levels.initial_mouse_pos[:, 1],
-            levels.dish_pos[:, 0],
-            levels.dish_pos[:, 1],
+            levels.napkin_pos[:, 0],
+            levels.napkin_pos[:, 1],
         ]
-        solvable_dish = ~jnp.isposinf(opt_dists_dish)
-        opt_dists_solvable_dish = solvable_dish * opt_dists_dish
-        opt_dists_finite_dish = jnp.nan_to_num(opt_dists_dish, posinf=(h-2)*(w-2)/2)
+        solvable_pile = ~jnp.isposinf(opt_dists_pile)
+        opt_dists_solvable_pile = solvable_pile * opt_dists_pile
+        opt_dists_finite_pile = jnp.nan_to_num(opt_dists_pile, posinf=(h-2)*(w-2)/2)
 
         #buffer
-        cheese_on_dish = (levels.cheese_pos[:, 0] == levels.dish_pos[:, 0]) & (levels.cheese_pos[:, 1] == levels.dish_pos[:, 1])
-        cheese_on_dish_avg =  cheese_on_dish.mean()
+        cheese_on_pile= (levels.cheese_pos[:, 0] == levels.napkin_pos[:, 0]) & (levels.cheese_pos[:, 1] == levels.napkin_pos[:, 1])
+        cheese_on_pile_avg =  cheese_on_pile.mean()
+
+        #tracking elements on pile
+        objects_on_cheese = (
+            (levels.dish_pos == levels.cheese_pos).all(axis=1) +
+            (levels.fork_pos == levels.cheese_pos).all(axis=1) +
+            (levels.spoon_pos == levels.cheese_pos).all(axis=1) +
+            (levels.glass_pos == levels.cheese_pos).all(axis=1) +
+            (levels.mug_pos == levels.cheese_pos).all(axis=1) 
+            ).mean()
+        objects_on_pile = (
+            (levels.dish_pos == levels.napkin_pos).all(axis=1) +
+            (levels.fork_pos == levels.napkin_pos).all(axis=1) +
+            (levels.spoon_pos == levels.napkin_pos).all(axis=1) +
+            (levels.glass_pos == levels.napkin_pos).all(axis=1) +
+            (levels.mug_pos == levels.napkin_pos).all(axis=1) 
+            ).mean()
+        
+        dish_napkin_same = jnp.all(jnp.all(levels.dish_pos == levels.napkin_pos, axis=1))
+
+
+        objects_on_cheese, objects_on_pile = lax.cond(
+            dish_napkin_same,
+            lambda: (jnp.float32(6), jnp.float32(0)),
+            lambda: (objects_on_cheese, objects_on_pile)
+        )
 
 
         # rendered levels in a grid
@@ -1092,8 +1074,8 @@ class LevelMetrics(base.LevelMetrics):
                 'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
                 'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
                 'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
-                'dish_map_avg_img': util.viridis(dish_map.mean(axis=0)),
-                'dish_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
+                'pile_map_avg_img': util.viridis(dish_map.mean(axis=0)),
+                'pile_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
 
             },
             'distances': {
@@ -1107,20 +1089,21 @@ class LevelMetrics(base.LevelMetrics):
                 'mouse-cheese_dist_finite_wavg': (opt_dists_finite_cheese @ weights),
                 'mouse-cheese_dist_solvable_avg': opt_dists_solvable_cheese.sum() / solvable.sum(),
                 'mouse-cheese_dist_solvable_wavg': (opt_dists_solvable_cheese @ weights) / (solvable @ weights),
-                # optimal dist from mouse to dish
-                'mouse-dish_dist_finite_hist': opt_dists_finite_dish,
-                'mouse-dish_dist_finite_avg': opt_dists_finite_dish.mean(),
-                'mouse-dish_dist_finite_wavg': (opt_dists_finite_dish @ weights),
-                'mouse-dish_dist_solvable_avg': opt_dists_solvable_dish.sum() / solvable_dish.sum(),
-                'mouse-dish_dist_solvable_wavg': (opt_dists_solvable_dish @ weights) / (solvable_dish @ weights),
+                # optimal dist from mouse to pile
+                'mouse-pile_dist_finite_hist': opt_dists_finite_pile,
+                'mouse-pile_dist_finite_avg': opt_dists_finite_pile.mean(),
+                'mouse-pile_dist_finite_wavg': (opt_dists_finite_pile @ weights),
+                'mouse-pile_dist_solvable_avg': opt_dists_solvable_pile.sum() / solvable_pile.sum(),
+                'mouse-pile_dist_solvable_wavg': (opt_dists_solvable_pile @ weights) / (solvable_pile @ weights),
                 # avg cheese-dish distance
-                'cheese-dish_dist_hist': cheese_dish_dists_finite,
-                'cheese-dish_dist_avg': avg_cheese_dish_dist,
-                'cheese-dish_dist_wavg': cheese_dish_dists_finite @ weights,
+                'cheese-pile_dist_hist': cheese_pile_dists_finite,
+                'cheese-pile_dist_avg': avg_cheese_pile_dist,
+                'cheese-pile_dist_wavg': cheese_pile_dists_finite @ weights,
+                # elements on cheese and pile
+                '#objects_on_cheese': objects_on_cheese,
+                '#objects_on_pile': objects_on_pile,
+
                 #buffer metrics
-                'levels_cheese_is_on_dish_avg':  cheese_on_dish_avg
-
-            },
+                'levels_cheese_is_on_pile_avg':  cheese_on_pile_avg 
+            },  
         }
-
-

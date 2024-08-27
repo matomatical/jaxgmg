@@ -389,6 +389,12 @@ class LevelSolution:
     """
     Represent a solution to some level. All fields come from subclass.
     """
+    
+@struct.dataclass
+class LevelSolutionProxies:
+    """
+    Represent a solution to some level. All fields come from subclass.
+    """
 
 
 @struct.dataclass
@@ -425,6 +431,11 @@ class LevelSolver:
     def level_value(self, soln: LevelSolution, level: Level) -> float:
         state = self.env._reset(level)
         return self.state_value(soln, state)
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def level_value_proxy(self, soln: LevelSolutionProxies, level: Level) -> dict[str, float]:
+        state = self.env._reset(level)
+        return self.state_value_proxies(soln, state)
 
 
     # pre-vectorised methods
@@ -452,6 +463,27 @@ class LevelSolver:
         )
         return vectorised_level_value(solns, levels)
 
+    #ADD FOR PROXIES
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def vmap_solve_proxies(
+        self,
+        levels: Level, # Level[n]
+    ) -> LevelSolutionProxies:
+        vectorised_solve = jax.vmap(
+            self.solve_proxy,
+        )
+        return vectorised_solve(levels)
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def vmap_level_value_proxy(
+        self,
+        solns: LevelSolutionProxies,   # LevelSolution[n]
+        levels: Level,          # Level[n]
+    ) -> dict[str, float]:
+        vectorised_level_value = jax.vmap(
+            self.level_value_proxy,
+        )
+        return vectorised_level_value(solns, levels)
 
 # # # 
 # Level complexity metrics

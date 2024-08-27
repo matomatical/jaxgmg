@@ -277,6 +277,7 @@ def compute_rollout_metrics(
     rollouts: Rollout,                  # Rollout[num_levels]
     discount_rate: float,
     benchmark_returns: Array | None,    # float[num_levels]
+    benchmark_proxies: dict[str, Array] | None,
 ) -> dict[str, Any]:
     """
     Parameters:
@@ -360,7 +361,17 @@ def compute_rollout_metrics(
             'lvl_avg_return_hist': avg_proxy_returns,
             'lvl_reward_per_step_hist': proxy_reward_per_step,
         }
-    
+        if benchmark_proxies is not None:
+            benchmark_proxy = benchmark_proxies[proxy_name]
+            benchmark_regret = benchmark_proxy - avg_proxy_returns
+            metrics[proxy_name].update({
+                # average over all levels in the batch
+                f"avg_benchmark_return_{proxy_name}": benchmark_proxy.mean(),
+                f"avg_benchmark_regret_{proxy_name}": benchmark_regret.mean(),
+                # histograms of values for each level
+                f"lvl_benchmark_return_hist_{proxy_name}": benchmark_proxy,
+                f"lvl_benchmark_regret_hist_{proxy_name}": benchmark_regret,
+            })
     return metrics
 
 

@@ -15,6 +15,18 @@ from jaxgmg.environments.base import Level, LevelGenerator, LevelMetrics, LevelS
 
 from jaxgmg.baselines.experience import Rollout
 
+from jaxgmg.procgen import maze_generation
+from jaxgmg.environments import base
+from jaxgmg.environments import cheese_in_the_corner
+from jaxgmg.environments import keys_and_chests
+from jaxgmg.environments import cheese_on_a_dish
+from jaxgmg.environments import cheese_on_a_pile
+from jaxgmg.baselines import ppo
+from jaxgmg.baselines import networks
+from jaxgmg.baselines import evals
+from jaxgmg.baselines import autocurricula
+from jaxgmg.baselines import experience
+
 
 # # # 
 # Base classes
@@ -181,6 +193,7 @@ def plr_compute_scores(
     regret_estimator: str,
     rollouts: Rollout,  # Rollout[num_levels] with Transition[num_steps]
     advantages: Array,  # float[num_levels, num_steps]
+    level: Level,       # Level[num_levels]
 ) -> Array:             # float[num_levels]
     match regret_estimator.lower():
         case "absgae":
@@ -191,6 +204,159 @@ def plr_compute_scores(
             true_reward = rollouts.transitions.reward.sum(axis=1)
             proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
             return jnp.maximum(true_reward - proxy_reward,0)
+
+        case "true_regret_corner":
+            env = cheese_in_the_corner.Env(
+                    obs_level_of_detail=0,
+                    penalize_time=False,
+                    terminate_after_cheese_and_corner=False,
+                )
+            level_solver = cheese_in_the_corner.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            levels = level
+
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            return jnp.maximum(regret_true_reward,0)
+
+
+        case "relative_pvl_regret_corner":
+            pvl = jnp.maximum(advantages, 0).mean(axis=1)
+            proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].mean(axis=1)
+            pvl_normalized = (pvl - pvl.min()) / (pvl.max() - pvl.min() + 1e-8)
+            proxy_reward_normalized = (proxy_reward - proxy_reward.min()) / (proxy_reward.max() - proxy_reward.min() + 1e-8)
+            return jnp.maximum(pvl_normalized - proxy_reward_normalized, 0)
+
+        case "relative_regret_corner":
+            env = cheese_in_the_corner.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_corner=False,
+            )
+            level_solver = cheese_in_the_corner.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            #print('transition',rollouts.transitions.env_state.level)
+            #levels = rollouts.transitions.env_state.level[:,0]
+            levels = level
+
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            regret_proxy_reward = eval_off_level_set['corner']['lvl_benchmark_regret_hist_corner']
+            #regret_true_reward = eval_off_level_set['benchmark_returns']['avg_benchmark_regret'].sum(axis=1)
+            #regret_proxy_reward = eval_off_level_set['benchmark_proxies']['avg_benchmark_regret_corner'].sum(axis=1)
+            return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
+
+        case "relative_regret_dish":
+            env = cheese_on_a_dish.Env(
+            obs_level_of_detail=0,
+            penalize_time=False,
+            terminate_after_cheese_and_dish= False,
+        )
+            level_solver = cheese_on_a_dish.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            #print('transition',rollouts.transitions.env_state.level)
+            #levels = rollouts.transitions.env_state.level[:,0]
+            levels = level
+
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            regret_proxy_reward = eval_off_level_set['dish']['lvl_benchmark_regret_hist_dish']
+            #regret_true_reward = eval_off_level_set['benchmark_returns']['avg_benchmark_regret'].sum(axis=1)
+            #regret_proxy_reward = eval_off_level_set['benchmark_proxies']['avg_benchmark_regret_corner'].sum(axis=1)
+            return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
+
+        case "true_regret_dish":
+            env = cheese_on_a_dish.Env(
+            obs_level_of_detail=0,
+            penalize_time=False,
+            terminate_after_cheese_and_dish= False,
+        )
+            level_solver = cheese_on_a_dish.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            #print('transition',rollouts.transitions.env_state.level)
+            #levels = rollouts.transitions.env_state.level[:,0]
+            levels = level
+
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            
+            return jnp.maximum(regret_true_reward ,0)
+            
+                    
+
+            
         case "proxy_regret_corner_wdistance":
             true_reward = rollouts.transitions.reward.sum(axis=1)
             proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
@@ -363,6 +529,7 @@ class PrioritisedLevelReplay(CurriculumLevelGenerator):
             regret_estimator=self.regret_estimator,
             rollouts=rollouts,
             advantages=advantages,
+            level=levels,
         )
     
         # perform both a replay-type update and a new-type update
@@ -595,6 +762,7 @@ class ParallelRobustPrioritisedLevelReplay(CurriculumLevelGenerator):
             regret_estimator=self.regret_estimator,
             rollouts=rollouts,
             advantages=advantages,
+            level=levels,
         )
         num_levels = scores.shape[0] // 2
 
