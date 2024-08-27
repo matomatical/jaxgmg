@@ -153,7 +153,7 @@ def plr_compute_scores(
             return jnp.maximum(regret_true_reward ,0)
         case "proxy_regret_dish":
             true_reward = rollouts.transitions.reward.sum(axis=1)
-            proxy_reward = rollouts.transitions.info['proxy_rewards']['proxy_dish'].sum(axis=1)
+            proxy_reward = rollouts.transitions.info['proxy_rewards']['dish'].sum(axis=1)
             return jnp.maximum(true_reward - proxy_reward,0)
         case "proxy_regret_pile":
             true_reward = rollouts.transitions.reward.sum(axis=1)

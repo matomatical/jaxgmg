@@ -756,17 +756,27 @@ class LevelSolver(base.LevelSolver):
         proxy_directions = {}
         # first, get the name of each proxy
         for proxy_name in proxies:
-            if proxy_name == 'dish':
-                dir_dist_to_corner = dir_dist[
+            if proxy_name == 'dish' or proxy_name == 'first_dish':
+                dir_dist_to_dish = dir_dist[
                     :,
                     :,
                     level.dish_pos[0],
                     level.dish_pos[1],
                     :,
                 ]
-                proxy_directions[proxy_name] = dir_dist_to_corner
+                proxy_directions[proxy_name] = dir_dist_to_dish
+            if proxy_name == 'first_cheese':
+                dir_dist_to_cheese = dir_dist[
+                    :,
+                    :,
+                    level.cheese_pos[0],
+                    level.cheese_pos[1],
+                    :,
+                ]
+                proxy_directions[proxy_name] = dir_dist_to_cheese
             else:
                 raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment
+            
         return LevelSolutionProxies(
             level=level,
             directional_distance_to_proxies=proxy_directions,
@@ -843,7 +853,7 @@ class LevelSolver(base.LevelSolver):
                     4, # stay here
                 ]
                 # reward when we get to the corner is 1 iff the corner is still there
-                reward = (1.0 - state.got_dish)
+                reward = (1.0 - state.got_dish) 
                 # maybe we apply a time penalty
                 time_of_reward = state.steps + optimal_dist
                 penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
@@ -859,6 +869,51 @@ class LevelSolver(base.LevelSolver):
                 # discount the reward
                 discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
                 proxy_rewards[proxy_name] = discounted_reward
+            if proxy_name == 'first_dish':
+                optimal_dist = proxy_directions[
+                    state.mouse_pos[0],
+                    state.mouse_pos[1],
+                    4, # stay here
+                ]
+                
+                reward = (1.0 - state.got_dish) * ~state.got_cheese # 1 iff the dish is still there and the cheese is not gotten - double check this?
+                # maybe we apply a time penalty
+                time_of_reward = state.steps + optimal_dist
+                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+                penalized_reward = jnp.where(
+                    self.env.penalize_time,
+                    penalty * reward,
+                    reward,
+                )
+                # mask out rewards beyond the end of the episode
+                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+                valid_reward = penalized_reward * episode_still_valid
+
+                # discount the reward
+                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+                proxy_rewards[proxy_name] = discounted_reward
+            if proxy_name == 'first_cheese':
+                optimal_dist = proxy_directions[
+                    state.mouse_pos[0],
+                    state.mouse_pos[1],
+                    4, # stay here
+                ]
+                reward = (1.0 - state.got_cheese) * ~state.got_dish # 1 iff the cheese is still there and the dish is not gotten - double check this?
+                # maybe we apply a time penalty
+                time_of_reward = state.steps + optimal_dist
+                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+                penalized_reward = jnp.where(
+                    self.env.penalize_time,
+                    penalty * reward,
+                    reward,
+                )
+                # mask out rewards beyond the end of the episode
+                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+                valid_reward = penalized_reward * episode_still_valid
+                # discount the reward
+                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+                proxy_rewards[proxy_name] = discounted_reward
+
             else:
                 raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment, did not implement any other
         
