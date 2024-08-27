@@ -319,8 +319,6 @@ class Env(base.Env):
         else:
             done = state.got_cheese | state.got_napkin
 
-        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
-        pile_rate = lax.cond(jnp.any(state.got_napkin), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -329,10 +327,8 @@ class Env(base.Env):
             {
                 'proxy_rewards': {
                     'proxy_pile': proxy_pile,
-                    'proxy_pile_first': proxy_pile_first,
-                    'proxy_cheese_first': proxy_cheese_first,
-                    'cheese_solve_rate': cheese_rate, 
-                    'pile_solve_rate': pile_rate,
+                    'proxy_first_pile': proxy_pile_first,
+                    'proxy_first_cheese': proxy_cheese_first,
                      #'proxy_cheese_second': proxy_cheese_second,
                      #'proxy_dish_second': proxy_dish_second,
                 },
@@ -783,6 +779,366 @@ class LevelGenerator(base.LevelGenerator):
             mug_pos = final_spawn[4],
             napkin_pos = final_spawn[5],
         )
+
+
+@struct.dataclass
+class LevelSolution(base.LevelSolution):
+    level: Level
+    directional_distance_to_cheese: chex.Array
+
+@struct.dataclass
+class LevelSolutionProxies(base.LevelSolutionProxies):
+    level: Level
+    #you have a dictionary of proxies, and have an entry for each proxy. so create a dict of proxies, where each entry has a name for a proxy and a corresponding chex.array
+    directional_distance_to_proxies: dict[str, chex.Array]
+
+
+@struct.dataclass
+class LevelSolver(base.LevelSolver):
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def solve(self, level: Level) -> LevelSolution:
+        """
+        Compute the distance from each possible mouse position to the cheese
+        position a given level. From this information one can easy compute
+        the optimal action or value from any state of this level.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+
+        Returns:
+
+        * soln : LevelSolution
+                The necessary precomputed (directional) distances for later
+                computing optimal values and actions from states.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        """
+        # compute distance between mouse and cheese
+        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
+        dir_dist_to_cheese = dir_dist[
+            :,
+            :,
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+            :,
+        ]
+
+        return LevelSolution(
+            level=level,
+            directional_distance_to_cheese=dir_dist_to_cheese,
+        )
+
+    @functools.partial(jax.jit, static_argnames=('self',)) #proxies is a list with a name of strings for various proxies
+    def solve_proxy(self, level: Level) -> LevelSolutionProxies:
+        """
+        Compute the distance from each possible mouse position to the cheese
+        position a given level. From this information one can easy compute
+        the optimal action or value from any state of this level.
+
+        Parameters:
+
+        * level : Level
+                The level to compute the optimal value for.
+
+        Returns:
+
+        * soln : LevelSolution
+                The necessary precomputed (directional) distances for later
+                computing optimal values and actions from states.
+
+        TODO:
+
+        * Solving the mazes currently uses all pairs shortest paths
+          algorithm, which is not efficient enough to work for very large
+          mazes. If we wanted to solve very large mazes, we could by changing
+          to a single source shortest path algorithm.
+        """
+        proxies = ['dish'] #where you define your proxies...
+        # compute distance between mouse and cheese
+        dir_dist = maze_solving.maze_directional_distances(level.wall_map)
+        # calculate the distance for each proxy
+        proxy_directions = {}
+        # first, get the name of each proxy
+        for proxy_name in proxies:
+            if proxy_name == 'proxy_pile' or proxy_name == 'proxy_first_pile':
+                dir_dist_to_pile = dir_dist[
+                    :,
+                    :,
+                    level.napkin_pos[0],
+                    level.napkin_pos[1],
+                    :,
+                ]
+            if proxy_name == 'proxy_first_cheese':
+                dir_dist_to_cheese = dir_dist[
+                    :,
+                    :,
+                    level.cheese_pos[0],
+                    level.cheese_pos[1],
+                    :,
+                ]
+                proxy_directions[proxy_name] = dir_dist_to_cheese
+            else:
+                raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment
+            
+        return LevelSolutionProxies(
+            level=level,
+            directional_distance_to_proxies=proxy_directions,
+        )
+            
+        
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_value(self, soln: LevelSolution, state: EnvState) -> float:
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the value for.
+
+        Return:
+
+        * value : float
+                The optimal value of this state.
+        """
+        # steps to get to the cheese: look up in distance cache
+        optimal_dist = soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+            4, # stay here
+        ]
+
+        # reward when we get to the cheese is 1 iff the cheese is still there
+        reward = (1.0 - state.got_cheese)
+        # maybe we apply a time penalty
+        time_of_reward = state.steps + optimal_dist
+        penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+        penalized_reward = jnp.where(
+            self.env.penalize_time,
+            penalty * reward,
+            reward,
+        )
+        # mask out rewards beyond the end of the episode
+        episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+        valid_reward = penalized_reward * episode_still_valid
+
+        # discount the reward
+        discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+
+        return discounted_reward
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_value_proxies(self,soln: LevelSolutionProxies, state: EnvState) -> dict[str, float]:
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolutionProxies
+                The output of `solve` method for this level for the proxies.
+        * state : EnvState
+                The state to compute the value for.
+        
+        Return:
+
+        * dict of rewards for each proxy: dict[str, float]
+                The optimal value of this state for each proxy.
+        """
+
+        proxy_rewards = {}
+        for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
+              'proxy_pile': proxy_pile,
+                    'proxy_first_pile': proxy_pile_first,
+                    'proxy_first_cheese': proxy_cheese_first,
+            if proxy_name == 'proxy_pile':
+                optimal_dist = proxy_directions[
+                    state.mouse_pos[0],
+                    state.mouse_pos[1],
+                    4, # stay here
+                ]
+                # reward when we get to the corner is 1 iff the corner is still there
+                reward = (1.0 - state.got_napkin)
+                # maybe we apply a time penalty
+                time_of_reward = state.steps + optimal_dist
+                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+                penalized_reward = jnp.where(
+                    self.env.penalize_time,
+                    penalty * reward,
+                    reward,
+                )
+                # mask out rewards beyond the end of the episode
+                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+                valid_reward = penalized_reward * episode_still_valid
+
+                # discount the reward
+                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+                proxy_rewards[proxy_name] = discounted_reward
+            if proxy_name == 'proxy_first_pile':
+                optimal_dist = proxy_directions[
+                    state.mouse_pos[0],
+                    state.mouse_pos[1],
+                    4, # stay here
+                ]
+                
+                reward = (1.0 - state.got_napkin) * ~state.got_cheese # 1 iff the pile is still there and the cheese is not gotten - double check this?
+                # maybe we apply a time penalty
+                time_of_reward = state.steps + optimal_dist
+                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+                penalized_reward = jnp.where(
+                    self.env.penalize_time,
+                    penalty * reward,
+                    reward,
+                )
+                # mask out rewards beyond the end of the episode
+                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+                valid_reward = penalized_reward * episode_still_valid
+
+                # discount the reward
+                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+                proxy_rewards[proxy_name] = discounted_reward
+            if proxy_name == 'first_cheese':
+                optimal_dist = proxy_directions[
+                    state.mouse_pos[0],
+                    state.mouse_pos[1],
+                    4, # stay here
+                ]
+                reward = (1.0 - state.got_cheese) * ~state.got_napkin # 1 iff the cheese is still there and the dish is not gotten - double check this?
+                # maybe we apply a time penalty
+                time_of_reward = state.steps + optimal_dist
+                penalty = (1.0 - 0.9 * time_of_reward / self.env.max_steps_in_episode)
+                penalized_reward = jnp.where(
+                    self.env.penalize_time,
+                    penalty * reward,
+                    reward,
+                )
+                # mask out rewards beyond the end of the episode
+                episode_still_valid = time_of_reward < self.env.max_steps_in_episode
+                valid_reward = penalized_reward * episode_still_valid
+                # discount the reward
+                discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+                proxy_rewards[proxy_name] = discounted_reward
+
+            else:
+                raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment, did not implement any other
+        
+        return proxy_rewards
+    
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action_values(
+        self,
+        soln: LevelSolution,
+        state: EnvState,
+    ) -> chex.Array: # float[4]
+        """
+        Optimal return value from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the value for.
+            
+        Notes:
+
+        * With a steep discount rate or long episodes, this algorithm might
+          run into minor numerical issues where small contributions to the
+          return from late into the episode are lost.
+        """
+        # steps to get to the cheese for adjacent squares: look up in cache
+        dir_dists = soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+        ] # -> float[5] (up left down right stay)
+        # steps after taking each action, taking collisions into account:
+        # replace inf values with stay-still values
+        action_dists = jnp.where(
+            jnp.isinf(dir_dists[:4]),
+            dir_dists[4],
+            dir_dists[:4],
+        )
+
+        # reward when we get to the cheese is 1 iff the cheese is still there
+        reward = (1.0 - state.got_cheese)
+        # maybe we apply a time penalty
+        times_of_reward = state.steps + action_dists
+        penalties = (
+            1.0 - 0.9 * times_of_reward / self.env.max_steps_in_episode
+        )
+        penalized_rewards = jnp.where(
+            self.env.penalize_time,
+            penalties * reward,
+            reward,
+        )
+        # mask out rewards beyond the end of the episode
+        episode_still_valids = times_of_reward < self.env.max_steps_in_episode
+        valid_rewards = penalized_rewards * episode_still_valids
+
+        # discount the reward
+        discounted_rewards = (
+            (self.discount_rate ** action_dists) * valid_rewards
+        )
+
+        return discounted_rewards
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def state_action(self, soln: LevelSolution, state: EnvState) -> int:
+        """
+        Optimal action from a given state.
+
+        Parameters:
+
+        * soln : LevelSolution
+                The output of `solve` method for this level.
+        * state : EnvState
+                The state to compute the optimal action for.
+            
+        Return:
+
+        * action : int                      # TODO: use the Env.Action enum?
+                An optimal action from the given state.
+                
+        Notes:
+
+        * If there are multiple equally optimal actions, this method will
+          return the first according to the order up (0), left (1), down (2),
+          or right (3).
+        * As a special case of this, if the cheese is unreachable, the
+          returned action will be up (0).
+        * If the cheese is on the current square, the returned action is
+          arbitrary, and in fact it might even be suboptimal, since if there
+          is a wall the optimal action is to move into that wall.
+        * If the cheese has already been gotten then there is no more reward
+          available, but this method will still direct the mouse towards the
+          cheese position.
+        * If the cheese is too far away to reach by the end of the episode,
+          this method will still direct the mouse towards the cheese.
+
+        TODO: 
+
+        * Make all environments have a 'stay action' will simplify these
+          solutions a fair bit. The mouse could stay when on the cheese, or
+          when the cheese is unreachable, or when the cheese is already
+          gotten.
+        """
+        action = jnp.argmin(soln.directional_distance_to_cheese[
+            state.mouse_pos[0],
+            state.mouse_pos[1],
+            :4,
+        ])
+        return action
 
 
 class LevelMetrics(base.LevelMetrics):

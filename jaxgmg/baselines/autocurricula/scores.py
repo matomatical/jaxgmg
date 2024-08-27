@@ -58,11 +58,7 @@ def plr_compute_scores(
             regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
             return jnp.maximum(regret_true_reward,0)
         case "relative_pvl_regret_corner":
-            pvl = jnp.maximum(advantages, 0).mean(axis=1)
-            proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].mean(axis=1)
-            pvl_normalized = (pvl - pvl.min()) / (pvl.max() - pvl.min() + 1e-8)
-            proxy_reward_normalized = (proxy_reward - proxy_reward.min()) / (proxy_reward.max() - proxy_reward.min() + 1e-8)
-            return jnp.maximum(pvl_normalized - proxy_reward_normalized, 0)
+            raise NotImplementedError
         case "relative_true_regret_corner":
             env = cheese_in_the_corner.Env(
                 obs_level_of_detail=0,
@@ -88,8 +84,8 @@ def plr_compute_scores(
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
                 )
-            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
-            regret_proxy_reward = eval_off_level_set['corner']['lvl_benchmark_regret_hist_corner']
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist'] #shape float[num_levels]
+            regret_proxy_reward = eval_off_level_set['corner']['lvl_benchmark_regret_hist_corner'] #shape float[num_levels]
             return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
         case "relative_true_regret_dish":
             env = cheese_on_a_dish.Env(
