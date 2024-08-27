@@ -31,6 +31,7 @@ def corner(
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
+    net_width: int = 256,
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -203,6 +204,7 @@ def corner(
         heatmap_splayer_fn=splayer_fn,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
+        net_width=net_width,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -255,6 +257,7 @@ def dish(
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
+    net_width: int = 256,
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -411,6 +414,7 @@ def dish(
         heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
+        net_width=net_width,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -472,6 +476,7 @@ def pile(
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
+    net_width: int = 256,
     # ued config
     ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -604,6 +609,7 @@ def pile(
         heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
+        net_width=net_width,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -659,6 +665,7 @@ def keys(
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
+    net_width: int = 256,
     # ued config
     ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -786,6 +793,7 @@ def keys(
         heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
+        net_width=net_width,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -838,6 +846,7 @@ def minimaze(
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
+    net_width: int = 256,
     # ued config
     ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
@@ -1233,6 +1242,7 @@ def minimaze(
         heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
+        net_width=net_width,
         ued=ued,
         prob_shift=prob_shift,
         num_train_levels=num_train_levels,
@@ -1283,6 +1293,7 @@ def memory_test(
     # policy config
     net_cnn_type: str = "mlp",
     net_rnn_type: str = "ff",
+    net_width: int = 64,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1355,6 +1366,7 @@ def memory_test(
         heatmap_splayer_fn=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
+        net_width=net_width,
         ued=ued,
         prob_shift=0.0,
         num_train_levels=plr_buffer_size,

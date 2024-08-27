@@ -195,6 +195,9 @@ class Impala(ActorCriticNetwork):
             * "lstm": LSTM, as in Espeholt et al. (2018).
             * "gru": Gated Recurrent Unit, which is supposed to work about
               the same but with fewer parameters.
+    * width : int
+            The width used for various components (RNN layer, dense layers in
+            MLP and CNNs). Note IMPALA uses 256.
 
     Note: There are small differences in the handling of auxiliary inputs.
     
@@ -208,6 +211,7 @@ class Impala(ActorCriticNetwork):
     """
     cnn_type: Literal["mlp", "small", "large"]
     rnn_type: Literal["ff", "lstm", "gru"]
+    width: int
 
     @nn.compact
     def __call__(
@@ -223,11 +227,11 @@ class Impala(ActorCriticNetwork):
         # embed the image part of the observation
         match self.cnn_type:
             case "mlp":
-                obs_embedding = _DenseMLP()(obs.image)
+                obs_embedding = _DenseMLP(width=self.width)(obs.image)
             case "small":
-                obs_embedding = _ImpalaSmallCNN()(obs.image)
+                obs_embedding = _ImpalaSmallCNN(width=self.width)(obs.image)
             case "large":
-                obs_embedding = _ImpalaLargeCNN()(obs.image)
+                obs_embedding = _ImpalaLargeCNN(width=self.width)(obs.image)
             case _:
                 raise ValueError(f"Unknown CNN type {self.cnn_type}")
         # combine with everything other than the image
@@ -253,15 +257,15 @@ class Impala(ActorCriticNetwork):
         rnn_in = combined_embedding
         match self.rnn_type:
             case "ff":
-                rnn_out = nn.relu(nn.Dense(features=256)(rnn_in))
+                rnn_out = nn.relu(nn.Dense(features=self.width)(rnn_in))
                 next_state = state
             case "lstm":
                 next_state, rnn_out = nn.OptimizedLSTMCell(
-                    features=256,
+                    features=self.width,
                 )(state, rnn_in)
             case "gru":
                 next_state, rnn_out = nn.GRUCell(
-                    features=256,
+                    features=self.width,
                 )(state, rnn_in)
             case _:
                 raise ValueError(f"Unknown RNN type {self.rnn_type}")
@@ -297,19 +301,19 @@ class Impala(ActorCriticNetwork):
                 return None
             case "lstm":
                 return nn.OptimizedLSTMCell(
-                    features=256,
+                    features=self.width,
                     parent=None,
                 ).initialize_carry(
                     rng=rng,
-                    input_shape=(256,)
+                    input_shape=(self.width,)
                 )
             case "gru":
                 return nn.GRUCell(
-                    features=256,
+                    features=self.width,
                     parent=None,
                 ).initialize_carry(
                     rng=rng,
-                    input_shape=(256,)
+                    input_shape=(self.width,)
                 )
             case _:
                 raise ValueError(f"Unknown RNN type {self.rnn_type}")
@@ -320,6 +324,8 @@ class Impala(ActorCriticNetwork):
 
 
 class _ImpalaLargeCNN(nn.Module):
+    width: int
+
     @nn.compact
     def __call__(self, x):
         for ch in (16, 32, 32):
@@ -338,12 +344,14 @@ class _ImpalaLargeCNN(nn.Module):
                 x = x + y
         x = nn.relu(x)
         x = jnp.ravel(x)
-        x = nn.Dense(features=256)(x)
+        x = nn.Dense(features=self.width)(x)
         x = nn.relu(x)
         return x
 
 
 class _ImpalaSmallCNN(nn.Module):
+    width: int
+
     @nn.compact
     def __call__(self, x):
         x = nn.Conv(features=16, kernel_size=(8,8), strides=(4,4))(x)
@@ -351,22 +359,24 @@ class _ImpalaSmallCNN(nn.Module):
         x = nn.Conv(features=32, kernel_size=(4,4), strides=(2,2))(x)
         x = nn.relu(x)
         x = jnp.ravel(x)
-        x = nn.Dense(features=256)(x)
+        x = nn.Dense(features=self.width)(x)
         x = nn.relu(x)
         return x
 
 
 class _DenseMLP(nn.Module):
+    width: int
+
     @nn.compact
     def __call__(self, x):
         # flatten for MLP
         x = jnp.ravel(x)
         # start the residual stream
-        x = nn.Dense(features=128)(x)
+        x = nn.Dense(features=self.width)(x)
         x = nn.relu(x)
         # add with more residual blocks
         for _embedding_residual_block in range(2):
-            y = nn.Dense(features=128)(x)
+            y = nn.Dense(features=self.width)(x)
             y = nn.relu(y)
             x = x + y
         # done

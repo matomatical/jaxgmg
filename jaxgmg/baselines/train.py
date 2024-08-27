@@ -58,6 +58,7 @@ def run(
     # actor critic policy config
     net_cnn_type: str,
     net_rnn_type: str,
+    net_width: int,
     # ued config
     ued: str,
     prob_shift: float,
@@ -272,6 +273,7 @@ def run(
         num_actions=env.num_actions,
         cnn_type=net_cnn_type,
         rnn_type=net_rnn_type,
+        width=net_width,
     )
     # initialise the network
     print("  initialising network...")
