@@ -55,6 +55,7 @@ def run(
     eval_level_generators: dict[str, LevelGenerator],
     fixed_eval_levels: dict[str, Level],
     heatmap_splayer_fn: Callable | None,
+    classify_level_is_shift: Callable[[Level], bool] | None,
     # actor critic policy config
     net_cnn_type: str,
     net_rnn_type: str,
@@ -388,6 +389,12 @@ def run(
         # should do rollouts and update UED in all of them, but we should
         # only train in the first num_levels of them.
         # TODO: more fine-grained logging.
+        if log_cycle and classify_level_is_shift is not None:
+            # TODO: consider robust UED methods here too
+            shift_levels_mask = jax.vmap(classify_level_is_shift)(levels_t)
+            metrics['env/levels'] = {
+                'shift_proportion': shift_levels_mask.mean(),
+            }
     
         
         # collect experience

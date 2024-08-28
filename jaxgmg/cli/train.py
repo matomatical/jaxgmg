@@ -3,6 +3,7 @@ Launcher for training runs.
 """
 
 import jax
+import jax.numpy as jnp
 
 from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import cheese_in_the_corner
@@ -12,6 +13,7 @@ from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import minigrid_maze
 from jaxgmg.baselines import train
 
+from jaxgmg.environments.base import Level
 from jaxgmg.environments.base import MixtureLevelGenerator
 from jaxgmg.environments.base import MixtureLevelMutator, IteratedLevelMutator
 
@@ -126,6 +128,13 @@ def corner(
         )
     else:
         train_level_generator = orig_level_generator
+
+    print("configuring level classifier...")
+    def classify_level_is_shift(level: Level) -> bool:
+        return jnp.logical_or(
+            level.cheese_pos[0] != 1,
+            level.cheese_pos[1] != 1,
+        )
     
     print("configuring eval level generators...")
     if prob_shift > 0.0:
@@ -206,6 +215,7 @@ def corner(
         eval_level_generators=eval_level_generators,
         fixed_eval_levels=fixed_eval_levels,
         heatmap_splayer_fn=splayer_fn,
+        classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         net_width=net_width,
@@ -356,6 +366,13 @@ def dish(
     else:
         train_level_generator = orig_level_generator
     
+    print("configuring level classifier...")
+    def classify_level_is_shift(level: Level) -> bool:
+        return jnp.logical_or(
+            level.cheese_pos[0] != level.dish_pos[0],
+            level.cheese_pos[1] != level.dish_pos[1],
+        )
+    
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -416,6 +433,7 @@ def dish(
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
         heatmap_splayer_fn=None,
+        classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         net_width=net_width,
@@ -576,6 +594,13 @@ def pile(
     else:
         train_level_generator = orig_level_generator
     
+    print("configuring level classifier...")
+    def classify_level_is_shift(level: Level) -> bool:
+        return jnp.logical_or(
+            level.cheese_pos[0] != level.napkin_pos[0],
+            level.cheese_pos[1] != level.napkin_pos[1],
+        )
+    
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -611,6 +636,7 @@ def pile(
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
         heatmap_splayer_fn=None,
+        classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         net_width=net_width,
@@ -764,6 +790,9 @@ def keys(
     else:
         train_level_generator = orig_level_generator
     
+    print("TODO: define level classifier")
+    classify_level_is_shift = None
+    
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -795,6 +824,7 @@ def keys(
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
         heatmap_splayer_fn=None,
+        classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         net_width=net_width,
@@ -943,6 +973,13 @@ def minimaze(
         )
     else:
         train_level_generator = orig_level_generator
+    
+    print("configuring level classifier...")
+    def classify_level_is_shift(level: Level) -> bool:
+        return jnp.logical_or(
+            level.goal_pos[0] != 1,
+            level.goal_pos[1] != 1,
+        )
     
     print("configuring eval level generators...")
     if prob_shift > 0.0:
@@ -1244,6 +1281,7 @@ def minimaze(
         eval_level_generators=eval_level_generators,
         fixed_eval_levels=fixed_eval_levels,
         heatmap_splayer_fn=None,
+        classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         net_width=net_width,
@@ -1368,6 +1406,7 @@ def memory_test(
         eval_level_generators={},
         fixed_eval_levels={},
         heatmap_splayer_fn=None,
+        classify_level_is_shift=None,
         net_cnn_type=net_cnn_type,
         net_rnn_type=net_rnn_type,
         net_width=net_width,
