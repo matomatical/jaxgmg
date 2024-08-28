@@ -72,6 +72,7 @@ def corner(
     prob_mutate_wall: float     = 0.60,
     prob_mutate_step: float     = 0.95,
     prob_mutate_cheese: float   = 0.0,
+    transpose: bool             = False,
     fps: float                  = 12.0,
     debug: bool                 = False,
     seed: int                   = 42,
@@ -97,8 +98,12 @@ def corner(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_in_the_corner.ToggleWallLevelMutator(),
-                cheese_in_the_corner.StepMouseLevelMutator(),
-                cheese_in_the_corner.ScatterMouseLevelMutator(),
+                cheese_in_the_corner.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision=transpose,
+                ),
+                cheese_in_the_corner.ScatterMouseLevelMutator(
+                    transpose_with_cheese_on_collision=transpose,
+                ),
                 cheese_in_the_corner.StepCheeseLevelMutator(),
                 cheese_in_the_corner.ScatterCheeseLevelMutator(),
             ),

@@ -471,6 +471,7 @@ class ToggleWallLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class StepMouseLevelMutator(base.LevelMutator):
+    transpose_with_cheese_on_collision: bool = False
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
@@ -507,11 +508,20 @@ class StepMouseLevelMutator(base.LevelMutator):
 
         # upon collision with cheese, transpose mouse with cheese
         hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
-        new_cheese_pos = jax.lax.select(
-            hit_cheese,
-            level.initial_mouse_pos,
-            level.cheese_pos,
-        )
+        if self.transpose_with_cheese_on_collision:
+            new_cheese_pos = jax.lax.select(
+                hit_cheese,
+                level.initial_mouse_pos,
+                level.cheese_pos,
+            )
+        else:
+            new_cheese_pos = level.cheese_pos
+            new_initial_mouse_pos = jax.lax.select(
+                hit_cheese,
+                level.initial_mouse_pos,
+                new_initial_mouse_pos,
+            )
+
 
         return level.replace(
             wall_map=new_wall_map,
@@ -522,6 +532,7 @@ class StepMouseLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class ScatterMouseLevelMutator(base.LevelMutator):
+    transpose_with_cheese_on_collision: bool = False
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
@@ -551,11 +562,19 @@ class ScatterMouseLevelMutator(base.LevelMutator):
 
         # upon collision with cheese, transpose mouse with cheese
         hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
-        new_cheese_pos = jax.lax.select(
-            hit_cheese,
-            level.initial_mouse_pos,
-            level.cheese_pos,
-        )
+        if self.transpose_with_cheese_on_collision:
+            new_cheese_pos = jax.lax.select(
+                hit_cheese,
+                level.initial_mouse_pos,
+                level.cheese_pos,
+            )
+        else:
+            new_cheese_pos = level.cheese_pos
+            new_initial_mouse_pos = jax.lax.select(
+                hit_cheese,
+                level.initial_mouse_pos,
+                new_initial_mouse_pos,
+            )
 
         return level.replace(
             wall_map=new_wall_map,
@@ -567,6 +586,7 @@ class ScatterMouseLevelMutator(base.LevelMutator):
 @struct.dataclass
 class StepCheeseLevelMutator(base.LevelMutator):
     # TODO: restrict to a designated region
+    # TODO: make it optional to transpose with the mouse
 
 
     @functools.partial(jax.jit, static_argnames=["self"])

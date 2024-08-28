@@ -145,8 +145,12 @@ def corner(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_in_the_corner.ToggleWallLevelMutator(),
-                cheese_in_the_corner.StepMouseLevelMutator(),
-                cheese_in_the_corner.ScatterMouseLevelMutator(),
+                cheese_in_the_corner.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                ),
+                cheese_in_the_corner.ScatterMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                ),
                 cheese_in_the_corner.StepCheeseLevelMutator(),
                 cheese_in_the_corner.ScatterCheeseLevelMutator(),
             ),
