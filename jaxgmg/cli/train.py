@@ -301,6 +301,7 @@ def dish(
     prob_mutate_wall: float = 0.60,
     prob_mutate_step: float = 0.95,
     prob_mutate_cheese_or_dish: float = 0.0,
+    prob_mutate_shift: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -538,6 +539,7 @@ def pile(
     prob_mutate_step: float = 0.95,
     prob_mutate_cheese_or_pile: float = 0.0,
     prob_mutate_objects_count_on_pile: float = 0.2,
+    prob_mutate_shift: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -694,7 +696,7 @@ def pile(
         env=env,
         train_level_generator=train_level_generator,
         level_solver=None,
-        level_mutator=None,
+        level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
@@ -939,7 +941,7 @@ def minimaze(
     env_layout: str = 'noise',
     obs_height: int = 5,
     obs_width: int = 5,
-    env_size_shift: int = 21,
+    env_size_shift: int = 15,
     corner_size: int = 1,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
