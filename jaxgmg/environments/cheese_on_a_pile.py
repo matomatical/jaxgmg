@@ -862,7 +862,7 @@ class LevelSolver(base.LevelSolver):
           mazes. If we wanted to solve very large mazes, we could by changing
           to a single source shortest path algorithm.
         """
-        proxies = ['dish'] #where you define your proxies...
+        proxies = ['proxy_pile','proxy_first_pile', 'proxy_first_cheese' ] #where you define your proxies...
         # compute distance between mouse and cheese
         dir_dist = maze_solving.maze_directional_distances(level.wall_map)
         # calculate the distance for each proxy
@@ -877,7 +877,8 @@ class LevelSolver(base.LevelSolver):
                     level.napkin_pos[1],
                     :,
                 ]
-            if proxy_name == 'proxy_first_cheese':
+                proxy_directions[proxy_name] = dir_dist_to_pile
+            elif proxy_name == 'proxy_first_cheese':
                 dir_dist_to_cheese = dir_dist[
                     :,
                     :,
@@ -981,7 +982,7 @@ class LevelSolver(base.LevelSolver):
                 # discount the reward
                 discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
                 proxy_rewards[proxy_name] = discounted_reward
-            if proxy_name == 'proxy_first_pile':
+            elif proxy_name == 'proxy_first_pile':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],
@@ -1004,7 +1005,7 @@ class LevelSolver(base.LevelSolver):
                 # discount the reward
                 discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
                 proxy_rewards[proxy_name] = discounted_reward
-            if proxy_name == 'first_cheese':
+            elif proxy_name == 'proxy_first_cheese':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],

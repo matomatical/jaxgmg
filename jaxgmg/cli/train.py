@@ -695,6 +695,7 @@ def minimaze(
     obs_height: int = 5,
     obs_width: int = 5,
     env_size_shift: int = 21,
+    corner_size: int = 1,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -774,11 +775,13 @@ def minimaze(
         maze_generator=maze_generator,
         height=env_size,
         width=env_size,
+        corner_size=corner_size,
     )
     shift_level_generator = minigrid_maze.LevelGenerator(
         maze_generator=maze_generator,
         height=env_size_shift,
         width=env_size_shift,
+        corner_size=env_size_shift -2,
     )
 
     print("TODO: implement level solver...")
