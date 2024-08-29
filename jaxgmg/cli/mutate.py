@@ -260,9 +260,7 @@ def pile(
                     transpose_with_mouse_on_collision=False,
                     split_elements=split_elements, 
                     ),
-                cheese_on_a_pile.MoveObjectsPileLevelMutator(
-                    split_elements = split_elements, # ininfluential for this mutator, will remove later
-                ),
+                cheese_on_a_pile.MoveObjectsPileLevelMutator(),
             ),
             mixing_probs=(
                 prob_mutate_wall,

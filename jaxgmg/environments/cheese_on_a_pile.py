@@ -1375,8 +1375,6 @@ class ScatterPileLevelMutator(base.LevelMutator):
 @struct.dataclass
 class MoveObjectsPileLevelMutator(base.LevelMutator):
     
-        split_elements: int = 0
-    
         @functools.partial(jax.jit, static_argnames=('self'))
         def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
             h, w = level.wall_map.shape
@@ -1391,24 +1389,20 @@ class MoveObjectsPileLevelMutator(base.LevelMutator):
                 level.mug_pos,
                 level.napkin_pos,
             ])
-
-            #mutate the number of elements to be moved
-            #jax.random.randint(key, shape, minval, maxval, dtype=<class 'int'>)[source]
-            objects_to_move = 1 # to be fixed -> Generate a random integer
-        
-            new_split_elements = objects_to_move
-    
-            # reassign the positions accordingly
-    
-            cheese_indices = jnp.arange(new_split_elements)
-            napkin_indices = jnp.arange(6 - new_split_elements, 6)
-    
-            cheese_mask = jnp.zeros(6, dtype=bool).at[cheese_indices].set(True)
-            napkin_mask = jnp.zeros(6, dtype=bool).at[napkin_indices].set(True)
-    
             
-            final_spawn = jnp.where(cheese_mask[:, None], level.cheese_pos, final_spawn)
-            final_spawn = jnp.where(napkin_mask[:, None], level.napkin_pos, final_spawn)
+            rng, rng_split = jax.random.split(rng)
+
+            # Generate a random number between 0 and 6 for splitting among cheese and pile
+            new_split_element = jax.random.randint(rng_split, (), 0, 7)
+
+            cheese_mask = jnp.arange(6) < new_split_element
+
+            # Create the array with objects moved  around
+            final_spawn = jnp.where(
+                cheese_mask[:, jnp.newaxis],
+                level.cheese_pos,
+                level.napkin_pos
+            )
 
             return level.replace(
                 wall_map=level.wall_map,
