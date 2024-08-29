@@ -173,6 +173,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             regret_estimator=self.regret_estimator,
             rollouts=rollouts,
             advantages=advantages,
+            level=levels,
         )
     
         # perform both a replay-type update and a new-type update

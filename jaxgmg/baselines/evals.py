@@ -156,6 +156,7 @@ class FixedLevelsEval(Eval):
             rollouts=rollouts,
             discount_rate=self.discount_rate,
             benchmark_returns=None,
+            benchmark_proxies=None,
         )
         return eval_metrics
 
@@ -168,6 +169,7 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
     env: Env
     levels: Level       # Level[num_levels]
     benchmarks: Array   # float[num_levels]
+    benchmark_proxies: dict[str, Array]
 
 
     def eval(
@@ -189,6 +191,7 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
             rollouts=rollouts,
             discount_rate=self.discount_rate,
             benchmark_returns=self.benchmarks,
+            benchmark_proxies=self.benchmark_proxies,
         )
         return eval_metrics
 

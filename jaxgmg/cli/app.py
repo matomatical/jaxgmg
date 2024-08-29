@@ -224,6 +224,7 @@ app.add_typer(make_typer_app(
         # train.monsters,
         train.minimaze,
         train.memory_test,
+        #train.scatter,
     ),
 ))
 
