@@ -13,6 +13,7 @@ from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
+from jaxgmg.environments import cheese_on_a_pile
 from jaxgmg.environments import minigrid_maze
 from jaxgmg.environments.base import MixtureLevelMutator, IteratedLevelMutator
 from jaxgmg import util
@@ -190,6 +191,101 @@ def dish(
         debug=debug,
     )
 
+def pile(
+    height: int                         = 9,
+    width: int                          = 9,
+    layout: str                         = 'tree',
+    level_of_detail: int                = 8,
+    max_cheese_radius: int              = 0,
+    split_elements: int                 = 1,
+    num_mutate_steps: int               = 1,
+    prob_mutate_wall: float             = 0.60,
+    prob_mutate_step: float             = 0.95,
+    prob_mutate_cheese_or_pile: float   = 0.0,
+    prob_mutate_objects_count_on_pile: float = 0.2,
+    transpose: bool                     = False,
+    fps: float                          = 12.0,
+    debug: bool                         = False,
+    seed: int                           = 42,
+):
+    """
+    Iterative Cheese on a Dish mutator demo.
+    """
+    if level_of_detail not in {1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
+    rng = jax.random.PRNGKey(seed=seed)
+    env = cheese_on_a_pile.Env(split_object_firstgroup=split_elements,img_level_of_detail=level_of_detail)
+    level_generator = cheese_on_a_pile.LevelGenerator(
+        height=height,
+        width=width,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name=layout
+        )(),
+        max_cheese_radius=max_cheese_radius,
+        split_elements=split_elements,
+    )
+    print("configuring level mutator...")
+    level_mutator = IteratedLevelMutator(
+        mutator=MixtureLevelMutator(
+            mutators=(
+                cheese_on_a_pile.ToggleWallLevelMutator(),
+                cheese_on_a_pile.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements,
+                    ),
+                cheese_on_a_pile.ScatterMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements,
+                    ),
+                cheese_on_a_pile.StepCheeseLevelMutator(
+                    transpose_with_mouse_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements,
+                    ),
+                cheese_on_a_pile.ScatterCheeseLevelMutator(
+                    transpose_with_mouse_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements,
+                    ),
+                cheese_on_a_pile.StepPileLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_mouse_on_collision=False,
+                    split_elements=split_elements,
+                    ),
+                cheese_on_a_pile.ScatterPileLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_mouse_on_collision=False,
+                    split_elements=split_elements, 
+                    ),
+                cheese_on_a_pile.MoveObjectsPileLevelMutator(
+                    split_elements = split_elements, # ininfluential for this mutator, will remove later
+                ),
+            ),
+            mixing_probs=(
+                prob_mutate_wall,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*prob_mutate_step,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*prob_mutate_objects_count_on_pile,
+            ),
+        ),
+        num_steps=num_mutate_steps,
+    )
+    mutate_forever(
+        rng=rng,
+        env=env,
+        level_generator=level_generator,
+        level_mutator=level_mutator,
+        fps=fps,
+        debug=debug,
+    )
 
 def minimaze(
     height: int                     = 9,

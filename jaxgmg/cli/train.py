@@ -510,6 +510,12 @@ def pile(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    # for accel
+    num_mutate_steps: int = 6,
+    prob_mutate_wall: float = 0.60,
+    prob_mutate_step: float = 0.95,
+    prob_mutate_cheese_or_pile: float = 0.0,
+    prob_mutate_objects_count_on_pile: float = 0.2,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -613,8 +619,62 @@ def pile(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
+
+    print("configuring level mutator...")
+    level_mutator = IteratedLevelMutator(
+        mutator=MixtureLevelMutator(
+            mutators=(
+                cheese_on_a_pile.ToggleWallLevelMutator(),
+                cheese_on_a_pile.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements_shift, # split elements train and shift should both be equal now
+                    ),
+                cheese_on_a_pile.ScatterMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements_shift, # split elements train and shift should both be equal now
+                    ),
+                cheese_on_a_pile.StepCheeseLevelMutator(
+                    transpose_with_mouse_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements_shift, # split elements train and shift should both be equal now
+                    ),
+                cheese_on_a_pile.ScatterCheeseLevelMutator(
+                    transpose_with_mouse_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements_shift, # split elements train and shift should both be equal now
+                    ),
+                cheese_on_a_pile.StepPileLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_mouse_on_collision=False,
+                    split_elements=split_elements_shift, # split elements train and shift should both be equal now
+                    ),
+                cheese_on_a_pile.ScatterPileLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_mouse_on_collision=False,
+                    split_elements=split_elements_shift, # split elements train and shift should both be equal now
+                    ),
+                cheese_on_a_pile.MoveObjectsPileLevelMutator(
+                    split_elements = split_elements_shift, # ininfluential for this mutator, will remove later
+                ),
+            ),
+            mixing_probs=(
+                prob_mutate_wall,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*prob_mutate_step,
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*prob_mutate_step,
+                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*(1-prob_mutate_step),
+                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*prob_mutate_objects_count_on_pile,
+            ),
+        ),
+        num_steps=num_mutate_steps,
+    )
+
     
-    print("TODO: implement level solver...")
+    print("TODO: implement level solver...") # this should be done but let's double check how to integrate it
     
     print("configuring level metrics...")
     level_metrics = cheese_on_a_pile.LevelMetrics(

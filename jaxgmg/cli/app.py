@@ -125,6 +125,7 @@ app.add_typer(make_typer_app(
         mutate.corner,
         mutate.dish,
         mutate.minimaze,
+        mutate.pile,
     ),
 ))
 
