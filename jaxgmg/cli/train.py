@@ -117,6 +117,14 @@ def corner(
         maze_generator=maze_generator,
         corner_size=env_size-2,
     )
+    tree_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name='tree',
+        )(),
+        corner_size=env_corner_size,
+    )
     if prob_shift > 0.0:
         print("  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
@@ -126,26 +134,13 @@ def corner(
         )
     else:
         train_level_generator = orig_level_generator
-
+    
     print("configuring level classifier...")
     def classify_level_is_shift(level: Level) -> bool:
         return jnp.logical_or(
             level.cheese_pos[0] != 1,
             level.cheese_pos[1] != 1,
         )
-    
-    print("configuring eval level generators...")
-    if prob_shift > 0.0:
-        eval_level_generators = {
-            "train": train_level_generator,
-            "orig": orig_level_generator,
-            "shift": shift_level_generator,
-        }
-    else:
-        eval_level_generators = {
-            "orig": orig_level_generator,
-            "shift": shift_level_generator,
-        }
 
     print("configuring level mutator...")
     # if mutating cheese, mostly stay in the restricted region
@@ -186,12 +181,27 @@ def corner(
         env=env,
         discount_rate=ppo_gamma,
     )
+
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+            "tree": tree_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+            "tree": tree_level_generator,
+        }
     
     print("configuring fixed eval levels...")
     fixed_eval_levels = {
-    #     "random1": orig_level_generator.sample(jax.random.key(1)),
-    #     "random2": orig_level_generator.sample(jax.random.key(2)),
-    #     "random3": orig_level_generator.sample(jax.random.key(3)),
+        "random1": orig_level_generator.sample(jax.random.key(1)),
+        "random2": orig_level_generator.sample(jax.random.key(2)),
+        "random3": orig_level_generator.sample(jax.random.key(3)),
     }
 
     print("configuring heatmap splayer...")
