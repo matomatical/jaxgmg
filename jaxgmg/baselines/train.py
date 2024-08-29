@@ -25,7 +25,6 @@ from jaxgmg.baselines.ppo import ProximalPolicyOptimisation
 from jaxgmg.baselines.autocurricula import dr_infinite
 from jaxgmg.baselines.autocurricula import dr_finite
 from jaxgmg.baselines.autocurricula import plr
-from jaxgmg.baselines.autocurricula import plr_parallel
 from jaxgmg.baselines.autocurricula import accel
 
 # types and abstract base classes used for type annotations
@@ -69,6 +68,7 @@ def run(
     plr_staleness_coeff: float,
     plr_prob_replay: float,
     plr_regret_estimator: str,
+    plr_robust: bool,
     # PPO config
     ppo_lr: float,
     ppo_gamma: float,
@@ -139,19 +139,7 @@ def run(
             staleness_coeff=plr_staleness_coeff,
             prob_replay=plr_prob_replay,
             regret_estimator=plr_regret_estimator,
-        )
-        gen_state = gen.init(
-            rng=rng_train_levels,
-            batch_size_hint=num_parallel_envs,
-        )
-    elif ued == "plr-parallel":
-        gen = plr_parallel.CurriculumGenerator(
-            level_generator=train_level_generator,
-            level_metrics=level_metrics,
-            buffer_size=plr_buffer_size,
-            temperature=plr_temperature,
-            staleness_coeff=plr_staleness_coeff,
-            regret_estimator=plr_regret_estimator,
+            robust=plr_robust,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -168,6 +156,7 @@ def run(
             staleness_coeff=plr_staleness_coeff,
             prob_replay=plr_prob_replay,
             regret_estimator=plr_regret_estimator,
+            robust=plr_robust,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -178,10 +167,13 @@ def run(
 
 
     evals_dict = {}
+
+
     print(f"configuring eval batches from {len(eval_level_generators)} level generators...")
     rng_evals, rng_setup = jax.random.split(rng_setup)
     for levels_name, level_generator in eval_level_generators.items():
         print(f"  generating {num_eval_levels} {levels_name!r} levels...")
+        eval_name = f"batch-{levels_name}"
         rng_eval_levels, rng_evals = jax.random.split(rng_evals)
         levels = level_generator.vsample(
             rng_eval_levels,
@@ -219,14 +211,16 @@ def run(
             env=env,
             period=num_cycles_per_big_eval,
         )
-        evals_dict[levels_name] = evals.EvalList.create(
+        evals_dict[eval_name] = evals.EvalList.create(
             levels_eval,
             rollouts_eval,
         )
 
+
     print(f"configuring evals for {len(fixed_eval_levels)} fixed eval levels...")
     for level_name, level in fixed_eval_levels.items():
         print(f"  registering fixed level {level_name!r}")
+        eval_name = f"fixed-{level_name}"
         solo_eval = evals.SingleLevelEval(
             num_steps=num_env_steps_per_eval,
             discount_rate=ppo_gamma,
@@ -257,13 +251,13 @@ def run(
                 num_steps=num_env_steps_per_eval,
                 period=num_cycles_per_big_eval,
             )
-            evals_dict[level_name] = evals.EvalList.create(
+            evals_dict[eval_name] = evals.EvalList.create(
                 solo_eval,
                 spawn_heatmap_eval,
                 rollout_heatmap_eval,
             )
         else:
-            evals_dict[level_name] = solo_eval
+            evals_dict[eval_name] = solo_eval
 
 
     print("configuring actor critic network...")
@@ -354,50 +348,44 @@ def run(
         dynamic_ncols=True,
         colour='magenta',
     )
+    t_env_steps = 0
+    t_env_steps_curated = 0
+    t_ppo_updates = 0
     for t in range(num_total_cycles):
         rng_t, rng_train = jax.random.split(rng_train)
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
         first_cycle = (t == 0)
         if log_cycle:
             metrics = collections.defaultdict(dict)
-
-
-        # step counting
-        if log_cycle:
-            t_env_before = t * num_total_env_steps_per_cycle
-            t_env_after = t_env_before + num_total_env_steps_per_cycle
-            t_ppo_before = t * num_updates_per_cycle
-            t_ppo_after = t_ppo_before + num_updates_per_cycle
+            # 'before' step counts
             metrics['step'].update({
-                'ppo-update': t_ppo_before,
-                'env-step': t_env_before,
-                'ppo-update-after': t_ppo_after,
-                'env-step-after': t_env_after,
+                'ppo-update': t_ppo_updates,
+                'env-step': t_env_steps,
+                'env-step-curated': t_env_steps_curated,
             })
 
 
-        # choose levels for this round
+        # choose levels for this round from curriculum
         rng_levels, rng_t = jax.random.split(rng_t)
-        gen_state, levels_t = gen.get_batch(
+        gen_state, levels_t, curated_levels = gen.get_batch(
             state=gen_state,
             rng=rng_levels,
             num_levels=num_parallel_envs,
         )
-        # NOTE: get_batch may return num_levels levels or a number of
-        # additional levels (e.g. in the case of parallel robust PLR,
-        # 2*num_levels levels are returned). The contract is that we
-        # should do rollouts and update UED in all of them, but we should
-        # only train in the first num_levels of them.
-        # TODO: more fine-grained logging.
+        # level classification
         if log_cycle and classify_level_is_shift is not None:
-            # TODO: consider robust UED methods here too
             shift_levels_mask = jax.vmap(classify_level_is_shift)(levels_t)
-            metrics['env/levels'] = {
+            shift_proportion = shift_levels_mask.mean()
+            classification_metrics = {
                 'shift_proportion': shift_levels_mask.mean(),
             }
+            if curated_levels:
+                metrics['train-curated'].update(classification_metrics)
+            else:
+                metrics['train-prospective'].update(classification_metrics)
     
         
-        # collect experience
+        # collect experience in the levels
         rng_env, rng_t = jax.random.split(rng_t)
         if log_cycle:
             env_start_time = time.perf_counter()
@@ -411,29 +399,27 @@ def run(
             levels=levels_t,
         )
         if log_cycle:
-            env_metrics = experience.compute_rollout_metrics(
+            env_elapsed_time = time.perf_counter() - env_start_time
+            metrics['perf']['env_steps_per_second'] = (
+                num_total_env_steps_per_cycle / env_elapsed_time
+            )
+        # compute env metrics
+        if log_cycle:
+            train_metrics = experience.compute_rollout_metrics(
                 rollouts=rollouts,
                 discount_rate=ppo_gamma,
                 benchmark_returns=None,
             )
-            env_elapsed_time = time.perf_counter() - env_start_time
-            metrics['env/train'].update(env_metrics)
-            metrics['perf']['env_steps_per_second'] = (
-                num_total_env_steps_per_cycle / env_elapsed_time
-            )
-            # TODO: steps per second is now wrong, doesn't account for actual
-            # levels generated and simulated... use size of rollouts
-            # TODO: split up each kind of rollouts/metrics?
-        if log_cycle and train_gifs:
-            frames = experience.animate_rollouts(
-                rollouts=rollouts,
-                grid_width=train_gif_grid_width,
-                env=env,
-            )
-            metrics['env/train'].update({'rollouts_gif': frames})
-            # TODO: split up each kind of rollouts/metrics?
-            # TODO: count the number of env steps total along with the number
-            # of env steps used for training
+            if train_gifs:
+                train_metrics['rollouts_gif'] = experience.animate_rollouts(
+                    rollouts=rollouts,
+                    grid_width=train_gif_grid_width,
+                    env=env,
+                )
+            if curated_levels:
+                metrics['train-curated'].update(train_metrics)
+            else:
+                metrics['train-prospective'].update(train_metrics)
         
 
         # generalised advantage estimation
@@ -461,32 +447,29 @@ def run(
             metrics['ued'].update(gen.compute_metrics(gen_state))
 
 
-        # isolate valid levels for ppo updating
-        valid_rollouts, valid_advantages = jax.tree.map(
-            lambda x: x[:num_parallel_envs],
-            (rollouts, advantages),
-        )
-        # ppo update network on this data a few times
+        # ppo update network on this data
+        # ONLY IF THE LEVELS WERE FLAGGED AS CURATED
         rng_update, rng_t = jax.random.split(rng_t)
-        if log_cycle:
-            ppo_start_time = time.perf_counter()
-        # ppo step
-        train_state, ppo_metrics = ppo.update(
-            rng=rng_update,
-            train_state=train_state,
-            net_init_state=net_init_state,
-            transitions=valid_rollouts.transitions,
-            advantages=valid_advantages,
-            num_epochs=num_epochs_per_cycle,
-            num_minibatches_per_epoch=num_minibatches_per_epoch,
-            compute_metrics=log_cycle,
-        )
-        if log_cycle:
-            ppo_elapsed_time = time.perf_counter() - ppo_start_time
-            metrics['ppo'].update(ppo_metrics)
-            metrics['perf']['ppo_updates_per_second'] = (
-                num_updates_per_cycle / ppo_elapsed_time
+        if curated_levels:
+            if log_cycle:
+                ppo_start_time = time.perf_counter()
+            # ppo step
+            train_state, ppo_metrics = ppo.update(
+                rng=rng_update,
+                train_state=train_state,
+                net_init_state=net_init_state,
+                transitions=rollouts.transitions,
+                advantages=advantages,
+                num_epochs=num_epochs_per_cycle,
+                num_minibatches_per_epoch=num_minibatches_per_epoch,
+                compute_metrics=log_cycle,
             )
+            if log_cycle:
+                ppo_elapsed_time = time.perf_counter() - ppo_start_time
+                metrics['ppo'].update(ppo_metrics)
+                metrics['perf']['ppo_updates_per_second'] = (
+                    num_updates_per_cycle / ppo_elapsed_time
+                )
         
 
         # periodic evaluations
@@ -494,7 +477,7 @@ def run(
         if log_cycle:
             for eval_name, eval_obj in evals_dict.items():
                 rng_eval, rng_evals = jax.random.split(rng_evals)
-                metrics['eval'][eval_name] = eval_obj.periodic_eval(
+                metrics['eval-'+eval_name] = eval_obj.periodic_eval(
                     rng=rng_eval,
                     step=t,
                     train_state=train_state,
@@ -502,39 +485,45 @@ def run(
                 )
 
         
-        # define metrics
+        # (filtered) step counting
+        t_env_steps += num_total_env_steps_per_cycle
+        if curated_levels:
+            t_env_steps_curated += num_total_env_steps_per_cycle
+            t_ppo_updates += num_updates_per_cycle
+        if log_cycle:
+            metrics['step'].update({
+                'ppo-update-after': t_ppo_updates,
+                'env-step-after': t_env_steps,
+                'env-step-curated-after': t_env_steps_curated,
+            })
+
+
+        # define metrics upon first cycle
         if first_cycle and wandb_log:
             wandb.define_metric("step/env-step-after")
             wandb.define_metric("step/ppo-update-after")
             util.wandb_define_metrics(
                 example_metrics=metrics,
                 step_metric_prefix_mapping={
-                    "env/": "step/env-step-after",
-                    "ppo/": "step/ppo-update-after",
-                    "ued/": "step/env-step-after",
-                    "eval/": "step/env-step-after",
+                    "train": "step/env-step-after",
+                    "eval": "step/env-step-after",
+                    "ued": "step/env-step-after",
+                    "ppo": "step/ppo-update-after",
                 },
             )
 
 
-        # periodic logging
+        # periodic logging to console/wandb
         if log_cycle and console_log:
-            progress.write("\n".join([
-                "=" * 59,
-                util.dict2str(metrics),
-                "=" * 59,
-            ]))
+            progress.write("\n".join(["="*59, util.dict2str(metrics), "="*59]))
         if log_cycle and wandb_log:
             wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
 
         
         # periodic checkpointing
         if checkpointing and t % num_cycles_per_checkpoint == 0:
-            checkpoint_manager.save(
-                t,
-                args=ocp.args.PyTreeSave(train_state.params),
-            )
-            progress.write(f"saving checkpoint (wandb will sync at end)...")
+            progress.write("saving checkpoint (wandb will sync at end of run)...")
+            checkpoint_manager.save(t, args=ocp.args.PyTreeSave(train_state.params))
 
 
         # ending cycle

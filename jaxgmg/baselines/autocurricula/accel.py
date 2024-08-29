@@ -71,6 +71,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     prob_replay: float
     regret_estimator: str                   # "absGAE", "PVL", todo: "maxMC"
     level_metrics: LevelMetrics | None
+    robust: bool
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -120,6 +121,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels]
+        bool,
     ]:
         # generate a batch of new levels
         rng_generate, rng = jax.random.split(rng)
@@ -192,7 +194,13 @@ class CurriculumGenerator(base.CurriculumGenerator):
             prev_batch_level_ids=replay_level_ids,
             prev_batch_mutate_counts=mutate_counts,
         )
-        return next_state, chosen_levels
+
+        # flag if the levels were curated or are prospective
+        curated = jnp.logical_or(
+            not self.robust, # If not robust, always flag as curated
+            batch_type == BatchType.REPLAY, # otherwise only replay levels
+        )
+        return next_state, chosen_levels, curated
 
 
     @functools.partial(jax.jit, static_argnames=['self'])

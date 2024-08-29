@@ -46,6 +46,7 @@ def corner(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     # PPO hyperparameters
@@ -237,6 +238,7 @@ def corner(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -293,6 +295,7 @@ def dish(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_wall: float = 0.60,
@@ -455,6 +458,7 @@ def dish(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -520,6 +524,7 @@ def pile(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -658,6 +663,7 @@ def pile(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -717,6 +723,7 @@ def keys(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -846,6 +853,7 @@ def keys(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -902,6 +910,7 @@ def minimaze(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_wall: float = 0.60,
@@ -1303,6 +1312,7 @@ def minimaze(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1364,6 +1374,7 @@ def memory_test(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
+    plr_robust: bool = True,
     # training dimensions
     num_total_env_steps: int = 1000_000,
     num_env_steps_per_cycle: int = 64,
@@ -1428,6 +1439,7 @@ def memory_test(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1446,9 +1458,9 @@ def memory_test(
         num_cycles_per_eval=num_cycles_per_eval,
         num_eval_levels=num_eval_levels,
         num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_log=num_cycles_per_log,
         num_cycles_per_big_eval=1024,
         eval_gif_grid_width=4,
+        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,

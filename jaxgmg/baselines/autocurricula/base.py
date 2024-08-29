@@ -39,12 +39,33 @@ class CurriculumGenerator:
 
     def get_batch(
         self,
+        state: GeneratorState,
         rng: PRNGKey,
         num_levels: int,
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels] # TODO: or more levels?
+        bool,
     ]:
+        """
+        Sample a batch of levels from the curriculum.
+
+        Returns:
+
+        * state : GeneratorState
+                The updated curriculum state.
+        * levels : Level[num_levels]
+                The batch of levels.
+                NOTE: COULD BE MORE THAN NUM_LEVELS LEVELS IN SOME CASES.
+        * curated : bool
+                Whether these levels have come from a curated selection and
+                should be used for training the policy, or not.
+                Either way, the caller should collect experience in these
+                levels and pass it back to the curriculum generator via the
+                update method.
+                But if this flag is True, one can also do training steps in
+                these levels, whereas if it is False, one should not.
+        """
         raise NotImplementedError
 
 

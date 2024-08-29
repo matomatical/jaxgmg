@@ -30,11 +30,12 @@ class CurriculumGenerator(base.CurriculumGenerator):
     ) -> tuple[
         base.GeneratorState,
         Level, # Level[num_levels]
+        bool,
     ]:
         levels_batch = self.level_generator.vsample(
             rng,
             num_levels=num_levels,
         )
-        return state, levels_batch
+        return state, levels_batch, True
 
 
