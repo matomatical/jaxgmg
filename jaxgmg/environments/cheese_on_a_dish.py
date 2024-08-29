@@ -506,17 +506,15 @@ class LevelGenerator(base.LevelGenerator):
             dish_pos[1],
         ]
 
-        near_dish = (distance_to_dish == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
+        near_dish = (distance_to_dish <= self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
         #remove the walls from the near_dish mask
-        near_dish_nowall = near_dish | (near_dish & no_wall)
 
         rng_spawn_cheese, rng = jax.random.split(rng)
         cheese_pos = jax.random.choice(
             key=rng_spawn_cheese,
             a=coords,
             axis=0,
-            #p=no_wall & no_mouse & near_dish,
-            p = no_mouse & near_dish_nowall,
+            p=no_wall & no_mouse & near_dish,
         )
 
         wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
@@ -575,7 +573,8 @@ class ToggleWallLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class StepMouseLevelMutator(base.LevelMutator):
-
+    transpose_with_cheese_on_collision: bool = False
+    transpose_with_dish_on_collision: bool = False
 
     @functools.partial(jax.jit, static_argnames=["self"])
     def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
@@ -610,19 +609,117 @@ class StepMouseLevelMutator(base.LevelMutator):
         ].set(False)
 
         # upon collision with cheese, transpose mouse with cheese
-        hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
-        new_cheese_pos = jax.lax.select(
-            hit_cheese,
-            level.initial_mouse_pos,
-            level.cheese_pos,
-        )
         
+        hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
+        if self.transpose_with_cheese_on_collision:
+            new_cheese_pos = jax.lax.select(
+                hit_cheese,
+                level.initial_mouse_pos,
+                level.cheese_pos,
+            )
+        else:
+            new_cheese_pos = level.cheese_pos
+            new_initial_mouse_pos = jax.lax.select(
+                hit_cheese,
+                level.initial_mouse_pos,
+                new_initial_mouse_pos,
+            )
+
         # upon collision with dish, transpose mouse with dish
         hit_dish = (new_initial_mouse_pos == level.dish_pos).all()
-        new_dish_pos = jax.lax.select(
-            hit_dish,
-            level.initial_mouse_pos,
-            level.dish_pos,
+        if self.transpose_with_dish_on_collision:
+            new_dish_pos = jax.lax.select(
+                hit_dish,
+                level.initial_mouse_pos,
+                level.dish_pos,
+            )
+        else:
+            new_dish_pos = level.dish_pos
+            new_initial_mouse_pos = jax.lax.select(
+                hit_dish,
+                level.initial_mouse_pos,
+                new_initial_mouse_pos,
+            )
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_mouse_pos=new_initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+            dish_pos=new_dish_pos,
+        )
+
+@struct.dataclass
+class CheeseOnDishLevelMutator(base.LevelMutator):
+    max_cheese_radius: int = 0
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+        coords = einops.rearrange(jnp.indices((h, w)), 'c h w -> (h w) c')
+        # eliminate the border from coords
+        border = jnp.zeros((h, w), dtype=bool)
+        border = border.at[(0, h-1), :].set(True)
+        border = border.at[:, (0, w-1)].set(True)
+        border = border.flatten()
+
+        # teleport the cheese to a random location within bounds
+        rng_row, rng_col = jax.random.split(rng)
+        new_cheese_row = jax.random.choice(
+            key=rng_row,
+            a=jnp.arange(1, h-1),
+        )
+        new_cheese_col = jax.random.choice(
+            key=rng_col,
+            a=jnp.arange(1, w-1),
+        )
+        new_cheese_pos = jnp.array((
+            new_cheese_row,
+            new_cheese_col,
+        ))
+        # carve through walls
+        new_wall_map = level.wall_map.at[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ].set(False)
+
+        # place dish within max_cheese_radius of cheese
+        
+        distance_to_cheese = maze_solving.maze_distances(new_wall_map)[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ]
+
+        near_cheese = (distance_to_cheese <= self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
+        #remove the walls from the near_dish mask
+        #near_dish_nowall = near_dish | (near_dish & no_wall)
+
+        rng_spawn_dish, rng = jax.random.split(rng)
+        new_dish_pos = jax.random.choice(
+            key=rng_spawn_dish,
+            a=coords,
+            p = near_cheese & ~border,
+        )
+
+
+        new_wall_map = new_wall_map.at[
+            new_dish_pos[0],
+            new_dish_pos[1],
+        ].set(False)
+
+        # upon collision with mouse, transpose cheese with mouse
+        cheese_hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
+        new_initial_mouse_pos = jax.lax.select(
+                cheese_hit_mouse,
+                level.cheese_pos,
+                level.initial_mouse_pos,
+        )
+
+        # upon collision with dish, transpose mouse with dish
+        dish_hit_mouse = (new_dish_pos == level.initial_mouse_pos).all()
+        new_initial_mouse_pos = jax.lax.select(
+                dish_hit_mouse,
+                level.dish_pos,
+                level.initial_mouse_pos,
         )
 
         return level.replace(
@@ -631,6 +728,7 @@ class StepMouseLevelMutator(base.LevelMutator):
             cheese_pos=new_cheese_pos,
             dish_pos=new_dish_pos,
         )
+
 
 
 @struct.dataclass

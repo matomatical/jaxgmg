@@ -133,10 +133,9 @@ def dish(
     layout: str                         = 'tree',
     level_of_detail: int                = 8,
     max_cheese_radius: int              = 0,
+    max_cheese_radius_shift: int        = 0,
     num_mutate_steps: int               = 1,
-    prob_mutate_wall: float             = 0.60,
-    prob_mutate_step: float             = 0.95,
-    prob_mutate_cheese_or_dish: float   = 0.0,
+    prob_mutate_shift: float            = 0.0,
     fps: float                          = 12.0,
     debug: bool                         = False,
     seed: int                           = 42,
@@ -158,29 +157,34 @@ def dish(
         )(),
         max_cheese_radius=max_cheese_radius,
     )
+    biased_cheese_on_dish_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            cheese_on_a_dish.CheeseOnDishLevelMutator(
+                max_cheese_radius=max_cheese_radius,
+            ),
+            # teleport cheese and dish to a random different position, apart by max_cheese_radius
+            cheese_on_a_dish.CheeseOnDishLevelMutator(
+                max_cheese_radius=max_cheese_radius_shift,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_on_a_dish.ToggleWallLevelMutator(),
-                cheese_on_a_dish.StepMouseLevelMutator(),
-                cheese_on_a_dish.ScatterMouseLevelMutator(),
-                cheese_on_a_dish.StepDishLevelMutator(),
-                cheese_on_a_dish.ScatterDishLevelMutator(),
-                cheese_on_a_dish.StepCheeseLevelMutator(),
-                cheese_on_a_dish.ScatterCheeseLevelMutator(),
+                cheese_on_a_dish.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                ),
+                biased_cheese_on_dish_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_dish)*prob_mutate_step,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_dish)*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*(1-prob_mutate_step),
-            ),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )
+
     mutate_forever(
         rng=rng,
         env=env,
@@ -196,19 +200,17 @@ def pile(
     layout: str                         = 'tree',
     level_of_detail: int                = 8,
     max_cheese_radius: int              = 0,
-    split_elements: int                 = 1,
+    max_cheese_radius_shift: int        = 5,
+    split_elements: int                 = 0,
     num_mutate_steps: int               = 1,
-    prob_mutate_wall: float             = 0.60,
-    prob_mutate_step: float             = 0.95,
-    prob_mutate_cheese_or_pile: float   = 0.0,
-    prob_mutate_objects_count_on_pile: float = 0.2,
+    prob_mutate_shift: float            = 0.3,
     transpose: bool                     = False,
     fps: float                          = 12.0,
     debug: bool                         = False,
     seed: int                           = 42,
 ):
     """
-    Iterative Cheese on a Dish mutator demo.
+    Iterative Cheese on a Pile mutator demo.
     """
     if level_of_detail not in {1,3,4,8}:
         raise ValueError(f"invalid level of detail {level_of_detail}")
@@ -226,55 +228,39 @@ def pile(
         split_elements=split_elements,
     )
     print("configuring level mutator...")
+    
+    biased_cheese_on_pile_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese on pile
+            cheese_on_a_pile.CheeseonPileLevelMutator(
+                max_cheese_radius=max_cheese_radius,
+                split_elements=split_elements,
+            ),
+            # teleport cheese and pile to a random different position, apart by max_cheese_radius
+            cheese_on_a_pile.CheeseonPileLevelMutator(
+                max_cheese_radius=max_cheese_radius_shift,
+                split_elements=split_elements,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_on_a_pile.ToggleWallLevelMutator(),
                 cheese_on_a_pile.StepMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_pile_on_collision=False,
-                    split_elements=split_elements,
-                    ),
-                cheese_on_a_pile.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_pile_on_collision=False,
-                    split_elements=split_elements,
-                    ),
-                cheese_on_a_pile.StepCheeseLevelMutator(
-                    transpose_with_mouse_on_collision=False,
-                    transpose_with_pile_on_collision=False,
-                    split_elements=split_elements,
-                    ),
-                cheese_on_a_pile.ScatterCheeseLevelMutator(
-                    transpose_with_mouse_on_collision=False,
-                    transpose_with_pile_on_collision=False,
-                    split_elements=split_elements,
-                    ),
-                cheese_on_a_pile.StepPileLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_mouse_on_collision=False,
-                    split_elements=split_elements,
-                    ),
-                cheese_on_a_pile.ScatterPileLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_mouse_on_collision=False,
-                    split_elements=split_elements, 
-                    ),
-                cheese_on_a_pile.MoveObjectsPileLevelMutator(),
+                    transpose_with_cheese_on_collision = False,
+                    transpose_with_pile_on_collision = False,
+                    split_elements = split_elements,
+                ),
+                biased_cheese_on_pile_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*prob_mutate_step,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_pile/2*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_pile)*prob_mutate_objects_count_on_pile,
-            ),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )
+
     mutate_forever(
         rng=rng,
         env=env,

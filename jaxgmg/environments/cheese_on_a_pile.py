@@ -676,7 +676,7 @@ class LevelGenerator(base.LevelGenerator):
             p=no_wall,
         )
         
-        # dish spawns in some remaining valid position
+        # pile spawns in some remaining valid position
         no_mouse = jnp.ones_like(wall_map).at[
             initial_mouse_pos[0],
             initial_mouse_pos[1],
@@ -696,70 +696,24 @@ class LevelGenerator(base.LevelGenerator):
             pos = napkin_pos
             final_spawn.append(pos)
 
-        #no_dish = jnp.ones_like(wall_map).at[
-           # dish_pos[0],
-           # dish_pos[1],
-        #].set(False).flatten()
 
-        #cheese_position
-
-       
-        #dish_pos = jax.random.choice(
-        #    key=rng_spawn_dish,
-        #    a=coords,
-        #    axis=0,
-        #    p=no_wall & no_mouse,
-        #)
-
-        # cheese spawns in some remaining valid position near the napkin
         distance_to_napkin = maze_solving.maze_distances(wall_map)[
             napkin_pos[0],
             napkin_pos[1],
         ]
 
-        near_napkin = (distance_to_napkin == self.max_cheese_radius).flatten()
+        near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
 
-        near_napkin_nowall = near_napkin | (near_napkin & no_wall)
 
         rng_spawn_cheese, rng = jax.random.split(rng)
         cheese_pos = jax.random.choice(
             key=rng_spawn_cheese,
             a=coords,
             axis=0,
-            #p=no_wall & no_mouse & near_napkin,
-            p=near_napkin_nowall & no_mouse,
+            p=no_wall & no_mouse & near_napkin,
+            
         )
 
-        # distance_to_napkin = maze_solving.maze_distances(wall_map)[
-        #     napkin_pos[0],
-        #     napkin_pos[1],
-        # ]
-        # near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
-
-        # rng_spawn_cheese, rng = jax.random.split(rng)
-        # cheese_pos = jax.random.choice(
-        #     key=rng_spawn_cheese,
-        #     a=coords,
-        #     axis=0,
-        #     p=no_wall & no_mouse & near_napkin,
-        # )
-
-        #second group
-        #distance_to_cheese = maze_solving.maze_distances(wall_map)[
-         #   cheese_pos[0],
-          #  cheese_pos[1],
-        #]
-
-        #near_cheese = (distance_to_cheese <= self.max_dish_radius).flatten()
-
-        #rng_spawn_second, rng = jax.random.split(rng)
-
-        #second_pos = jax.random.choice(
-         #   key=rng_spawn_second,
-          #  a=coords,
-           # axis=0,
-            #p=no_wall & no_mouse & near_dish & near_cheese,
-        #)
 
         for i in range(self.split_elements):
             pos = cheese_pos
@@ -1106,6 +1060,102 @@ class StepCheeseLevelMutator(base.LevelMutator):
             napkin_pos = final_spawn[5],
         )
 
+@struct.dataclass
+class CheeseonPileLevelMutator(base.LevelMutator):
+    split_elements: int = 0
+    max_cheese_radius: int = 0
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+        assert h > 3 and w > 3
+        coords = einops.rearrange(jnp.indices((h, w)), 'c h w -> (h w) c')
+        # eliminate the border from coords
+        border = jnp.zeros((h, w), dtype=bool)
+        border = border.at[(0, h-1), :].set(True)
+        border = border.at[:, (0, w-1)].set(True)
+        border = border.flatten()
+
+
+        
+        
+        
+        rng_row, rng_col = jax.random.split(rng)
+        new_cheese_row = jax.random.choice(
+            key=rng_row,
+            a=jnp.arange(1, h-1),
+        )
+        new_cheese_col = jax.random.choice(
+            key=rng_col,
+            a=jnp.arange(1, w-1),
+        )
+        new_cheese_pos = jnp.array((new_cheese_row, new_cheese_col))
+        
+        #carve the wall
+        new_wall_map = level.wall_map.at[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ].set(False)
+
+        distance_to_cheese = maze_solving.maze_distances(new_wall_map)[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ]
+
+        near_cheese = (distance_to_cheese <= self.max_cheese_radius).flatten()
+
+        rng_spawn_pile, rng = jax.random.split(rng)
+        new_napkin_pos = jax.random.choice(
+            key=rng_spawn_pile,
+            a =coords,
+            p = near_cheese & ~border
+        )
+    
+
+        #carve the wall
+        new_wall_map = new_wall_map.at[
+            new_napkin_pos[0],
+            new_napkin_pos[1],
+        ].set(False)
+
+        napkin_hit_mouse = (new_napkin_pos == level.initial_mouse_pos).all()
+        cheese_hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
+
+        new_initial_mouse_pos = jax.lax.select(
+            napkin_hit_mouse,
+            level.napkin_pos, 
+            level.initial_mouse_pos,
+        )
+
+        new_initial_mouse_pos = jax.lax.select(
+            cheese_hit_mouse,
+            level.cheese_pos, 
+            level.initial_mouse_pos,
+        )
+
+        final_spawn = []
+        for i in range(6-self.split_elements):
+            pos = new_napkin_pos
+            final_spawn.append(pos)
+        
+        for i in range(self.split_elements):
+            pos = new_cheese_pos
+            final_spawn.append(pos)
+        
+        final_spawn.reverse()
+
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_mouse_pos=new_initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+            dish_pos=final_spawn[0],
+            fork_pos = final_spawn[1],
+            spoon_pos = final_spawn[2],
+            glass_pos = final_spawn[3],
+            mug_pos = final_spawn[4],
+            napkin_pos = final_spawn[5],
+        )
 
 
 @struct.dataclass
@@ -1164,25 +1214,14 @@ class ScatterCheeseLevelMutator(base.LevelMutator):
                 new_cheese_pos,
             )
         
-        final_spawn = jnp.array([
-            level.dish_pos,
-            level.fork_pos,
-            level.spoon_pos,
-            level.glass_pos,
-            level.mug_pos,
-            level.napkin_pos,
-        ])
-
-        # reassign the positions accordingly
-        cheese_indices = jnp.arange(self.split_elements)
-        napkin_indices = jnp.arange(6 - self.split_elements, 6)
-
-        cheese_mask = jnp.zeros(6, dtype=bool).at[cheese_indices].set(True)
-        napkin_mask = jnp.zeros(6, dtype=bool).at[napkin_indices].set(True)
-
-         
-        final_spawn = jnp.where(cheese_mask[:, None], new_cheese_pos, final_spawn)
-        final_spawn = jnp.where(napkin_mask[:, None], new_napkin_pos, final_spawn)
+        final_spawn = []
+        for i in range(6-self.split_elements):
+            pos = new_napkin_pos
+            final_spawn.append(pos)
+        for i in range(self.split_elements):
+            pos = new_cheese_pos
+            final_spawn.append(pos)
+        final_spawn.reverse()
 
         return level.replace(
             wall_map=new_wall_map,
@@ -1250,36 +1289,14 @@ class StepPileLevelMutator(base.LevelMutator):
         
         #not doing it for cheese since pile and cheese can have the same position
 
-        final_spawn = jnp.array([
-            level.dish_pos,
-            level.fork_pos,
-            level.spoon_pos,
-            level.glass_pos,
-            level.mug_pos,
-            level.napkin_pos,
-        ])
-
-        # reassign the positions accordingly
-
-        final_spawn = jnp.array([
-            level.dish_pos,
-            level.fork_pos,
-            level.spoon_pos,
-            level.glass_pos,
-            level.mug_pos,
-            level.napkin_pos,
-        ])
-
-        # reassign the positions accordingly
-        cheese_indices = jnp.arange(self.split_elements)
-        napkin_indices = jnp.arange(6 - self.split_elements, 6)
-
-        cheese_mask = jnp.zeros(6, dtype=bool).at[cheese_indices].set(True)
-        napkin_mask = jnp.zeros(6, dtype=bool).at[napkin_indices].set(True)
-
-         
-        final_spawn = jnp.where(cheese_mask[:, None], level.cheese_pos, final_spawn)
-        final_spawn = jnp.where(napkin_mask[:, None], new_napkin_pos, final_spawn)
+        final_spawn = []
+        for i in range(6-self.split_elements):
+            pos = new_napkin_pos
+            final_spawn.append(pos)
+        for i in range(self.split_elements):
+            pos = new_cheese_pos
+            final_spawn.append(pos)
+        final_spawn.reverse()
 
         return level.replace(
             wall_map=new_wall_map,
@@ -1338,27 +1355,14 @@ class ScatterPileLevelMutator(base.LevelMutator):
         
         #not doing it for cheese since pile and cheese can have the same position
 
-        final_spawn = jnp.array([
-            level.dish_pos,
-            level.fork_pos,
-            level.spoon_pos,
-            level.glass_pos,
-            level.mug_pos,
-            level.napkin_pos,
-        ])
-
-
-        # reassign the positions accordingly
-
-        cheese_indices = jnp.arange(self.split_elements)
-        napkin_indices = jnp.arange(6 - self.split_elements, 6)
-
-        cheese_mask = jnp.zeros(6, dtype=bool).at[cheese_indices].set(True)
-        napkin_mask = jnp.zeros(6, dtype=bool).at[napkin_indices].set(True)
-
-         
-        final_spawn = jnp.where(cheese_mask[:, None], level.cheese_pos, final_spawn)
-        final_spawn = jnp.where(napkin_mask[:, None], new_napkin_pos, final_spawn)
+        final_spawn = []
+        for i in range(6-self.split_elements):
+            pos = new_napkin_pos
+            final_spawn.append(pos)
+        for i in range(self.split_elements):
+            pos = new_cheese_pos
+            final_spawn.append(pos)
+        final_spawn.reverse()
 
         return level.replace(
             wall_map=new_wall_map,
