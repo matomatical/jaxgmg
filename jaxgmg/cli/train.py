@@ -37,6 +37,7 @@ def corner(
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
+    prob_mutate_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
@@ -47,9 +48,6 @@ def corner(
     plr_regret_estimator: str = "PVL",
     # for accel
     num_mutate_steps: int = 6,
-    prob_mutate_wall: float = 0.60,
-    prob_mutate_step: float = 0.95,
-    prob_mutate_cheese: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -150,6 +148,19 @@ def corner(
         }
 
     print("configuring level mutator...")
+    # if mutating cheese, mostly stay in the restricted region
+    biased_cheese_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            cheese_in_the_corner.CornerCheeseLevelMutator(
+                corner_size=env_corner_size,
+            ),
+            # teleport cheese to a random position
+            cheese_in_the_corner.ScatterCheeseLevelMutator(),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
@@ -157,19 +168,9 @@ def corner(
                 cheese_in_the_corner.StepMouseLevelMutator(
                     transpose_with_cheese_on_collision=False,
                 ),
-                cheese_in_the_corner.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                ),
-                cheese_in_the_corner.StepCheeseLevelMutator(),
-                cheese_in_the_corner.ScatterCheeseLevelMutator(),
+                biased_cheese_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*prob_mutate_step,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese*(1-prob_mutate_step),
-            ),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )
@@ -188,10 +189,9 @@ def corner(
     
     print("configuring fixed eval levels...")
     fixed_eval_levels = {
-        "random0": orig_level_generator.sample(jax.random.key(0)),
-        "random1": orig_level_generator.sample(jax.random.key(1)),
-        "random2": orig_level_generator.sample(jax.random.key(2)),
-        "random3": orig_level_generator.sample(jax.random.key(3)),
+    #     "random1": orig_level_generator.sample(jax.random.key(1)),
+    #     "random2": orig_level_generator.sample(jax.random.key(2)),
+    #     "random3": orig_level_generator.sample(jax.random.key(3)),
     }
 
     print("configuring heatmap splayer...")

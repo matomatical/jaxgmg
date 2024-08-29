@@ -69,9 +69,7 @@ def corner(
     corner_size: int            = 1,
     level_of_detail: int        = 8,
     num_mutate_steps: int       = 1,
-    prob_mutate_wall: float     = 0.60,
-    prob_mutate_step: float     = 0.95,
-    prob_mutate_cheese: float   = 0.0,
+    prob_mutate_shift: float    = 0.0,
     transpose: bool             = False,
     fps: float                  = 12.0,
     debug: bool                 = False,
@@ -94,26 +92,27 @@ def corner(
         )(),
         corner_size=corner_size,
     )
+    # if mutating cheese, mostly stay in the restricted region
+    biased_cheese_mutator = MixtureLevelMutator(
+        mutators=(
+            cheese_in_the_corner.CornerCheeseLevelMutator(
+                corner_size=corner_size,
+            ),
+            cheese_in_the_corner.ScatterCheeseLevelMutator(),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_in_the_corner.ToggleWallLevelMutator(),
                 cheese_in_the_corner.StepMouseLevelMutator(
-                    transpose_with_cheese_on_collision=transpose,
+                    transpose_with_cheese_on_collision=False,
                 ),
-                cheese_in_the_corner.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=transpose,
-                ),
-                cheese_in_the_corner.StepCheeseLevelMutator(),
-                cheese_in_the_corner.ScatterCheeseLevelMutator(),
+                biased_cheese_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*prob_mutate_step,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese*(1-prob_mutate_step),
-            ),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )
