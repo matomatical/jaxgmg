@@ -37,6 +37,7 @@ def corner(
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
+    prob_mutate_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
@@ -45,11 +46,9 @@ def corner(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
-    prob_mutate_wall: float = 0.60,
-    prob_mutate_step: float = 0.95,
-    prob_mutate_cheese: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -119,6 +118,14 @@ def corner(
         maze_generator=maze_generator,
         corner_size=env_size-2,
     )
+    tree_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generation.get_generator_class_from_name(
+            name='tree',
+        )(),
+        corner_size=env_corner_size,
+    )
     if prob_shift > 0.0:
         print("  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
@@ -128,28 +135,28 @@ def corner(
         )
     else:
         train_level_generator = orig_level_generator
-
+    
     print("configuring level classifier...")
     def classify_level_is_shift(level: Level) -> bool:
         return jnp.logical_or(
             level.cheese_pos[0] != 1,
             level.cheese_pos[1] != 1,
         )
-    
-    print("configuring eval level generators...")
-    if prob_shift > 0.0:
-        eval_level_generators = {
-            "train": train_level_generator,
-            "orig": orig_level_generator,
-            "shift": shift_level_generator,
-        }
-    else:
-        eval_level_generators = {
-            "orig": orig_level_generator,
-            "shift": shift_level_generator,
-        }
 
     print("configuring level mutator...")
+    # if mutating cheese, mostly stay in the restricted region
+    biased_cheese_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            cheese_in_the_corner.CornerCheeseLevelMutator(
+                corner_size=env_corner_size,
+            ),
+            # teleport cheese to a random position
+            cheese_in_the_corner.ScatterCheeseLevelMutator(),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
@@ -157,19 +164,9 @@ def corner(
                 cheese_in_the_corner.StepMouseLevelMutator(
                     transpose_with_cheese_on_collision=False,
                 ),
-                cheese_in_the_corner.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                ),
-                cheese_in_the_corner.StepCheeseLevelMutator(),
-                cheese_in_the_corner.ScatterCheeseLevelMutator(),
+                biased_cheese_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*prob_mutate_step,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese)*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese*(1-prob_mutate_step),
-            ),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )
@@ -185,10 +182,24 @@ def corner(
         env=env,
         discount_rate=ppo_gamma,
     )
+
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+            "tree": tree_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+            "tree": tree_level_generator,
+        }
     
     print("configuring fixed eval levels...")
     fixed_eval_levels = {
-        "random0": orig_level_generator.sample(jax.random.key(0)),
         "random1": orig_level_generator.sample(jax.random.key(1)),
         "random2": orig_level_generator.sample(jax.random.key(2)),
         "random3": orig_level_generator.sample(jax.random.key(3)),
@@ -227,6 +238,7 @@ def corner(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -283,6 +295,7 @@ def dish(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_wall: float = 0.60,
@@ -445,6 +458,7 @@ def dish(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -510,6 +524,7 @@ def pile(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_wall: float = 0.60,
@@ -708,6 +723,7 @@ def pile(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -767,6 +783,7 @@ def keys(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -896,6 +913,7 @@ def keys(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -952,6 +970,7 @@ def minimaze(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_wall: float = 0.60,
@@ -1353,6 +1372,7 @@ def minimaze(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1414,6 +1434,7 @@ def memory_test(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
+    plr_robust: bool = True,
     # training dimensions
     num_total_env_steps: int = 1000_000,
     num_env_steps_per_cycle: int = 64,
@@ -1478,6 +1499,7 @@ def memory_test(
         plr_staleness_coeff=plr_staleness_coeff,
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1496,9 +1518,9 @@ def memory_test(
         num_cycles_per_eval=num_cycles_per_eval,
         num_eval_levels=num_eval_levels,
         num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_log=num_cycles_per_log,
         num_cycles_per_big_eval=1024,
         eval_gif_grid_width=4,
+        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
         checkpointing=checkpointing,

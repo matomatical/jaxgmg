@@ -39,13 +39,45 @@ class CurriculumGenerator:
 
     def get_batch(
         self,
+        state: GeneratorState,
         rng: PRNGKey,
         num_levels: int,
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels] # TODO: or more levels?
+        int,
     ]:
+        """
+        Sample a batch of levels from the curriculum.
+
+        Returns:
+
+        * state : GeneratorState
+                The updated curriculum state.
+        * levels : Level[num_levels]
+                The batch of levels.
+        * batch_type : int
+                Indicates the type of the batch (e.g. a replay batch vs. a
+                newly generated batch in PLR).
+        """
         raise NotImplementedError
+
+    
+    def batch_type_name(self, batch_type: int) -> str:
+        """
+        You got a batch of this type from the `get_batch` method. This str is
+        a name you can use in your logging 
+        """
+        raise NotImplementedError
+
+
+    def should_train(self, batch_type: int) -> bool:
+        """
+        You got a batch of this type from the `get_batch` method . This bool
+        tells you if you should do PPO updates (True) or not (False).
+        """
+        raise NotImplementedError
+
 
 
     @functools.partial(jax.jit, static_argnames=['self'])

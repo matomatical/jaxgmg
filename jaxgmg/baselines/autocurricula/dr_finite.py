@@ -15,7 +15,8 @@ from chex import PRNGKey, Array
 from jaxgmg.environments.base import Level, LevelGenerator, LevelMetrics
 from jaxgmg.baselines.experience import Rollout
 import jaxgmg.baselines.autocurricula.base as base
-    
+
+
 @struct.dataclass
 class GeneratorState(base.GeneratorState):
     levels: Level           # Level[num_levels]
@@ -44,6 +45,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels]
+        int,
     ]:
         num_levels_total = jax.tree.leaves(state.levels)[0].shape[0]
         level_ids = jax.random.choice(
@@ -56,7 +58,15 @@ class CurriculumGenerator(base.CurriculumGenerator):
         new_state = state.replace(
             visit_counts=state.visit_counts.at[level_ids].add(1),
         )
-        return new_state, levels_batch
+        return new_state, levels_batch, 0
+
+
+    def batch_type_name(self, batch_type: int) -> str:
+        return "generate"
+
+
+    def should_train(self, batch_type: int) -> bool:
+        return True
 
 
     @functools.partial(jax.jit, static_argnames=['self'])

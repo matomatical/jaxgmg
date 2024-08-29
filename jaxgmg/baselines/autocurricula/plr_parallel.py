@@ -13,6 +13,37 @@ version).
 TODO: find a better, less hacky API for robustness...
 """
 
+raise NotImplementedError
+"""
+Until I find the right API for this, I am decommissioning this module. I have
+moved on from this API in the baselines/train script. Here is some relevant
+old code from the training loop:
+
+        ... (get batch call that might return more levels)
+
+        # NOTE: get_batch may return num_levels levels or a number of
+        # additional levels (e.g. in the case of parallel robust PLR,
+        # 2*num_levels levels are returned). The contract is that we
+        # should do rollouts and update UED in all of them, but we should
+        # only train in the first num_levels of them.
+        # TODO: more fine-grained logging.
+
+        ... collect experience, update UED method)
+            # TODO: steps per second is now wrong, doesn't account for actual
+            # levels generated and simulated... use size of rollouts
+            # TODO: split up each kind of rollouts/metrics?
+            # TODO: count the number of env steps total along with the number
+            # of env steps used for training
+        
+        # isolate valid levels for ppo updating
+        valid_rollouts, valid_advantages = jax.tree.map(
+            lambda x: x[:num_parallel_envs],
+            (rollouts, advantages),
+        )
+        ... (and then pass these to ppo update)
+"""
+
+
 import functools
 from typing import Any
 

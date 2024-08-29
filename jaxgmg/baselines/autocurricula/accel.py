@@ -71,6 +71,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     prob_replay: float
     regret_estimator: str                   # "absGAE", "PVL", todo: "maxMC"
     level_metrics: LevelMetrics | None
+    robust: bool
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -120,6 +121,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels]
+        bool,
     ]:
         # generate a batch of new levels
         rng_generate, rng = jax.random.split(rng)
@@ -192,7 +194,27 @@ class CurriculumGenerator(base.CurriculumGenerator):
             prev_batch_level_ids=replay_level_ids,
             prev_batch_mutate_counts=mutate_counts,
         )
-        return next_state, chosen_levels
+
+        return next_state, chosen_levels, batch_type
+
+    
+    def batch_type_name(self, batch_type: int) -> str:
+        match batch_type:
+            case 0:
+                return "generate"
+            case 1:
+                return "replay"
+            case 2:
+                return "mutate"
+            case _:
+                raise ValueError(f"Invalid batch type {batch_type!r}")
+
+
+    def should_train(self, batch_type: int) -> bool:
+        if not self.robust:
+            return True
+        else:
+            return (batch_type == 1)
 
 
     @functools.partial(jax.jit, static_argnames=['self'])
