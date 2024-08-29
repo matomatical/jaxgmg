@@ -45,7 +45,7 @@ class CurriculumGenerator:
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels] # TODO: or more levels?
-        bool,
+        int,
     ]:
         """
         Sample a batch of levels from the curriculum.
@@ -56,17 +56,28 @@ class CurriculumGenerator:
                 The updated curriculum state.
         * levels : Level[num_levels]
                 The batch of levels.
-                NOTE: COULD BE MORE THAN NUM_LEVELS LEVELS IN SOME CASES.
-        * curated : bool
-                Whether these levels have come from a curated selection and
-                should be used for training the policy, or not.
-                Either way, the caller should collect experience in these
-                levels and pass it back to the curriculum generator via the
-                update method.
-                But if this flag is True, one can also do training steps in
-                these levels, whereas if it is False, one should not.
+        * batch_type : int
+                Indicates the type of the batch (e.g. a replay batch vs. a
+                newly generated batch in PLR).
         """
         raise NotImplementedError
+
+    
+    def batch_type_name(self, batch_type: int) -> str:
+        """
+        You got a batch of this type from the `get_batch` method. This str is
+        a name you can use in your logging 
+        """
+        raise NotImplementedError
+
+
+    def should_train(self, batch_type: int) -> bool:
+        """
+        You got a batch of this type from the `get_batch` method . This bool
+        tells you if you should do PPO updates (True) or not (False).
+        """
+        raise NotImplementedError
+
 
 
     @functools.partial(jax.jit, static_argnames=['self'])

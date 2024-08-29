@@ -45,7 +45,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     ) -> tuple[
         GeneratorState,
         Level, # Level[num_levels]
-        bool,
+        int,
     ]:
         num_levels_total = jax.tree.leaves(state.levels)[0].shape[0]
         level_ids = jax.random.choice(
@@ -58,7 +58,15 @@ class CurriculumGenerator(base.CurriculumGenerator):
         new_state = state.replace(
             visit_counts=state.visit_counts.at[level_ids].add(1),
         )
-        return new_state, levels_batch, True
+        return new_state, levels_batch, 0
+
+
+    def batch_type_name(self, batch_type: int) -> str:
+        return "generate"
+
+
+    def should_train(self, batch_type: int) -> bool:
+        return True
 
 
     @functools.partial(jax.jit, static_argnames=['self'])

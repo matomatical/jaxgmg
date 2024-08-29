@@ -195,12 +195,26 @@ class CurriculumGenerator(base.CurriculumGenerator):
             prev_batch_mutate_counts=mutate_counts,
         )
 
-        # flag if the levels were curated or are prospective
-        curated = jnp.logical_or(
-            not self.robust, # If not robust, always flag as curated
-            batch_type == BatchType.REPLAY, # otherwise only replay levels
-        )
-        return next_state, chosen_levels, curated
+        return next_state, chosen_levels, batch_type
+
+    
+    def batch_type_name(self, batch_type: int) -> str:
+        match batch_type:
+            case 0:
+                return "generate"
+            case 1:
+                return "replay"
+            case 2:
+                return "mutate"
+            case _:
+                raise ValueError(f"Invalid batch type {batch_type!r}")
+
+
+    def should_train(self, batch_type: int) -> bool:
+        if not self.robust:
+            return True
+        else:
+            return (batch_type == 1)
 
 
     @functools.partial(jax.jit, static_argnames=['self'])

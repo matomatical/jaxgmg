@@ -36,6 +36,14 @@ class CurriculumGenerator(base.CurriculumGenerator):
             rng,
             num_levels=num_levels,
         )
-        return state, levels_batch, True
+        return state, levels_batch, 0
+
+
+    def batch_type_name(self, batch_type: int) -> str:
+        return "generate"
+
+
+    def should_train(self, batch_type: int) -> bool:
+        return True
 
 

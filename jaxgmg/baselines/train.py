@@ -348,43 +348,39 @@ def run(
         dynamic_ncols=True,
         colour='magenta',
     )
-    t_env_steps = 0
-    t_env_steps_curated = 0
-    t_ppo_updates = 0
+    step_counts = collections.defaultdict(int)
     for t in range(num_total_cycles):
         rng_t, rng_train = jax.random.split(rng_train)
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
         first_cycle = (t == 0)
         if log_cycle:
             metrics = collections.defaultdict(dict)
-            # 'before' step counts
+        
+        
+        # mark 'before' step counts
+        if log_cycle:
             metrics['step'].update({
-                'ppo-update': t_ppo_updates,
-                'env-step': t_env_steps,
-                'env-step-curated': t_env_steps_curated,
+                f'{key}-before': count for key, count in step_counts.items()
             })
 
 
         # choose levels for this round from curriculum
         rng_levels, rng_t = jax.random.split(rng_t)
-        gen_state, levels_t, curated_levels = gen.get_batch(
+        gen_state, levels_t, batch_type = gen.get_batch(
             state=gen_state,
             rng=rng_levels,
             num_levels=num_parallel_envs,
         )
+        batch_type_name = gen.batch_type_name(batch_type)
         # level classification
         if log_cycle and classify_level_is_shift is not None:
             shift_levels_mask = jax.vmap(classify_level_is_shift)(levels_t)
             shift_proportion = shift_levels_mask.mean()
-            classification_metrics = {
-                'shift_proportion': shift_levels_mask.mean(),
-            }
-            if curated_levels:
-                metrics['train-curated'].update(classification_metrics)
-            else:
-                metrics['train-prospective'].update(classification_metrics)
-    
-        
+            batch_metrics = {'shift_proportion': shift_levels_mask.mean()}
+            metrics[f'train-{batch_type_name}'].update(batch_metrics)
+            metrics['train-all'].update(batch_metrics)
+       
+
         # collect experience in the levels
         rng_env, rng_t = jax.random.split(rng_t)
         if log_cycle:
@@ -403,7 +399,8 @@ def run(
             metrics['perf']['env_steps_per_second'] = (
                 num_total_env_steps_per_cycle / env_elapsed_time
             )
-        # compute env metrics
+        step_counts['env-step-all'] += num_total_env_steps_per_cycle
+        step_counts[f'env-step-{batch_type_name}'] += num_total_env_steps_per_cycle
         if log_cycle:
             train_metrics = experience.compute_rollout_metrics(
                 rollouts=rollouts,
@@ -416,10 +413,8 @@ def run(
                     grid_width=train_gif_grid_width,
                     env=env,
                 )
-            if curated_levels:
-                metrics['train-curated'].update(train_metrics)
-            else:
-                metrics['train-prospective'].update(train_metrics)
+            metrics[f'train-{batch_type_name}'].update(train_metrics)
+            metrics['train-all'].update(train_metrics)
         
 
         # generalised advantage estimation
@@ -444,16 +439,15 @@ def run(
             advantages=advantages, # shortcut: we did gae already
         )
         if log_cycle:
-            metrics['ued'].update(gen.compute_metrics(gen_state))
+            ued_metrics = gen.compute_metrics(gen_state)
+            metrics['ued'].update(ued_metrics)
 
 
-        # ppo update network on this data
-        # ONLY IF THE LEVELS WERE FLAGGED AS CURATED
+        # ppo update network on this data (if curriculum says so, else skip)
         rng_update, rng_t = jax.random.split(rng_t)
-        if curated_levels:
+        if gen.should_train(batch_type):
             if log_cycle:
                 ppo_start_time = time.perf_counter()
-            # ppo step
             train_state, ppo_metrics = ppo.update(
                 rng=rng_update,
                 train_state=train_state,
@@ -466,10 +460,13 @@ def run(
             )
             if log_cycle:
                 ppo_elapsed_time = time.perf_counter() - ppo_start_time
-                metrics['ppo'].update(ppo_metrics)
                 metrics['perf']['ppo_updates_per_second'] = (
                     num_updates_per_cycle / ppo_elapsed_time
                 )
+            step_counts['env-step-used'] += num_total_env_steps_per_cycle
+            step_counts['ppo-update'] += num_updates_per_cycle
+            if log_cycle:
+                metrics['ppo'].update(ppo_metrics)
         
 
         # periodic evaluations
@@ -477,37 +474,34 @@ def run(
         if log_cycle:
             for eval_name, eval_obj in evals_dict.items():
                 rng_eval, rng_evals = jax.random.split(rng_evals)
+                eval_start_time = time.perf_counter()
                 metrics['eval-'+eval_name] = eval_obj.periodic_eval(
                     rng=rng_eval,
                     step=t,
                     train_state=train_state,
                     net_init_state=net_init_state,
                 )
+                eval_elapsed_time = time.perf_counter() - eval_start_time
+                metrics['perf'][f'eval-{eval_name}-duration'] = eval_elapsed_time
 
         
-        # (filtered) step counting
-        t_env_steps += num_total_env_steps_per_cycle
-        if curated_levels:
-            t_env_steps_curated += num_total_env_steps_per_cycle
-            t_ppo_updates += num_updates_per_cycle
+        # mark 'after' step counts
         if log_cycle:
             metrics['step'].update({
-                'ppo-update-after': t_ppo_updates,
-                'env-step-after': t_env_steps,
-                'env-step-curated-after': t_env_steps_curated,
+                f'{key}-after': count for key, count in step_counts.items()
             })
 
 
-        # define metrics upon first cycle
+        # define metrics during first cycle
         if first_cycle and wandb_log:
-            wandb.define_metric("step/env-step-after")
+            wandb.define_metric("step/env-step-all-after")
             wandb.define_metric("step/ppo-update-after")
             util.wandb_define_metrics(
                 example_metrics=metrics,
                 step_metric_prefix_mapping={
-                    "train": "step/env-step-after",
-                    "eval": "step/env-step-after",
-                    "ued": "step/env-step-after",
+                    "train": "step/env-step-all-after",
+                    "eval": "step/env-step-all-after",
+                    "ued": "step/env-step-all-after",
                     "ppo": "step/ppo-update-after",
                 },
             )
