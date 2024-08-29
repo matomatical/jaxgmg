@@ -34,7 +34,7 @@ class Transition:
     obs: Observation
     net_state: ActorCriticState
     prev_action: int
-    value: float
+    values: Array # float[num_values]
     action: int
     log_prob: float
     reward: float
@@ -49,9 +49,9 @@ class Rollout:
 
     * trajectories : Transition[num_steps]
             The collected experience as a sequence of transitions.
-    * final_value : float
+    * final_values : float[num_values]
             The network's output for the result of the final transition.
-            Useful as a learning target.
+            Useful as a learning target. Used in computing GAE estimates.
     
     Note: Considered adding these fields, but decided to exclude them because
     they are currently unused so we don't need to compute them. They could be
@@ -73,7 +73,7 @@ class Rollout:
     # final_obs: Observation
     # final_net_state: ActorCriticState
     # final_prev_action: int
-    final_value: float
+    final_values: Array                 # float[num_values]
 
 
 # # # 
@@ -138,7 +138,7 @@ def collect_rollout(
         rng_action, rng = jax.random.split(rng)
         (
             action_distribution,
-            critic_value,
+            critic_values,
             next_net_state,
         ) = net_apply(
             net_params,
@@ -177,7 +177,7 @@ def collect_rollout(
             obs=obs,
             net_state=net_state,
             prev_action=prev_action,
-            value=critic_value,
+            values=critic_values,
             action=action,
             log_prob=log_prob,
             reward=reward,
@@ -193,7 +193,7 @@ def collect_rollout(
     )
     # compute final value
     (fin_env_state, fin_obs, fin_net_state, fin_prev_action) = final_carry
-    _fin_pi, fin_value, _fin_next_net_state = net_apply(
+    _fin_pi, fin_values, _fin_next_net_state = net_apply(
         net_params,
         fin_obs,
         fin_net_state,
@@ -206,7 +206,7 @@ def collect_rollout(
         # final_obs=fin_obs,
         # final_net_state=fin_net_stat,
         # final_prev_action=fin_prev_action,
-        final_value=fin_value,
+        final_values=fin_values,
     )
 
 
@@ -479,6 +479,10 @@ def compute_average_return(
     return average_return
 
 
+# # # 
+# Generalised advantage estimation, for rollouts and batches
+
+
 @jax.jit
 def generalised_advantage_estimation(
     rewards: Array,         # float[num_steps]
@@ -487,7 +491,7 @@ def generalised_advantage_estimation(
     final_value: float,
     lambda_: float,
     discount_rate: float,
-) -> Array:
+) -> Array:                 # float[num_steps]
     """
     Given a sequence of (reward, done, value) triples, estimate generalised
     advantages.
@@ -503,7 +507,7 @@ def generalised_advantage_estimation(
             timestep (before the transition).
     * final_value : float
             Scalar value estimate from the critic after the final timestep.
-    * lambda : float
+    * lambda_ : float
             Used in definition of GAE.
     * discount_rate : float
             Used in definition of GAE.
@@ -543,6 +547,193 @@ def generalised_advantage_estimation(
         unroll=16, # TODO: seems to have no noticable effect on speed on cpu
     )
     return gaes
+
+    
+@jax.jit
+def batch_generalised_advantage_estimation(
+    rewards: Array,         # float[num_levels, num_steps]
+    dones: Array,           # bool[num_levels, num_steps]
+    values: Array,          # float[num_levels, num_steps]
+    final_values: Array,    # float[num_levels]
+    lambda_: float,
+    discount_rate: float,
+) -> Array:                 # float[num_levels, num_steps]
+    """
+    Given a batch of sequences of (reward, done, value) triples, estimate
+    generalised advantages for each level in the batch.
+
+    Inputs:
+    
+    * rewards : float[num_levels, num_steps]
+            Reward delivered at the conclusion of each timestep.
+    * dones : bool[num_levels, num_steps]
+            True indicates that this timestep marks the end of an episode.
+    * values : float[num_levels, num_steps]
+            Value estimates from the critic of the state at this timestep
+            (before the transition).
+    * final_values : float[num_levels]
+            Value estimate from the critics after the final timestep.
+    * lambda_ : float
+            Used in definition of GAE.
+    * discount_rate : float
+            Used in definition of GAE.
+
+    Returns:
+
+    * gaes : float[num_levels, num_steps]
+            The generalised advantage estimates across the trajectory
+            (for each level).
+
+    Notes:
+
+    * The 'dones' flags indicate episode termination and also truncation.
+      When an episode is terminated it's fine to assume there is no value
+      left but when an episode is truncated this may not be correct.
+      Nevertheless, with the exception of the final episode represented in
+      the trajectory (for which we have `final_value` representing the value
+      from after the final step) we ignore this distinction for simplicity
+      (this also follows the original PPO implementation and PureJaxRL).
+    """
+    # vmap over multiple levels
+    vmapped = jax.vmap(
+        generalised_advantage_estimation,
+        in_axes=(0,0,0,0,None,None),
+        out_axes=0,
+    )
+    # compute
+    return vmapped(
+        rewards,        # float[vmap(num_levels), num_steps]
+        dones,          # bool[vmap(num_levels), num_steps]
+        values,         # float[vmap(num_levels), num_steps]
+        final_values,   # float[vmap(num_levels)]
+        lambda_,        # float
+        discount_rate,  # float
+    )                   # -> float[vmap(num_levels), num_steps]
+
+    
+@jax.jit
+def multi_value_generalised_advantage_estimation(
+    rewards: Array,         # float[num_steps, num_rewards]
+    dones: Array,           # bool[num_steps]
+    values: Array,          # float[num_steps, num_rewards]
+    final_values: Array,    # float[num_rewards]
+    lambda_: float,
+    discount_rate: float,
+) -> Array:                 # float[num_steps, num_rewards]
+    """
+    Given a sequence of (rewards, done, values) triples, estimate generalised
+    advantages for each reward stream.
+
+    Inputs:
+    
+    * rewards : float[num_steps, num_rewards]
+            Vector of rewards delivered at the conclusion of each timestep.
+    * dones : bool[num_steps]
+            True indicates that this timestep marks the end of an episode.
+    * values : float[num_steps, num_rewards]
+            Vector value estimate from the critics of the state at this
+            timestep (before the transition).
+    * final_values : float[num_rewards]
+            Vector value estimate from the critics after the final timestep.
+    * lambda_ : float
+            Used in definition of GAE.
+    * discount_rate : float
+            Used in definition of GAE.
+
+    Returns:
+
+    * gaes : float[num_steps, num_rewards]
+            The generalised advantage estimates across the trajectory
+            (for each reward stream).
+
+    Notes:
+
+    * The 'dones' flags indicate episode termination and also truncation.
+      When an episode is terminated it's fine to assume there is no value
+      left but when an episode is truncated this may not be correct.
+      Nevertheless, with the exception of the final episode represented in
+      the trajectory (for which we have `final_value` representing the value
+      from after the final step) we ignore this distinction for simplicity
+      (this also follows the original PPO implementation and PureJaxRL).
+    """
+    # vmap over multiple values
+    vmapped = jax.vmap(
+        generalised_advantage_estimation,
+        in_axes=(1,None,1,0,None,None),
+        out_axes=1,
+    )
+    # compute
+    return vmapped(
+        rewards,        # float[num_steps, vmap(num_rewards)]
+        dones,          # bool[num_steps]
+        values,         # float[num_steps, vmap(num_rewards)]
+        final_values,   # float[vmap(num_rewards)]
+        lambda_,        # float
+        discount_rate,  # float
+    )                   # -> float[num_steps, vmap(num_rewards)]
+
+    
+@jax.jit
+def batch_multi_value_generalised_advantage_estimation(
+    rewards: Array,         # float[num_levels, num_steps, num_rewards]
+    dones: Array,           # bool[num_levels, num_steps]
+    values: Array,          # float[num_levels, num_steps, num_rewards]
+    final_values: Array,    # float[num_levels, num_rewards]
+    lambda_: float,
+    discount_rate: float,
+) -> Array:                 # float[num_levels, num_steps, num_rewards]
+    """
+    Given a batch of sequences of (rewards, done, values) triples, estimate
+    generalised advantages for each reward stream for each level in the
+    batch.
+
+    Inputs:
+    
+    * rewards : float[num_levels, num_steps, num_rewards]
+            Vector of rewards delivered at the conclusion of each timestep.
+    * dones : bool[num_levels, num_steps]
+            True indicates that this timestep marks the end of an episode.
+    * values : float[num_levels, num_steps, num_rewards]
+            Vector value estimates from the critics of the state at this
+            timestep (before the transition).
+    * final_values : float[num_levels, num_rewards]
+            Vector value estimate from the critics after the final timestep.
+    * lambda_ : float
+            Used in definition of GAE.
+    * discount_rate : float
+            Used in definition of GAE.
+
+    Returns:
+
+    * gaes : float[num_levels, num_steps, num_rewards]
+            The generalised advantage estimates across the trajectory
+            (for each reward stream, for each level).
+
+    Notes:
+
+    * The 'dones' flags indicate episode termination and also truncation.
+      When an episode is terminated it's fine to assume there is no value
+      left but when an episode is truncated this may not be correct.
+      Nevertheless, with the exception of the final episode represented in
+      the trajectory (for which we have `final_value` representing the value
+      from after the final step) we ignore this distinction for simplicity
+      (this also follows the original PPO implementation and PureJaxRL).
+    """
+    # vmap over multiple levels
+    vmapped = jax.vmap(
+        multi_value_generalised_advantage_estimation,
+        in_axes=(0,0,0,0,None,None),
+        out_axes=0,
+    )
+    # compute
+    return vmapped(
+        rewards,        # float[vmap(num_levels), num_steps, num_rewards]
+        dones,          # bool[vmap(num_levels), num_steps]
+        values,         # float[vmap(num_levels), num_steps, num_rewards]
+        final_values,   # float[vmap(num_levels), num_rewards]
+        lambda_,        # float
+        discount_rate,  # float
+    )                   # -> float[vmap(num_levels), num_steps, num_rewards]
 
     
 # # # 

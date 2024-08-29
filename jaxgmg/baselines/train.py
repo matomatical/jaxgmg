@@ -266,6 +266,7 @@ def run(
     print(f"  {net_rnn_type=}")
     net = networks.Impala(
         num_actions=env.num_actions,
+        num_values=1, # TODO: generalise this for more values
         cnn_type=net_cnn_type,
         rnn_type=net_rnn_type,
         width=net_width,
@@ -418,25 +419,29 @@ def run(
         
 
         # generalised advantage estimation
-        advantages = jax.vmap(
-            experience.generalised_advantage_estimation,
-            in_axes=(0,0,0,0,None,None),
-        )(
-            rollouts.transitions.reward,
-            rollouts.transitions.done,
-            rollouts.transitions.value,
-            rollouts.final_value,
-            ppo_gae_lambda,
-            ppo_gamma,
+        advantages = experience.batch_generalised_advantage_estimation(
+            # just do the main reward for now
+            rewards=rollouts.transitions.reward,
+            dones=rollouts.transitions.done,
+            # just do the first value output for now
+            values=rollouts.transitions.values[:,:,0],
+            final_values=rollouts.final_values[:,0],
+            lambda_=ppo_gae_lambda,
+            discount_rate=ppo_gamma,
         )
-        
+        # TODO: if estimate_proxy:
+        # proxy_advantages = gae(rewards=rollouts.transitions.info[...], ...)
+        # OR
+        # maybe vmap for efficiency (but not sure)
+
 
         # report experience and performance to level generator
         gen_state = gen.update(
             state=gen_state,
             levels=levels_t,
             rollouts=rollouts,
-            advantages=advantages, # shortcut: we did gae already
+            # shortcut: we did gae already
+            advantages=advantages,
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
@@ -452,8 +457,8 @@ def run(
                 rng=rng_update,
                 train_state=train_state,
                 net_init_state=net_init_state,
-                transitions=rollouts.transitions,
-                advantages=advantages,
+                transitions=rollouts.transitions,   # TODO: this now has multiple values
+                advantages=advantages,              # TODO: this one does not yet
                 num_epochs=num_epochs_per_cycle,
                 num_minibatches_per_epoch=num_minibatches_per_epoch,
                 compute_metrics=log_cycle,

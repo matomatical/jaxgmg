@@ -288,7 +288,7 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             ),
             net_init_state,
         )
-        action_distr, values, _net_state = jax.vmap(
+        action_distr, valuess, _net_state = jax.vmap(
             train_state.apply_fn,
             in_axes=(None, 0, 0, 0),
         )(
@@ -305,15 +305,19 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             pos=self.levels_pos,
         )
         # model value -> heatmap
-        value_heatmap = generate_heatmap(
-            shape=self.grid_shape,
-            data=values,
-            pos=self.levels_pos,
-        )
+        value_heatmaps = jax.vmap(
+            generate_heatmap,
+            in_axes=(None, 1, None),
+            out_axes=0,
+        )(
+            self.grid_shape,    # shape
+            valuess,            # values : float[num_levels, vmap(num_values)]
+            self.levels_pos,    # pos
+        )                       # -> float[num_values, *shape, rgb]
     
         return {
             'action_probs_img': action_diamond_plot,
-            'value_img': value_heatmap,
+            **{f'value{i}_img': img for i, img in enumerate(value_heatmaps)},
         }
     
 

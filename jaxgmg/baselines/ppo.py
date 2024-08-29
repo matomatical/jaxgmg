@@ -73,7 +73,7 @@ class ProximalPolicyOptimisation:
         """
         num_levels, num_steps = advantages.shape
         # value targets based on on-policy values + GAEs
-        targets = transitions.value + advantages
+        targets = transitions.values[:,:,0] + advantages
         # compile data set
         data = (transitions, advantages, targets)
 
@@ -175,7 +175,7 @@ class ProximalPolicyOptimisation:
         # run latest network to get current value/action predictions
         if self.do_backprop_thru_time:
             # recompute hidden states to allow BPTT
-            action_distribution, value = jax.vmap(
+            action_distribution, values = jax.vmap(
                 networks.evaluate_sequence_recurrent,
                 in_axes=(None, None, None, 0, 0, 0)
             )(
@@ -188,7 +188,7 @@ class ProximalPolicyOptimisation:
             )
         else:
             # use cached inputs, run forward pass in parallel (no BPTT)
-            action_distribution, value = jax.vmap(
+            action_distribution, values = jax.vmap(
                 networks.evaluate_sequence_parallel,
                 in_axes=(None, None, 0, 0, 0),
             )(
@@ -218,10 +218,13 @@ class ProximalPolicyOptimisation:
             actor_approxkl1 = jnp.mean(-logratio)
             actor_approxkl3 = jnp.mean((ratio - 1) - logratio)
 
+        # TODO: vmap this over reward channels
+        value = values[:,:,0]
+        transitions_value = transitions.values[:,:,0]
         # critic loss
-        value_diff = value - transitions.value
+        value_diff = value - transitions_value
         value_diff_clipped = jnp.clip(value_diff, -self.clip_eps, self.clip_eps)
-        value_proximal = transitions.value + value_diff_clipped
+        value_proximal = transitions_value + value_diff_clipped
         critic_loss = jnp.maximum(
             jnp.square(value - targets),
             jnp.square(value_proximal - targets),

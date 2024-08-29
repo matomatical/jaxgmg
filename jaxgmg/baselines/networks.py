@@ -36,13 +36,18 @@ class ActorCriticNetwork(nn.Module):
     
     Fields:
 
-    * num_actions : int
+    * num_actions : int (> 0)
+            The actor returns a distribution over this many actions.
+    * num_values: int (> 0)
+            The critic returns a vector of values with this many values.
+            (Usually this would only be one value, but this can be used to
+            also approximate proxy goals for example.)
 
     Subclasses must implement `setup` and `__call__` (or just `__call__` with
     `@compact`). The call function should follow this API:
     
     ```
-    pi, v, next_state = architecture.apply(
+    pi, vs, next_state = architecture.apply(
         params=params,
         obs=obs,
         state=state,
@@ -61,6 +66,7 @@ class ActorCriticNetwork(nn.Module):
     ```
     """
     num_actions: int
+    num_values: int
 
 
     @property
@@ -91,8 +97,8 @@ class ActorCriticNetwork(nn.Module):
         state: ActorCriticState,
         prev_action: int,
     ) -> tuple[
-        distrax.Categorical,
-        float,
+        distrax.Categorical,    # distribution over range(num_actions)
+        Array,                  # float[num_values]
         ActorCriticState,
     ]:
         raise NotImplementedError
@@ -111,7 +117,7 @@ def evaluate_sequence_recurrent(
     action_sequence: Array,     # int[num_steps]
 ) -> tuple[
     Array, # distrax.Categorical[num_steps] (action_distributions)
-    Array, # float[num_steps] (values)
+    Array, # float[num_steps, num_values] (values)
 ]:
     # scan through the trajectory
     default_prev_action = -1
@@ -128,7 +134,7 @@ def evaluate_sequence_recurrent(
         net_state, prev_action = carry
         obs, done, chosen_action = transition
         # apply network
-        action_distribution, critic_value, next_net_state = net_apply(
+        action_distribution, critic_values, next_net_state = net_apply(
             net_params,
             obs,
             net_state,
@@ -141,14 +147,14 @@ def evaluate_sequence_recurrent(
             (next_net_state, chosen_action),
         )
         carry = (next_net_state, next_prev_action)
-        output = (action_distribution, critic_value)
+        output = (action_distribution, critic_values)
         return carry, output
-    _final_carry, (action_distributions, critic_values) = jax.lax.scan(
+    _final_carry, (action_distributions, critic_valuess) = jax.lax.scan(
         _net_step,
         initial_carry,
         transitions,
     )
-    return action_distributions, critic_values
+    return action_distributions, critic_valuess
 
 
 def evaluate_sequence_parallel(
@@ -159,9 +165,9 @@ def evaluate_sequence_parallel(
     prev_action_sequence: Array,            # int[num_steps]
 ) -> tuple[
     Array, # distrax.Categorical[num_steps] (action_distributions)
-    Array, # float[num_steps] (values)
+    Array, # float[num_steps, num_values] (values)
 ]:
-    action_distributions, critic_values, _net_states = jax.vmap(
+    action_distributions, critic_valuess, _net_states = jax.vmap(
         net_apply,
         in_axes=(None, 0, 0, 0),
     )(
@@ -170,7 +176,7 @@ def evaluate_sequence_parallel(
         net_state_sequence,
         prev_action_sequence,
     )
-    return action_distributions, critic_values
+    return action_distributions, critic_valuess
 
 
 # # # 
@@ -184,6 +190,12 @@ class Impala(ActorCriticNetwork):
 
     Fields:
 
+    * num_actions : int (> 0)
+            The actor returns a distribution over this many actions.
+    * num_values: int (> 0)
+            The critic returns a vector of values with this many values.
+            (Usually this would only be one value, but this can be used to
+            also approximate proxy goals for example.)
     * cnn_type: "mlp", "small" or "large"
             The size of the CNN for embedding observation images.
             * "mlp", a small fully-connected residual ReLU network.
@@ -208,6 +220,8 @@ class Impala(ActorCriticNetwork):
       environments) which are fed directly into the LSTM (etc.) input.
       * TODO: Understand what 'blue ladder' is and try more sophisticated
         embeddings.
+
+    Also, the IMPALA paper uses only one value head.
     """
     cnn_type: Literal["mlp", "small", "large"]
     rnn_type: Literal["ff", "lstm", "gru"]
@@ -221,7 +235,7 @@ class Impala(ActorCriticNetwork):
         prev_action: int,
     ) -> tuple[
         distrax.Categorical,
-        float,
+        Array,                  # float[num_values]
         ActorCriticState,
     ]:
         # embed the image part of the observation
@@ -274,11 +288,10 @@ class Impala(ActorCriticNetwork):
         logits = nn.Dense(features=self.num_actions)(rnn_out)
         pi = distrax.Categorical(logits=logits)
 
-        # critic head -> value
-        v = nn.Dense(features=1)(rnn_out)
-        v = jnp.squeeze(v)
+        # critic head -> values vector
+        vs = nn.Dense(features=self.num_values)(rnn_out)
 
-        return pi, v, next_state
+        return pi, vs, next_state
 
     
     @property
