@@ -433,7 +433,7 @@ def pile(
 
     print("configuring environment...")
     env = cheese_on_a_pile.Env(
-        terminate_after_cheese_and_dish=env_terminate_after_dish,
+        terminate_after_cheese_and_pile=env_terminate_after_dish,
         # check this, if it should be split_elements_train or split_elements_shift or 0
         split_object_firstgroup=split_elements_train,
         obs_level_of_detail=obs_level_of_detail,

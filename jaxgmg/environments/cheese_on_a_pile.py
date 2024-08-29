@@ -159,7 +159,7 @@ class Env(base.Env):
     * If the mouse hits the cheese, the agent gains reward and the episode
       ends.
     """
-    terminate_after_cheese_and_dish: bool = False
+    terminate_after_cheese_and_pile: bool = False
     split_object_firstgroup: int = 6
 
     @property
