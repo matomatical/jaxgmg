@@ -512,7 +512,7 @@ def pile(
     max_dish_radius: int = 0,
     max_dish_radius_shift: int= 0,
     # other env stuff
-    env_terminate_after_dish: bool = True,
+    env_terminate_after_pile: bool = True,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -584,7 +584,7 @@ def pile(
 
     print("configuring environment...")
     env = cheese_on_a_pile.Env(
-        terminate_after_cheese_and_dish=env_terminate_after_dish,
+        terminate_after_cheese_and_pile=env_terminate_after_pile,
         # check this, if it should be split_elements_train or split_elements_shift or 0
         split_object_firstgroup=split_elements_train,
         obs_level_of_detail=obs_level_of_detail,

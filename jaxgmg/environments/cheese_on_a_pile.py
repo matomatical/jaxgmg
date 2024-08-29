@@ -155,7 +155,7 @@ class Env(base.Env):
     * If the mouse hits the cheese, the agent gains reward and the episode
       ends.
     """
-    terminate_after_cheese_and_dish: bool = False
+    terminate_after_cheese_and_pile: bool = False
     split_object_firstgroup: int = 6
 
     @property
@@ -307,7 +307,7 @@ class Env(base.Env):
         proxy_cheese_first = reward * got_cheese_before_pile
         proxy_pile_first = proxy_pile * got_pile_before_cheese
         
-        if self.terminate_after_cheese_and_dish:
+        if self.terminate_after_cheese_and_pile:
             if len(second_group_first_time_objects) > 0:
                 done = state.got_cheese & state.got_napkin
             else:
