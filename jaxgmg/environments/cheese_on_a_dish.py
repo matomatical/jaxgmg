@@ -846,7 +846,7 @@ class LevelSolver(base.LevelSolver):
 
         proxy_rewards = {}
         for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
-            if proxy_name == 'dish':
+            if proxy_name == 'proxy_dish':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],
@@ -869,7 +869,7 @@ class LevelSolver(base.LevelSolver):
                 # discount the reward
                 discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
                 proxy_rewards[proxy_name] = discounted_reward
-            if proxy_name == 'first_dish':
+            if proxy_name == 'proxy_first_dish':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],
@@ -892,7 +892,7 @@ class LevelSolver(base.LevelSolver):
                 # discount the reward
                 discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
                 proxy_rewards[proxy_name] = discounted_reward
-            if proxy_name == 'first_cheese':
+            if proxy_name == 'proxy_first_cheese':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],
