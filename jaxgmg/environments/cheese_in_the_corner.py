@@ -219,9 +219,6 @@ class Env(base.Env):
             done = state.got_cheese & state.got_corner
         else:
             done = state.got_cheese
-        
-        cheese_rate = lax.cond(jnp.any(state.got_cheese), lambda _: 1.0, lambda _: 0.0, operand=None)
-        corner_rate = lax.cond(jnp.any(state.got_corner), lambda _: 1.0, lambda _: 0.0, operand=None)
 
         return (
             state,
@@ -230,8 +227,6 @@ class Env(base.Env):
             {
                 'proxy_rewards': {
                     'corner': proxy_reward,
-                    'cheese_solve_rate': cheese_rate, 
-                    'corner_solve_rate': corner_rate,
                 },
             },
         )

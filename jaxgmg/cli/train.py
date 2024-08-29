@@ -940,6 +940,7 @@ def minimaze(
     obs_height: int = 5,
     obs_width: int = 5,
     env_size_shift: int = 21,
+    corner_size: int = 1,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -961,9 +962,10 @@ def minimaze(
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
-    prob_mutate_wall: float = 0.60,
-    prob_mutate_step_or_turn: float = 0.95,
-    prob_mutate_goal: float = 0.50,
+    # prob_mutate_wall: float = 0.60,
+    # prob_mutate_step_or_turn: float = 0.95,
+    # prob_mutate_goal: float = 0.50,
+    prob_mutate_shift: float = 0.1,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1062,6 +1064,20 @@ def minimaze(
         }
 
     print("configuring level mutator...")
+    biased_cheese_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            minigrid_maze.CornerGoalLevelMutator(
+                corner_size=corner_size,
+            ),
+            # teleport cheese to a random position
+            minigrid_maze.CornerGoalLevelMutator(
+                corner_size=env_size-2,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
@@ -1069,20 +1085,34 @@ def minimaze(
                 minigrid_maze.StepHeroLevelMutator(),
                 minigrid_maze.TurnHeroLevelMutator(),
                 minigrid_maze.ScatterHeroLevelMutator(),
-                minigrid_maze.StepGoalLevelMutator(),
-                minigrid_maze.ScatterGoalLevelMutator(),
+                biased_cheese_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*(1-prob_mutate_step_or_turn),
-                (1-prob_mutate_wall)*prob_mutate_goal*prob_mutate_step_or_turn,
-                (1-prob_mutate_wall)*prob_mutate_goal*(1-prob_mutate_step_or_turn),
-            ),
+            mixing_probs=(1/5,1/5,1/5,1/5,1/5),
         ),
         num_steps=num_mutate_steps,
     )
+    # old code for the mutator, nto deleting it yet since I am not sure I should :)
+    # level_mutator = IteratedLevelMutator(
+    #     mutator=MixtureLevelMutator(
+    #         mutators=(
+    #             minigrid_maze.ToggleWallLevelMutator(),
+    #             minigrid_maze.StepHeroLevelMutator(),
+    #             minigrid_maze.TurnHeroLevelMutator(),
+    #             minigrid_maze.ScatterHeroLevelMutator(),
+    #             minigrid_maze.StepGoalLevelMutator(),
+    #             minigrid_maze.ScatterGoalLevelMutator(),
+    #         ),
+    #         mixing_probs=(
+    #             prob_mutate_wall,
+    #             (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
+    #             (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
+    #             (1-prob_mutate_wall)*(1-prob_mutate_goal)*(1-prob_mutate_step_or_turn),
+    #             (1-prob_mutate_wall)*prob_mutate_goal*prob_mutate_step_or_turn,
+    #             (1-prob_mutate_wall)*prob_mutate_goal*(1-prob_mutate_step_or_turn),
+    #         ),
+    #     ),
+    #     num_steps=num_mutate_steps,
+    # ) 
 
     print("TODO: implement level solver...")
     

@@ -277,10 +277,12 @@ def minimaze(
     obs_width: int                  = 5,
     layout: str                     = 'noise',
     level_of_detail: int            = 8,
+    corner_size: int                = 1,
     num_mutate_steps: int           = 1,
-    prob_mutate_wall: float         = 0.60,
-    prob_mutate_step_or_turn: float = 0.95,
-    prob_mutate_goal: float         = 0.50,
+    # prob_mutate_wall: float         = 0.60,
+    # prob_mutate_step_or_turn: float = 0.95,
+    # prob_mutate_goal: float         = 0.30,
+    prob_mutate_shift: float        = 0.0,
     fps: float                      = 12.0,
     debug: bool                     = False,
     seed: int                       = 42,
@@ -304,7 +306,22 @@ def minimaze(
         maze_generator=maze_generation.get_generator_class_from_name(
             name=layout
         )(),
+        corner_size= corner_size,
     )
+    biased_cheese_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            minigrid_maze.CornerGoalLevelMutator(
+                corner_size=corner_size,
+            ),
+            # teleport cheese to a random position
+            minigrid_maze.CornerGoalLevelMutator(
+                corner_size=height-2,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
@@ -312,17 +329,9 @@ def minimaze(
                 minigrid_maze.StepHeroLevelMutator(),
                 minigrid_maze.TurnHeroLevelMutator(),
                 minigrid_maze.ScatterHeroLevelMutator(),
-                minigrid_maze.StepGoalLevelMutator(),
-                minigrid_maze.ScatterGoalLevelMutator(),
+                biased_cheese_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*(1-prob_mutate_step_or_turn),
-                (1-prob_mutate_wall)*prob_mutate_goal*prob_mutate_step_or_turn,
-                (1-prob_mutate_wall)*prob_mutate_goal*(1-prob_mutate_step_or_turn),
-            ),
+            mixing_probs=(1/5,1/5,1/5,1/5,1/5),
         ),
         num_steps=num_mutate_steps,
     )

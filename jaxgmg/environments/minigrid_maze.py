@@ -80,10 +80,13 @@ class EnvState(base.EnvState):
             `level.initial_hero_dir`.
     * got_goal : bool
             Whether the hero has already gotten the goal.
+    * got_proxy : bool
+            Whether the hero has already gotten the proxy goal.
     """
     hero_pos: chex.Array
     hero_dir: int
     got_goal: bool
+    got_proxy: bool = False
 
 
 @struct.dataclass
@@ -182,6 +185,7 @@ class Env(base.Env):
             hero_pos=level.initial_hero_pos,
             hero_dir=level.initial_hero_dir,
             got_goal=False,
+            got_proxy=False,
             level=level,
             steps=0,
             done=False,
@@ -230,21 +234,33 @@ class Env(base.Env):
         got_goal = (state.hero_pos == state.level.goal_pos).all()
         got_goal_first_time = got_goal & ~state.got_goal
         state = state.replace(got_goal=state.got_goal | got_goal)
+
+        #check if hero got to proxy goal
+        proxy_pos = jnp.array([1, 1])
+        got_proxy_corner = (state.hero_pos == proxy_pos).all()
+        got_proxy_first_time = got_proxy_corner & ~state.got_proxy
+        state = state.replace(got_proxy=state.got_proxy | got_proxy)
+
         
         # rewards
         reward = got_goal_first_time.astype(float)
+        proxy_reward = got_proxy_first_time.astype(float)
         
         # end of episode
         if self.terminate_after_goal:
             done = state.got_goal
         else:
-            done = False
+            done = state.got_goal & state.got_proxy
 
         return (
             state,
             reward,
             done,
-            {},
+            {
+                'proxy_rewards': {
+                    'proxy_corner': proxy_reward,
+                },
+            },
         )
 
     
@@ -471,6 +487,7 @@ class LevelGenerator(base.LevelGenerator):
     height: int = 13
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
+    corner_size: int = 1
     
 
     @functools.partial(jax.jit, static_argnames=('self',))
@@ -487,21 +504,36 @@ class LevelGenerator(base.LevelGenerator):
             width=self.width,
         )
 
+        no_wall_map = ~wall_map
+        no_wall_mask = no_wall_map.flatten()
         # sample spawn positions by sampling from a list of coordinate pairs
         coords = einops.rearrange(
             jnp.indices((self.height, self.width)),
             'c h w -> (h w) c',
         )
-        
-        # spawn goal in some random valid position
-        no_wall = ~wall_map.flatten()
-        rng_spawn_goal, rng = jax.random.split(rng)
+        corner_mask = (
+            # first `corner_size` rows not including border
+              (coords[:, 0] >= 1)
+            & (coords[:, 0] <= self.corner_size)
+            # first `corner_size` cols not including border
+            & (coords[:, 1] >= 1)
+            & (coords[:, 1] <= self.corner_size)
+        ).flatten()
+
+        cheese_mask = corner_mask & no_wall_mask
+        cheese_mask = cheese_mask | (~(cheese_mask.any()) & corner_mask)
+        rng_spawn_cheese, rng = jax.random.split(rng)
         goal_pos = jax.random.choice(
-            key=rng_spawn_goal,
+            key=rng_spawn_cheese,
             a=coords,
             axis=0,
-            p=no_wall,
+            p=cheese_mask,
         )
+        # ... in case there *was* a wall there , remove it
+        wall_map = wall_map.at[goal_pos[0], goal_pos[1]].set(False)
+        no_wall_map = ~wall_map
+        no_wall_mask = no_wall_map.flatten()
+        
 
         # spawn hero in some random remaining valid position
         no_goal = jnp.ones_like(wall_map).at[
@@ -513,7 +545,7 @@ class LevelGenerator(base.LevelGenerator):
             key=rng_spawn_hero_pos,
             a=coords,
             axis=0,
-            p=no_wall & no_goal,
+            p=no_wall_mask & no_goal,
         )
 
         # spawn hero with some random orientation
@@ -818,6 +850,54 @@ class ScatterGoalLevelMutator(base.LevelMutator):
             initial_hero_pos=new_initial_hero_pos,
             goal_pos=new_goal_pos,
         )
+
+@struct.dataclass
+class CornerGoalLevelMutator(base.LevelMutator):
+    corner_size: int = 1
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        h, w = level.wall_map.shape
+        row_max = min(h - 2, self.corner_size)
+        col_max = min(w - 2, self.corner_size)
+
+        # teleport the cheese to a random location within the corner region
+        rng_row, rng_col = jax.random.split(rng)
+        new_goal_row = jax.random.choice(
+            key=rng_row,
+            a=jnp.arange(1, row_max+1), # 1 to row_max inclusive
+        )
+        new_goal_col = jax.random.choice(
+            key=rng_col,
+            a=jnp.arange(1, col_max+1), # 1 to col_max inclusive
+        )
+        new_goal_pos = jnp.array((
+            new_goal_row,
+            new_goal_col,
+        ))
+
+        # teleport the goal to a random location within bound
+
+        # carve through walls
+        new_wall_map = level.wall_map.at[
+            new_goal_pos[0],
+            new_goal_pos[1],
+        ].set(False)
+
+        # upon collision with hero, transpose goal with hero
+        hit_hero = (new_goal_pos == level.initial_hero_pos).all()
+        new_initial_hero_pos = jax.lax.select(
+            hit_hero,
+            level.goal_pos,
+            level.initial_hero_pos,
+        )
+
+        return level.replace(
+            wall_map=new_wall_map,
+            initial_hero_pos=new_initial_hero_pos,
+            goal_pos=new_goal_pos,
+        )
+
 
 
 # # # 
