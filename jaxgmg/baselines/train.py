@@ -191,6 +191,7 @@ def run(
                 discount_rate=ppo_gamma,
                 levels=levels,
                 benchmarks=benchmark_returns,
+                benchmark_proxies=None,
                 env=env,
                 period=num_cycles_per_eval,
             )
@@ -407,6 +408,7 @@ def run(
                 rollouts=rollouts,
                 discount_rate=ppo_gamma,
                 benchmark_returns=None,
+                benchmark_proxies=None,
             )
             if train_gifs:
                 train_metrics['rollouts_gif'] = experience.animate_rollouts(

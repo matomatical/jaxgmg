@@ -301,6 +301,7 @@ def dish(
     prob_mutate_wall: float = 0.60,
     prob_mutate_step: float = 0.95,
     prob_mutate_cheese_or_dish: float = 0.0,
+    prob_mutate_shift: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -399,31 +400,38 @@ def dish(
             "shift": shift_level_generator,
         }
     
+    
+    
     print("configuring level mutator...")
+
+    biased_cheese_on_dish_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            cheese_on_a_dish.CheeseOnDishLevelMutator(
+                max_cheese_radius=max_cheese_radius,
+            ),
+            # teleport cheese and dish to a random different position, apart by max_cheese_radius
+            cheese_on_a_dish.CheeseOnDishLevelMutator(
+                max_cheese_radius=max_cheese_radius_shift,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_on_a_dish.ToggleWallLevelMutator(),
-                cheese_on_a_dish.StepMouseLevelMutator(),
-                cheese_on_a_dish.ScatterMouseLevelMutator(),
-                cheese_on_a_dish.StepDishLevelMutator(),
-                cheese_on_a_dish.ScatterDishLevelMutator(),
-                cheese_on_a_dish.StepCheeseLevelMutator(),
-                cheese_on_a_dish.ScatterCheeseLevelMutator(),
+                cheese_on_a_dish.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                ),
+                biased_cheese_on_dish_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_dish)*prob_mutate_step,
-                (1-prob_mutate_wall)*(1-prob_mutate_cheese_or_dish)*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*(1-prob_mutate_step),
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*prob_mutate_step,
-                (1-prob_mutate_wall)*prob_mutate_cheese_or_dish/2*(1-prob_mutate_step),
-            ),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )
-    
+
     print("TODO: implement level solver...")
     
     print("configuring level metrics...")
@@ -505,7 +513,7 @@ def pile(
     max_dish_radius: int = 0,
     max_dish_radius_shift: int= 0,
     # other env stuff
-    env_terminate_after_dish: bool = True,
+    env_terminate_after_pile: bool = True,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -525,6 +533,13 @@ def pile(
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     plr_robust: bool = True,
+    # for accel
+    num_mutate_steps: int = 6,
+    prob_mutate_wall: float = 0.60,
+    prob_mutate_step: float = 0.95,
+    prob_mutate_cheese_or_pile: float = 0.0,
+    prob_mutate_objects_count_on_pile: float = 0.2,
+    prob_mutate_shift: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -571,7 +586,7 @@ def pile(
 
     print("configuring environment...")
     env = cheese_on_a_pile.Env(
-        terminate_after_cheese_and_dish=env_terminate_after_dish,
+        terminate_after_cheese_and_pile=env_terminate_after_pile,
         # check this, if it should be split_elements_train or split_elements_shift or 0
         split_object_firstgroup=split_elements_train,
         obs_level_of_detail=obs_level_of_detail,
@@ -628,8 +643,43 @@ def pile(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
+
+    print("configuring level mutator...")
     
-    print("TODO: implement level solver...")
+    biased_cheese_on_pile_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese on pile
+            cheese_on_a_pile.CheeseonPileLevelMutator(
+                max_cheese_radius=max_cheese_radius,
+                split_elements=split_elements_shift, # split elements shift and train should always be the same -> Will fix that
+            ),
+            # teleport cheese and pile to a random different position, apart by max_cheese_radius
+            cheese_on_a_pile.CheeseonPileLevelMutator(
+                max_cheese_radius=max_cheese_radius_shift,
+                split_elements=split_elements_shift,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
+    level_mutator = IteratedLevelMutator(
+        mutator=MixtureLevelMutator(
+            mutators=(
+                cheese_on_a_pile.ToggleWallLevelMutator(),
+                cheese_on_a_pile.StepMouseLevelMutator(
+                    transpose_with_cheese_on_collision = False,
+                    transpose_with_pile_on_collision = False,
+                    split_elements = split_elements_shift,
+                ),
+                biased_cheese_on_pile_mutator,
+            ),
+            mixing_probs=(1/3,1/3,1/3),
+        ),
+        num_steps=num_mutate_steps,
+    )
+
+    
+    print("TODO: implement level solver...") # this should be done but let's double check how to integrate it
     
     print("configuring level metrics...")
     level_metrics = cheese_on_a_pile.LevelMetrics(
@@ -646,7 +696,7 @@ def pile(
         env=env,
         train_level_generator=train_level_generator,
         level_solver=None,
-        level_mutator=None,
+        level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
@@ -891,7 +941,7 @@ def minimaze(
     env_layout: str = 'noise',
     obs_height: int = 5,
     obs_width: int = 5,
-    env_size_shift: int = 21,
+    corner_size: int = 1,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -913,9 +963,10 @@ def minimaze(
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
-    prob_mutate_wall: float = 0.60,
-    prob_mutate_step_or_turn: float = 0.95,
-    prob_mutate_goal: float = 0.50,
+    # prob_mutate_wall: float = 0.60,
+    # prob_mutate_step_or_turn: float = 0.95,
+    # prob_mutate_goal: float = 0.50,
+    prob_mutate_shift: float = 0.1,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -977,11 +1028,13 @@ def minimaze(
         maze_generator=maze_generator,
         height=env_size,
         width=env_size,
+        corner_size=corner_size,
     )
     shift_level_generator = minigrid_maze.LevelGenerator(
         maze_generator=maze_generator,
-        height=env_size_shift,
-        width=env_size_shift,
+        height=env_size,
+        width=env_size,
+        corner_size=env_size-2,
     )
     if prob_shift > 0.0:
         print("  mixing level generators with {prob_shift=}...")
@@ -1014,6 +1067,20 @@ def minimaze(
         }
 
     print("configuring level mutator...")
+    biased_cheese_mutator = MixtureLevelMutator(
+        mutators=(
+            # teleport cheese to the corner
+            minigrid_maze.CornerGoalLevelMutator(
+                corner_size=corner_size,
+            ),
+            # teleport cheese to a random position
+            minigrid_maze.CornerGoalLevelMutator(
+                corner_size=env_size-2,
+            ),
+        ),
+        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+    )
+    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
@@ -1021,20 +1088,34 @@ def minimaze(
                 minigrid_maze.StepHeroLevelMutator(),
                 minigrid_maze.TurnHeroLevelMutator(),
                 minigrid_maze.ScatterHeroLevelMutator(),
-                minigrid_maze.StepGoalLevelMutator(),
-                minigrid_maze.ScatterGoalLevelMutator(),
+                biased_cheese_mutator,
             ),
-            mixing_probs=(
-                prob_mutate_wall,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
-                (1-prob_mutate_wall)*(1-prob_mutate_goal)*(1-prob_mutate_step_or_turn),
-                (1-prob_mutate_wall)*prob_mutate_goal*prob_mutate_step_or_turn,
-                (1-prob_mutate_wall)*prob_mutate_goal*(1-prob_mutate_step_or_turn),
-            ),
+            mixing_probs=(1/5,1/5,1/5,1/5,1/5),
         ),
         num_steps=num_mutate_steps,
     )
+    # old code for the mutator, nto deleting it yet since I am not sure I should :)
+    # level_mutator = IteratedLevelMutator(
+    #     mutator=MixtureLevelMutator(
+    #         mutators=(
+    #             minigrid_maze.ToggleWallLevelMutator(),
+    #             minigrid_maze.StepHeroLevelMutator(),
+    #             minigrid_maze.TurnHeroLevelMutator(),
+    #             minigrid_maze.ScatterHeroLevelMutator(),
+    #             minigrid_maze.StepGoalLevelMutator(),
+    #             minigrid_maze.ScatterGoalLevelMutator(),
+    #         ),
+    #         mixing_probs=(
+    #             prob_mutate_wall,
+    #             (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
+    #             (1-prob_mutate_wall)*(1-prob_mutate_goal)*prob_mutate_step_or_turn/2,
+    #             (1-prob_mutate_wall)*(1-prob_mutate_goal)*(1-prob_mutate_step_or_turn),
+    #             (1-prob_mutate_wall)*prob_mutate_goal*prob_mutate_step_or_turn,
+    #             (1-prob_mutate_wall)*prob_mutate_goal*(1-prob_mutate_step_or_turn),
+    #         ),
+    #     ),
+    #     num_steps=num_mutate_steps,
+    # ) 
 
     print("TODO: implement level solver...")
     
