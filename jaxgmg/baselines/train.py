@@ -80,7 +80,7 @@ def run(
     ppo_max_grad_norm: float,
     ppo_lr_annealing: bool,
     train_proxy_critic: bool,
-    proxy_name: bool,
+    proxy_name: str,
     num_minibatches_per_epoch: int,
     num_epochs_per_cycle: int,
     # training run dimensions

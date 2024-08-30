@@ -319,7 +319,7 @@ def dish(
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
     train_proxy_critic: bool = False,
-    proxy_name: str = "dish",
+    proxy_name: str = "proxy_dish",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions

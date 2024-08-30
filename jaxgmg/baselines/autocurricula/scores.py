@@ -33,7 +33,6 @@ def plr_compute_scores(
             of these are actually estimators of regret, that's a historical
             name, we should probably change it to the more generic 'method'.
             See below for a list of methods.
-
     * rollouts : Rollout[num_levels] with Transition[num_steps].
             The experience data from which the score should be computed.
     * advantages : float[num_levels, num_steps]
@@ -87,16 +86,20 @@ def plr_compute_scores(
             return jnp.abs(advantages).mean(axis=1)
         case "pvl":
             return jnp.maximum(advantages, 0).mean(axis=1)
+        case "regret_diff_pvl":
+            pvl = jnp.maximum(advantages, 0).mean(axis=1)
+            proxy_pvl = jnp.maximum(proxy_advantages, 0).mean(axis=1)
+            return pvl - proxy_pvl
         case "proxy_regret_corner":
             true_reward = rollouts.transitions.reward.sum(axis=1)
             proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
             return jnp.maximum(true_reward - proxy_reward, 0)
         case "true_regret_corner":
             env = cheese_in_the_corner.Env(
-                    obs_level_of_detail=0,
-                    penalize_time=False,
-                    terminate_after_cheese_and_corner=False,
-                )
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_corner=False,
+            )
             level_solver = cheese_in_the_corner.LevelSolver(
                 env=env,
                 discount_rate=0.999,
@@ -142,7 +145,7 @@ def plr_compute_scores(
                 discount_rate=0.999,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
-                )
+            )
             regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist'] #shape float[num_levels]
             regret_proxy_reward = eval_off_level_set['corner']['lvl_benchmark_regret_hist_corner'] #shape float[num_levels]
             return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
