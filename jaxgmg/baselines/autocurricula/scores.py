@@ -91,8 +91,10 @@ def plr_compute_scores(
             proxy_pvl = jnp.maximum(proxy_advantages, 0).mean(axis=1)
             return pvl - proxy_pvl
         case "proxy_regret_corner":
-            true_reward = rollouts.transitions.reward.sum(axis=1)
-            proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
+            # true_reward = rollouts.transitions.reward.sum(axis=1)
+            # proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
+            true_reward = eval_off_level_set['lvl_avg_return_hist']
+            proxy_reward = eval_off_level_set['proxy_corner']['lvl_avg_return_hist']
             return jnp.maximum(true_reward - proxy_reward, 0)
         case "true_regret_corner":
             env = cheese_in_the_corner.Env(
@@ -120,8 +122,6 @@ def plr_compute_scores(
                 )
             regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
             return jnp.maximum(regret_true_reward,0)
-        case "relative_pvl_regret_corner":
-            raise NotImplementedError
         case "relative_true_regret_corner":
             env = cheese_in_the_corner.Env(
                 obs_level_of_detail=0,
@@ -313,13 +313,13 @@ def plr_compute_scores(
             regret_proxy_reward = eval_off_level_set['proxy_corner']['lvl_benchmark_regret_hist_proxy_corner']
             return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
         case "proxy_regret_dish":
-            true_reward = rollouts.transitions.reward.sum(axis=1)
-            proxy_reward = rollouts.transitions.info['proxy_rewards']['dish'].sum(axis=1)
-            return jnp.maximum(true_reward - proxy_reward,0)
+            true_reward = eval_off_level_set['lvl_avg_return_hist']
+            proxy_reward = eval_off_level_set['proxy_dish']['lvl_avg_return_hist']
+            return jnp.maximum(true_reward - proxy_reward, 0)
         case "proxy_regret_pile":
-            true_reward = rollouts.transitions.reward.sum(axis=1)
-            proxy_reward = rollouts.transitions.info['proxy_rewards']['proxy_pile'].sum(axis=1)
-            return jnp.maximum(true_reward - proxy_reward,0)
+            true_reward = eval_off_level_set['lvl_avg_return_hist']
+            proxy_reward = eval_off_level_set['proxy_pile']['lvl_avg_return_hist']
+            return jnp.maximum(true_reward - proxy_reward, 0)
         case "maxmc":
             raise NotImplementedError # TODO
         case _:
