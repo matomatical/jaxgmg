@@ -421,6 +421,7 @@ def dish(
                 cheese_on_a_dish.ToggleWallLevelMutator(),
                 cheese_on_a_dish.ScatterMouseLevelMutator(
                     transpose_with_cheese_on_collision=False,
+                    transpose_with_dish_on_collision=False,
                 ),
                 biased_cheese_on_dish_mutator,
             ),
