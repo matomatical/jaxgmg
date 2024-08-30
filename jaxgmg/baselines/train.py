@@ -76,8 +76,11 @@ def run(
     ppo_gae_lambda: float,
     ppo_entropy_coeff: float,
     ppo_critic_coeff: float,
+    ppo_proxy_critic_coeff: float,
     ppo_max_grad_norm: float,
     ppo_lr_annealing: bool,
+    train_proxy_critic: bool,
+    proxy_name: bool,
     num_minibatches_per_epoch: int,
     num_epochs_per_cycle: int,
     # training run dimensions
@@ -267,7 +270,6 @@ def run(
     print(f"  {net_rnn_type=}")
     net = networks.Impala(
         num_actions=env.num_actions,
-        num_values=1, # TODO: generalise this for more values
         cnn_type=net_cnn_type,
         rnn_type=net_rnn_type,
         width=net_width,
@@ -336,6 +338,8 @@ def run(
         clip_eps=ppo_clip_eps,
         entropy_coeff=ppo_entropy_coeff,
         critic_coeff=ppo_critic_coeff,
+        train_proxy_critic=train_proxy_critic,
+        proxy_critic_coeff=ppo_proxy_critic_coeff,
         do_backprop_thru_time=net.is_recurrent,
     )
 
@@ -422,19 +426,24 @@ def run(
 
         # generalised advantage estimation
         advantages = experience.batch_generalised_advantage_estimation(
-            # just do the main reward for now
             rewards=rollouts.transitions.reward,
             dones=rollouts.transitions.done,
-            # just do the first value output for now
-            values=rollouts.transitions.values[:,:,0],
-            final_values=rollouts.final_values[:,0],
+            values=rollouts.transitions.value,
+            final_values=rollouts.final_value,
             lambda_=ppo_gae_lambda,
             discount_rate=ppo_gamma,
         )
-        # TODO: if estimate_proxy:
-        # proxy_advantages = gae(rewards=rollouts.transitions.info[...], ...)
-        # OR
-        # maybe vmap for efficiency (but not sure)
+        if train_proxy_critic:
+            proxy_advantages = experience.batch_generalised_advantage_estimation(
+                rewards=rollouts.transitions.info["proxy_rewards"][proxy_name],
+                dones=rollouts.transitions.done,
+                values=rollouts.transitions.proxy_value,
+                final_values=rollouts.final_proxy_value,
+                lambda_=ppo_gae_lambda,
+                discount_rate=ppo_gamma,
+            )
+        else:
+            proxy_advantages = None
 
 
         # report experience and performance to level generator
@@ -444,6 +453,7 @@ def run(
             rollouts=rollouts,
             # shortcut: we did gae already
             advantages=advantages,
+            # proxy_advantages=proxy_advantages # TODO!
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
@@ -459,8 +469,9 @@ def run(
                 rng=rng_update,
                 train_state=train_state,
                 net_init_state=net_init_state,
-                transitions=rollouts.transitions,   # TODO: this now has multiple values
-                advantages=advantages,              # TODO: this one does not yet
+                transitions=rollouts.transitions,
+                advantages=advantages,
+                proxy_advantages=proxy_advantages,
                 num_epochs=num_epochs_per_cycle,
                 num_minibatches_per_epoch=num_minibatches_per_epoch,
                 compute_metrics=log_cycle,
