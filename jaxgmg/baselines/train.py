@@ -453,7 +453,7 @@ def run(
             rollouts=rollouts,
             # shortcut: we did gae already
             advantages=advantages,
-            # proxy_advantages=proxy_advantages # TODO!
+            proxy_advantages=proxy_advantages,
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
