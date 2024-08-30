@@ -355,7 +355,7 @@ def minimaze(
     record: bool                = False,
 ):
     """
-    Interactive Monster World environment.
+    Interactive Minigrid Maze environment.
     """
     if level_of_detail not in {1,3,4,8}:
         raise ValueError(f"invalid level of detail {level_of_detail}")

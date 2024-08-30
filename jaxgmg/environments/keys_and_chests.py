@@ -27,7 +27,6 @@ import jax
 import jax.numpy as jnp
 import einops
 from flax import struct
-
 import chex
 from jaxtyping import PyTree
 
@@ -535,6 +534,10 @@ class Env(base.Env):
         return values.max()
 
 
+# # # 
+# Level generator
+
+
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
     """
@@ -663,6 +666,10 @@ class LevelGenerator(base.LevelGenerator):
             hidden_keys=hidden_keys,
             hidden_chests=hidden_chests,
         )
+
+
+# # # 
+# Level parsing
 
 
 @struct.dataclass

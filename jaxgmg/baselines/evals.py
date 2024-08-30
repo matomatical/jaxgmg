@@ -26,13 +26,102 @@ from jaxgmg.environments.base import Env, Level
 
 @struct.dataclass
 class Eval:
+    period: int
+
+
+    def periodic_eval(
+        self,
+        rng: PRNGKey,
+        step: int,
+        train_state: TrainState,
+        net_init_state: networks.ActorCriticState,
+    ) -> dict[str, Any]:
+        """
+        Run the eval only if `step` is a multiple of `eval.period`. Otherwise
+        return an empty metrics dict.
+        """
+        if step % self.period == 0:
+            return self.eval(
+                rng=rng,
+                train_state=train_state,
+                net_init_state=net_init_state,
+            )
+        else:
+            return {}
+    
+
     def eval(
         self,
         rng: PRNGKey,
         train_state: TrainState,
         net_init_state: networks.ActorCriticState,
     ) -> dict[str, Any]:
+        """
+        Conduct the evaluation and return a metrics dictionary. Details to be
+        provided by subclass.
+        """
         raise NotImplementedError
+
+
+# # # 
+# Eval combinators
+
+
+@struct.dataclass
+class EvalList(Eval):
+    evals: list[Eval]
+
+
+    @classmethod
+    def create(Self, *evals):
+        return Self(evals=evals, period=0)
+    
+    
+    def periodic_eval(
+        self,
+        rng: PRNGKey,
+        step: int,
+        train_state: TrainState,
+        net_init_state: networks.ActorCriticState,
+    ) -> dict[str, Any]:
+        """
+        Child evals can have different periods. Collect all the ones whose
+        period has come up. Overrides the default behaviour from superclass.
+        Note: ignores the period of this class.
+        """
+        all_metrics = {}
+        debug_all_keys = []
+        for child in self.evals:
+            rng_child, rng = jax.random.split(rng)
+            child_metrics = child.periodic_eval(
+                rng=rng_child,
+                step=step,
+                train_state=train_state,
+                net_init_state=net_init_state,
+            )
+            all_metrics.update(child_metrics)
+            debug_all_keys.extend(list(child_metrics.keys()))
+        if debug_all_keys != list(all_metrics.keys()):
+            print("WARNING DUPLICATED KEYS")
+        return all_metrics
+    
+
+    def eval(
+        self,
+        rng: PRNGKey,
+        train_state: TrainState,
+        net_init_state: networks.ActorCriticState,
+    ) -> dict[str, Any]:
+        all_metrics = {}
+        for child in self.evals:
+            rng_child, rng = jax.random.split(rng)
+            child_metrics = child.eval(
+                rng=rng_child,
+                train_state=train_state,
+                net_init_state=net_init_state,
+            )
+            all_metrics.update(child_metrics)
+        return all_metrics
 
 
 # # # 
