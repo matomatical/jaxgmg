@@ -84,9 +84,10 @@ class CurriculumGenerator:
     def update(
         self,
         state: GeneratorState,
-        levels: Level,      # Level[num_levels]
-        rollouts: Rollout,  # Rollout[num_levels] with Transition[num_steps]
-        advantages: Array,  # float[num_levels, num_steps]
+        levels: Level,                  # Level[num_levels]
+        rollouts: Rollout,              # Rollout[num_levels] (num_steps)
+        advantages: Array,              # float[num_levels, num_steps]
+        proxy_advantages: Array | None, # float[num_levels, num_steps]
     ) -> GeneratorState:
         return state
 

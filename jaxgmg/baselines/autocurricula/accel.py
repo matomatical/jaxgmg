@@ -221,15 +221,18 @@ class CurriculumGenerator(base.CurriculumGenerator):
     def update(
         self,
         state: GeneratorState,
-        levels: Level,      # Level[num_levels]
-        rollouts: Rollout,  # Rollout[num_levels] with Transition[num_steps]
-        advantages: Array,  # float[num_levels, num_steps]
+        levels: Level,                  # Level[num_levels]
+        rollouts: Rollout,              # Rollout[num_levels] (num_steps)
+        advantages: Array,              # float[num_levels, num_steps]
+        proxy_advantages: Array | None, # float[num_levels, num_steps]
     ) -> GeneratorState:
         # estimate scores of these levels from the rollouts
         scores = plr_compute_scores(
             regret_estimator=self.regret_estimator,
             rollouts=rollouts,
             advantages=advantages,
+            proxy_advantages=proxy_advantages,
+            levels=levels,
         )
         # perform all possible kinds of update
         generate_next_state = self._generate_update(state, levels, scores)

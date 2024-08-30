@@ -76,8 +76,11 @@ def run(
     ppo_gae_lambda: float,
     ppo_entropy_coeff: float,
     ppo_critic_coeff: float,
+    ppo_proxy_critic_coeff: float,
     ppo_max_grad_norm: float,
     ppo_lr_annealing: bool,
+    train_proxy_critic: bool,
+    proxy_name: str,
     num_minibatches_per_epoch: int,
     num_epochs_per_cycle: int,
     # training run dimensions
@@ -335,6 +338,8 @@ def run(
         clip_eps=ppo_clip_eps,
         entropy_coeff=ppo_entropy_coeff,
         critic_coeff=ppo_critic_coeff,
+        train_proxy_critic=train_proxy_critic,
+        proxy_critic_coeff=ppo_proxy_critic_coeff,
         do_backprop_thru_time=net.is_recurrent,
     )
 
@@ -420,25 +425,35 @@ def run(
         
 
         # generalised advantage estimation
-        advantages = jax.vmap(
-            experience.generalised_advantage_estimation,
-            in_axes=(0,0,0,0,None,None),
-        )(
-            rollouts.transitions.reward,
-            rollouts.transitions.done,
-            rollouts.transitions.value,
-            rollouts.final_value,
-            ppo_gae_lambda,
-            ppo_gamma,
+        advantages = experience.batch_generalised_advantage_estimation(
+            rewards=rollouts.transitions.reward,
+            dones=rollouts.transitions.done,
+            values=rollouts.transitions.value,
+            final_values=rollouts.final_value,
+            lambda_=ppo_gae_lambda,
+            discount_rate=ppo_gamma,
         )
-        
+        if train_proxy_critic:
+            proxy_advantages = experience.batch_generalised_advantage_estimation(
+                rewards=rollouts.transitions.info["proxy_rewards"][proxy_name],
+                dones=rollouts.transitions.done,
+                values=rollouts.transitions.proxy_value,
+                final_values=rollouts.final_proxy_value,
+                lambda_=ppo_gae_lambda,
+                discount_rate=ppo_gamma,
+            )
+        else:
+            proxy_advantages = None
+
 
         # report experience and performance to level generator
         gen_state = gen.update(
             state=gen_state,
             levels=levels_t,
             rollouts=rollouts,
-            advantages=advantages, # shortcut: we did gae already
+            # shortcut: we did gae already
+            advantages=advantages,
+            proxy_advantages=proxy_advantages,
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
@@ -456,6 +471,7 @@ def run(
                 net_init_state=net_init_state,
                 transitions=rollouts.transitions,
                 advantages=advantages,
+                proxy_advantages=proxy_advantages,
                 num_epochs=num_epochs_per_cycle,
                 num_minibatches_per_epoch=num_minibatches_per_epoch,
                 compute_metrics=log_cycle,

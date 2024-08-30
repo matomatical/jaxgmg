@@ -291,7 +291,7 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             ),
             net_init_state,
         )
-        action_distr, values, _net_state = jax.vmap(
+        action_distr, values, proxy_values, _net_state = jax.vmap(
             train_state.apply_fn,
             in_axes=(None, 0, 0, 0),
         )(
@@ -313,10 +313,17 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             data=values,
             pos=self.levels_pos,
         )
+        # model proxy value -> heatmap
+        proxy_value_heatmap = generate_heatmap(
+            shape=self.grid_shape,
+            data=proxy_values,
+            pos=self.levels_pos,
+        )
     
         return {
             'action_probs_img': action_diamond_plot,
             'value_img': value_heatmap,
+            'proxy_value_img': value_heatmap,
         }
     
 
@@ -357,8 +364,8 @@ class RolloutHeatmapVisualisationEval(Eval):
             self.discount_rate,
         )
         rollout_heatmap = generate_heatmap(
-            data=returns,
             shape=self.grid_shape,
+            data=returns,
             pos=self.levels_pos,
         )
 

@@ -23,11 +23,17 @@ class ProximalPolicyOptimisation:
     Configure a PPO updater with the following hyperparameters:
 
     * clip_eps : float
-            TODO document.
+            Neighbourhood radius for PPO policy and value diff clipping.
     * entropy_coeff : float
-            TODO document.
+            Coefficient in the PPO objective for the (negative) entropy term.
     * critic_coeff : float
-            TODO document.
+            Coefficient in the PPO objective for the critic loss component.
+    * train_proxy_critic : bool
+            Whether to train the proxy value head of the network or not. If
+            False, proxy advantages are optional input to the update.
+    * proxy_critic_coeff : float
+            Coefficient in the PPO objective for the proxy critic loss
+            component (unused if train_proxy_critic is False).
     * do_backprop_thru_time : bool (static)
             Whether to do backpropagation through time during the update.
             Should be set to false for feedforward networks for efficiency.
@@ -38,8 +44,11 @@ class ProximalPolicyOptimisation:
     clip_eps: float
     entropy_coeff: float
     critic_coeff: float
+    proxy_critic_coeff: float
     # static fields
+    train_proxy_critic: bool = struct.field(pytree_node=False)
     do_backprop_thru_time: bool = struct.field(pytree_node=False)
+    # thus we avoid having to mark the whole object static for jitting, neat
 
 
     @functools.partial(
@@ -54,8 +63,9 @@ class ProximalPolicyOptimisation:
         rng: PRNGKey,
         train_state: TrainState,
         net_init_state: networks.ActorCriticState,
-        transitions: Transition, # Transition[num_levels, num_steps]
-        advantages: Array, # float[num_levels, num_steps]
+        transitions: Transition,        # Transition[num_levels, num_steps]
+        advantages: Array,              # float[num_levels, num_steps]
+        proxy_advantages: Array | None, # float[num_levels, num_steps]
         # static
         num_epochs: int,
         num_minibatches_per_epoch: int,
@@ -74,9 +84,14 @@ class ProximalPolicyOptimisation:
         num_levels, num_steps = advantages.shape
         # value targets based on on-policy values + GAEs
         targets = transitions.value + advantages
-        # compile data set
-        data = (transitions, advantages, targets)
-
+        # if proxy training, add proxy value targets to the dataset
+        if self.train_proxy_critic:
+            proxy_targets = transitions.proxy_value + proxy_advantages
+        else:
+            proxy_targets = None
+        
+        # compile data set (for tree mapping shuffling operations)
+        data = (transitions, advantages, targets, proxy_targets)
 
         # train on this data for a few epochs
         def _epoch(train_state, rng_epoch):
@@ -106,6 +121,7 @@ class ProximalPolicyOptimisation:
                     transitions=minibatch[0],
                     advantages=minibatch[1],
                     targets=minibatch[2],
+                    proxy_targets=minibatch[3],
                     compute_diagnostics=compute_metrics,
                 )
                 train_state = train_state.apply_gradients(grads=grads)
@@ -164,18 +180,19 @@ class ProximalPolicyOptimisation:
         params: networks.ActorCriticParams,
         net_apply: networks.ActorCriticForwardPass,
         net_init_state: networks.ActorCriticState,
-        transitions: Transition,    # Transition[minibatch_size, num_steps]
-        advantages: Array,          # float[minibatch_size, num_steps]
-        targets: Array,             # float[minibatch_size, num_steps]
-        compute_diagnostics: bool,  # if False, return empty metrics dict
+        transitions: Transition,        # Transition[minibatch_size, num_steps]
+        advantages: Array,              # float[minibatch_size, num_steps]
+        targets: Array,                 # float[minibatch_size, num_steps]
+        proxy_targets: Array | None,    # float[minibatch_size, num_steps]
+        compute_diagnostics: bool,      # if False, return empty metrics dict
     ) -> tuple[
-        float,                      # loss
-        dict[str, float],           # loss components and other diagnostics
+        float,                          # loss
+        dict[str, float],               # loss components + other diagnostics
     ]:
         # run latest network to get current value/action predictions
         if self.do_backprop_thru_time:
             # recompute hidden states to allow BPTT
-            action_distribution, value = jax.vmap(
+            action_distribution, value, proxy_value = jax.vmap(
                 networks.evaluate_sequence_recurrent,
                 in_axes=(None, None, None, 0, 0, 0)
             )(
@@ -188,7 +205,7 @@ class ProximalPolicyOptimisation:
             )
         else:
             # use cached inputs, run forward pass in parallel (no BPTT)
-            action_distribution, value = jax.vmap(
+            action_distribution, value, proxy_value = jax.vmap(
                 networks.evaluate_sequence_parallel,
                 in_axes=(None, None, 0, 0, 0),
             )(
@@ -230,6 +247,19 @@ class ProximalPolicyOptimisation:
             # fraction of clipped value diffs
             critic_clipfrac = jnp.mean(jnp.abs(value_diff) > self.clip_eps)
 
+        # proxy critic loss
+        if self.train_proxy_critic:
+            proxy_value_diff = proxy_value - transitions.proxy_value
+            proxy_value_diff_clipped = jnp.clip(proxy_value_diff, -self.clip_eps, self.clip_eps)
+            proxy_value_proximal = transitions.proxy_value + proxy_value_diff_clipped
+            proxy_critic_loss = jnp.maximum(
+                jnp.square(proxy_value - proxy_targets),
+                jnp.square(proxy_value_proximal - proxy_targets),
+            ).mean() / 2
+            if compute_diagnostics:
+                # fraction of clipped proxy value diffs
+                proxy_critic_clipfrac = jnp.mean(jnp.abs(proxy_value_diff) > self.clip_eps)
+
         # entropy regularisation term
         entropy = action_distribution.entropy().mean()
 
@@ -238,6 +268,8 @@ class ProximalPolicyOptimisation:
             + self.critic_coeff * critic_loss
             - self.entropy_coeff * entropy
         )
+        if self.train_proxy_critic:
+            total_loss += self.proxy_critic_coeff * proxy_critic_loss
 
         # auxiliary information for logging
         if compute_diagnostics:
@@ -250,6 +282,9 @@ class ProximalPolicyOptimisation:
                 'critic_clipfrac': critic_clipfrac,
                 'entropy': entropy,
             }
+            if self.train_proxy_critic:
+                diagnostics['proxy_critic_loss'] = proxy_critic_loss
+                diagnostics['proxy_critic_clipfrac'] = proxy_critic_clipfrac
         else:
             diagnostics = {}
 
