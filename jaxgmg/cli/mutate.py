@@ -108,7 +108,7 @@ def corner(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_in_the_corner.ToggleWallLevelMutator(),
-                cheese_in_the_corner.StepMouseLevelMutator(
+                cheese_in_the_corner.ScatterMouseLevelMutator(
                     transpose_with_cheese_on_collision=False,
                 ),
                 biased_cheese_mutator,
@@ -133,7 +133,7 @@ def dish(
     layout: str                         = 'tree',
     level_of_detail: int                = 8,
     max_cheese_radius: int              = 0,
-    max_cheese_radius_shift: int        = 0,
+    max_cheese_radius_shift: int        = 5,
     num_mutate_steps: int               = 1,
     prob_mutate_shift: float            = 0.0,
     fps: float                          = 12.0,
@@ -159,7 +159,7 @@ def dish(
     )
     biased_cheese_on_dish_mutator = MixtureLevelMutator(
         mutators=(
-            # teleport cheese to the corner
+            # teleport cheese and dish to a random position max_cheese_radius
             cheese_on_a_dish.CheeseOnDishLevelMutator(
                 max_cheese_radius=max_cheese_radius,
             ),
@@ -175,8 +175,9 @@ def dish(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_on_a_dish.ToggleWallLevelMutator(),
-                cheese_on_a_dish.StepMouseLevelMutator(
+                cheese_on_a_dish.ScatterMouseLevelMutator(
                     transpose_with_cheese_on_collision=False,
+                    transpose_with_dish_on_collision=False,
                 ),
                 biased_cheese_on_dish_mutator,
             ),
@@ -193,6 +194,7 @@ def dish(
         fps=fps,
         debug=debug,
     )
+
 
 def pile(
     height: int                         = 9,
@@ -249,10 +251,10 @@ def pile(
         mutator=MixtureLevelMutator(
             mutators=(
                 cheese_on_a_pile.ToggleWallLevelMutator(),
-                cheese_on_a_pile.StepMouseLevelMutator(
-                    transpose_with_cheese_on_collision = False,
-                    transpose_with_pile_on_collision = False,
-                    split_elements = split_elements,
+                cheese_on_a_pile.ScatterMouseLevelMutator(
+                    transpose_with_cheese_on_collision=False,
+                    transpose_with_pile_on_collision=False,
+                    split_elements=split_elements,
                 ),
                 biased_cheese_on_pile_mutator,
             ),
@@ -260,7 +262,6 @@ def pile(
         ),
         num_steps=num_mutate_steps,
     )
-
     mutate_forever(
         rng=rng,
         env=env,
@@ -269,6 +270,7 @@ def pile(
         fps=fps,
         debug=debug,
     )
+
 
 def minimaze(
     height: int                     = 9,
@@ -279,9 +281,6 @@ def minimaze(
     level_of_detail: int            = 8,
     corner_size: int                = 1,
     num_mutate_steps: int           = 1,
-    # prob_mutate_wall: float         = 0.60,
-    # prob_mutate_step_or_turn: float = 0.95,
-    # prob_mutate_goal: float         = 0.30,
     prob_mutate_shift: float        = 0.0,
     fps: float                      = 12.0,
     debug: bool                     = False,
@@ -308,7 +307,7 @@ def minimaze(
         )(),
         corner_size= corner_size,
     )
-    biased_cheese_mutator = MixtureLevelMutator(
+    biased_goal_mutator = MixtureLevelMutator(
         mutators=(
             # teleport cheese to the corner
             minigrid_maze.CornerGoalLevelMutator(
@@ -321,17 +320,16 @@ def minimaze(
         ),
         mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
     )
-    # overall, rotate between wall/mouse/cheese mutations uniformly
     level_mutator = IteratedLevelMutator(
         mutator=MixtureLevelMutator(
             mutators=(
                 minigrid_maze.ToggleWallLevelMutator(),
-                minigrid_maze.StepHeroLevelMutator(),
-                minigrid_maze.TurnHeroLevelMutator(),
-                minigrid_maze.ScatterHeroLevelMutator(),
-                biased_cheese_mutator,
+                minigrid_maze.ScatterAndSpinHeroLevelMutator(
+                    transpose_with_goal_on_collision=False,
+                ),
+                biased_goal_mutator,
             ),
-            mixing_probs=(1/5,1/5,1/5,1/5,1/5),
+            mixing_probs=(1/3,1/3,1/3),
         ),
         num_steps=num_mutate_steps,
     )

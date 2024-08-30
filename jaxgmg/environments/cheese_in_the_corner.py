@@ -466,7 +466,7 @@ class ToggleWallLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class StepMouseLevelMutator(base.LevelMutator):
-    transpose_with_cheese_on_collision: bool = False
+    transpose_with_cheese_on_collision: bool
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
@@ -501,22 +501,23 @@ class StepMouseLevelMutator(base.LevelMutator):
             new_initial_mouse_pos[1],
         ].set(False)
 
-        # upon collision with cheese, transpose mouse with cheese
+        # resolve collision with cheese
         hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
         if self.transpose_with_cheese_on_collision:
+            # transpose mouse with cheese
             new_cheese_pos = jax.lax.select(
                 hit_cheese,
                 level.initial_mouse_pos,
                 level.cheese_pos,
             )
         else:
+            # mutation fails to move cheese
             new_cheese_pos = level.cheese_pos
             new_initial_mouse_pos = jax.lax.select(
                 hit_cheese,
                 level.initial_mouse_pos,
                 new_initial_mouse_pos,
             )
-
 
         return level.replace(
             wall_map=new_wall_map,
@@ -527,7 +528,7 @@ class StepMouseLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class ScatterMouseLevelMutator(base.LevelMutator):
-    transpose_with_cheese_on_collision: bool = False
+    transpose_with_cheese_on_collision: bool
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
@@ -555,15 +556,17 @@ class ScatterMouseLevelMutator(base.LevelMutator):
             new_initial_mouse_pos[1],
         ].set(False)
 
-        # upon collision with cheese, transpose mouse with cheese
+        # resolve collision with cheese
         hit_cheese = (new_initial_mouse_pos == level.cheese_pos).all()
         if self.transpose_with_cheese_on_collision:
+            # transpose mouse with cheese
             new_cheese_pos = jax.lax.select(
                 hit_cheese,
                 level.initial_mouse_pos,
                 level.cheese_pos,
             )
         else:
+            # leave both in current positions
             new_cheese_pos = level.cheese_pos
             new_initial_mouse_pos = jax.lax.select(
                 hit_cheese,
