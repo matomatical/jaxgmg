@@ -912,8 +912,6 @@ class LevelSolver(base.LevelSolver):
         return action
 
 
-
-
 # # # 
 # Level mutation
 
@@ -960,6 +958,7 @@ class ToggleWallLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class StepHeroLevelMutator(base.LevelMutator):
+    transpose_with_goal_on_collision: bool
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
@@ -993,13 +992,23 @@ class StepHeroLevelMutator(base.LevelMutator):
             new_initial_hero_pos[1],
         ].set(False)
 
-        # upon collision with goal, transpose hero with goal
+        # resolve collision with goal
         hit_goal = (new_initial_hero_pos == level.goal_pos).all()
-        new_goal_pos = jax.lax.select(
-            hit_goal,
-            level.initial_hero_pos,
-            level.goal_pos,
-        )
+        if self.transpose_with_goal_on_collision:
+            # transpose hero with goal
+            new_goal_pos = jax.lax.select(
+                hit_goal,
+                level.initial_hero_pos,
+                level.goal_pos,
+            )
+        else:
+            # mutation fails to move hero
+            new_goal_pos = level.goal_pos
+            new_initial_hero_pos = jax.lax.select(
+                hit_goal,
+                level.initial_hero_pos,
+                new_initial_hero_pos,
+            )
 
         return level.replace(
             wall_map=new_wall_map,
@@ -1025,15 +1034,17 @@ class TurnHeroLevelMutator(base.LevelMutator):
 
 
 @struct.dataclass
-class ScatterHeroLevelMutator(base.LevelMutator):
+class ScatterAndSpinHeroLevelMutator(base.LevelMutator):
+    transpose_with_goal_on_collision: bool
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
     def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
         h, w = level.wall_map.shape
+        rng_scatter, rng_spin = jax.random.split(rng)
 
         # teleport the hero to a random location within bounds
-        rng_row, rng_col = jax.random.split(rng)
+        rng_row, rng_col = jax.random.split(rng_scatter)
         new_hero_row = jax.random.choice(
             key=rng_row,
             a=jnp.arange(1, h-1),
@@ -1047,23 +1058,40 @@ class ScatterHeroLevelMutator(base.LevelMutator):
             new_hero_col,
         ))
 
+        # turn the hero to face a random direction
+        new_initial_hero_dir = jax.random.choice(
+            key=rng_spin,
+            a=4,
+        )
+
         # carve through walls
         new_wall_map = level.wall_map.at[
             new_initial_hero_pos[0],
             new_initial_hero_pos[1],
         ].set(False)
 
-        # upon collision with goal, transpose hero with goal
+        # resolve collision with goal
         hit_goal = (new_initial_hero_pos == level.goal_pos).all()
-        new_goal_pos = jax.lax.select(
-            hit_goal,
-            level.initial_hero_pos,
-            level.goal_pos,
-        )
+        if self.transpose_with_goal_on_collision:
+            # transpose hero with goal
+            new_goal_pos = jax.lax.select(
+                hit_goal,
+                level.initial_hero_pos,
+                level.goal_pos,
+            )
+        else:
+            # mutation fails to move hero
+            new_goal_pos = level.goal_pos
+            new_initial_hero_pos = jax.lax.select(
+                hit_goal,
+                level.initial_hero_pos,
+                new_initial_hero_pos,
+            )
 
         return level.replace(
             wall_map=new_wall_map,
             initial_hero_pos=new_initial_hero_pos,
+            initial_hero_dir=new_initial_hero_dir,
             goal_pos=new_goal_pos,
         )
 
@@ -1207,7 +1235,6 @@ class CornerGoalLevelMutator(base.LevelMutator):
             initial_hero_pos=new_initial_hero_pos,
             goal_pos=new_goal_pos,
         )
-
 
 
 # # # 
