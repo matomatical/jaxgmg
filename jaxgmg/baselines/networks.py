@@ -144,7 +144,7 @@ def evaluate_sequence_recurrent(
             (next_net_state, chosen_action),
         )
         carry = (next_net_state, next_prev_action)
-        output = (action_distribution, critic_values)
+        output = (action_distribution, value, proxy_value)
         return carry, output
     _final_carry, outputs = jax.lax.scan(
         _net_step,
