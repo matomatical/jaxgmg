@@ -492,9 +492,28 @@ def plr_compute_scores(
             maxmc_true = max_ever_returns - true_average_returns
             maxmc_proxy = max_ever_proxy_returns - proxy_average_returns
             return maxmc_true - maxmc_proxy
+        case "maxmc-actor-proxydiff":
+            vmap_average_return = jax.vmap(
+                experience.compute_average_return,
+                in_axes=(0,0,None),
+            )
+            true_average_returns = vmap_average_return(
+                rollouts.transitions.reward,
+                rollouts.transitions.done,
+                discount_rate,
+            )
+            proxy_average_returns = vmap_average_return(
+                rollouts.transitions.info['proxy_rewards']['proxy_corner'],
+                rollouts.transitions.done,
+                discount_rate,
+            )
+            maxmc_true = max_ever_returns - true_average_returns
+            maxmc_proxy = max_ever_proxy_returns - proxy_average_returns
+            return maxmc_true - proxy_average_returns
 
         case _:
             raise ValueError("Invalid return estimator name.")
+        
 
 def maxmc_critic(
     values,             # float[num_steps]
