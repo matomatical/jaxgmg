@@ -23,6 +23,7 @@ def plr_compute_scores(
     proxy_advantages: Array | None, # optional float[num_levels, num_steps]
     levels: Level,                  # Level[num_levels]
     max_ever_returns: Array,        # float[num_levels]
+    max_ever_proxy_returns: Array,  # float[num_levels]
     discount_rate: float,
 ) -> Array:                         # float[num_levels]
     """
@@ -419,10 +420,18 @@ def plr_compute_scores(
             true_reward = eval_off_level_set['lvl_avg_return_hist']
             proxy_reward = eval_off_level_set['proxy_corner']['lvl_avg_return_hist']
             return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
-        case "maxmc-paper":
+        case "maxmc-paper": 
             return max_ever_returns - rollouts.transitions.value.mean(axis=1)
+        case "maxmc-paper-regretdiff":
+            maxmc_true = max_ever_returns - rollouts.transitions.value.mean(axis=1)
+            maxmc_proxy = max_ever_proxy_returns - rollouts.transitions.proxy_value.mean(axis=1)
+            return maxmc_true - maxmc_proxy
         case "maxmc-initial":
             return max_ever_returns - rollouts.transitions.value[:,0]
+        case "maxmc-initial-regretdiff":
+            maxmc_true = max_ever_returns - rollouts.transitions.value[:,0]
+            maxmc_proxy = max_ever_proxy_returns - rollouts.transitions.proxy_value[:,0]
+            return maxmc_true - maxmc_proxy
         case "maxmc-critic":
             return jax.vmap(
                 maxmc_critic,
@@ -433,6 +442,27 @@ def plr_compute_scores(
                 discount_rate,
                 max_ever_returns,
             )
+        case "maxmc-critic-regretdiff":
+            maxmc_true = jax.vmap(
+                maxmc_critic,
+                in_axes=(0,0,None,0),
+            )(
+                rollouts.transitions.value,
+                rollouts.transitions.done,
+                discount_rate,
+                max_ever_returns,
+            )
+
+            maxmc_proxy = jax.vmap(
+                maxmc_critic,
+                in_axes=(0,0,None,0),
+            )(
+                rollouts.transitions.proxy_value,
+                rollouts.transitions.done,
+                discount_rate,
+                max_ever_proxy_returns,
+            )
+            return maxmc_true - maxmc_proxy
         case "maxmc-actor":
             vmap_average_return = jax.vmap(
                 experience.compute_average_return,
@@ -444,9 +474,27 @@ def plr_compute_scores(
                 discount_rate,
             )
             return max_ever_returns - average_returns
+        case "maxmc-actor-regretdiff":
+            vmap_average_return = jax.vmap(
+                experience.compute_average_return,
+                in_axes=(0,0,None),
+            )
+            true_average_returns = vmap_average_return(
+                rollouts.transitions.reward,
+                rollouts.transitions.done,
+                discount_rate,
+            )
+            proxy_average_returns = vmap_average_return(
+                rollouts.transitions.info['proxy_rewards']['proxy_corner'],
+                rollouts.transitions.done,
+                discount_rate,
+            )
+            maxmc_true = max_ever_returns - true_average_returns
+            maxmc_proxy = max_ever_proxy_returns - proxy_average_returns
+            return maxmc_true - maxmc_proxy
+
         case _:
             raise ValueError("Invalid return estimator name.")
-
 
 def maxmc_critic(
     values,             # float[num_steps]

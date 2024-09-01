@@ -45,7 +45,7 @@ def corner(
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",
-    plr_robust: bool = False,
+    plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_shift: float = 0.0,

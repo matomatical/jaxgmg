@@ -26,6 +26,7 @@ class AnnotatedLevel:
     last_visit_time: int
     first_visit_time: int           # note: only used for metrics
     max_ever_return: float
+    max_ever_proxy_return: float | None # proxy returns for maxmc
 
 
 @struct.dataclass
@@ -76,6 +77,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 last_visit_time=initial_time,
                 first_visit_time=initial_time,
                 max_ever_return=jnp.zeros(self.buffer_size),
+                max_ever_proxy_return= jnp.zeros(self.buffer_size),
             ),
             num_replay_batches=0,
             prev_P_replay=jnp.zeros(self.buffer_size),
@@ -222,6 +224,20 @@ class CurriculumGenerator(base.CurriculumGenerator):
             new_max_returns,
             old_max_returns,
         )
+
+        proxy_max_returns = jax.vmap(
+            compute_maximum_return,
+            in_axes=(0,0,None),
+        )(
+            rollouts.transitions.info['proxy_rewards']['proxy_corner'],
+            rollouts.transitions.done, # in light of this we should be thinking about the termination of the episode...
+            self.discount_rate,
+        )
+        old_proxy_max_returns = state.buffer.max_ever_proxy_return[state.prev_batch_level_ids]
+        max_proxy_max_returns = jnp.maximum(
+            proxy_max_returns,
+            old_proxy_max_returns,
+        )
         # compute the scores of these levels from the rollouts
         scores = plr_compute_scores(
             regret_estimator=self.regret_estimator,
@@ -230,6 +246,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             proxy_advantages=proxy_advantages,
             levels=levels,
             max_ever_returns=max_max_returns,
+            max_ever_proxy_returns=max_proxy_max_returns,
             discount_rate=self.discount_rate,
         )
         # replace the scores of the replayed level ids with the new scores
@@ -245,6 +262,9 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 max_ever_return=state.buffer.max_ever_return
                     .at[state.prev_batch_level_ids]
                     .set(max_max_returns),
+                max_ever_proxy_return=state.buffer.max_ever_proxy_return
+                    .at[state.prev_batch_level_ids]
+                    .set(max_proxy_max_returns),
             ),
             num_replay_batches=state.num_replay_batches + 1,
         )
@@ -271,6 +291,16 @@ class CurriculumGenerator(base.CurriculumGenerator):
             rollouts.transitions.done,
             self.discount_rate,
         )
+
+        proxy_max_returns = jax.vmap(
+            compute_maximum_return,
+            in_axes=(0,0,None),
+        )(
+            rollouts.transitions.info['proxy_rewards']['proxy_corner'],
+            rollouts.transitions.done, 
+            self.discount_rate,
+        )
+
         scores = plr_compute_scores(
             regret_estimator=self.regret_estimator,
             rollouts=rollouts,
@@ -278,6 +308,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             proxy_advantages=proxy_advantages,
             levels=levels,
             max_ever_returns=max_returns,
+            max_ever_proxy_returns=proxy_max_returns,
             discount_rate=self.discount_rate,
         )
         
@@ -297,6 +328,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             last_visit_time=time_now,
             first_visit_time=time_now,
             max_ever_return=max_returns,
+            max_ever_proxy_return=proxy_max_returns,
         )
 
         # concatenate the low-potential levels and the challenger levels
