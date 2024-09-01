@@ -423,7 +423,7 @@ def compute_rollout_metrics(
         proxy_reward_per_step = (
             proxy_rewards.mean(axis=1)  # float[L, S] -> float[L]
         )
-        metrics["proxy_"+proxy_name] = {
+        metrics[proxy_name] = {
             # average over all levels in the batch
             'avg_avg_return': avg_proxy_returns.mean(),
             'avg_reward_per_step': proxy_reward_per_step.mean(),

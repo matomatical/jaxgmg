@@ -226,7 +226,7 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'corner': proxy_reward,
+                    'proxy_corner': proxy_reward,
                 },
             },
         )
@@ -711,6 +711,18 @@ class CornerCheeseLevelMutator(base.LevelMutator):
             new_cheese_col,
         ].set(False)
 
+        #if cheese is not in the corner, leave it there -> ADDING THIS TO SEE IF THIS IS THE PROBLEM FOR ACCEL PERFORMING POORLY
+        
+        # corner_pos = jnp.array([1,1])
+        # cheese_hit_corner = (level.cheese_pos == corner_pos).all()
+        # new_cheese_pos = jax.lax.select(
+        #     cheese_hit_corner,
+        #     new_cheese_pos,
+        #     level.cheese_pos,
+        # )
+        
+        
+            
         # upon collision with mouse, transpose cheese with mouse
         hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
         new_initial_mouse_pos = jax.lax.select(
@@ -718,11 +730,24 @@ class CornerCheeseLevelMutator(base.LevelMutator):
             level.cheese_pos,
             level.initial_mouse_pos,
         )
+        
 
         return level.replace(
             wall_map=new_wall_map,
             initial_mouse_pos=new_initial_mouse_pos,
             cheese_pos=new_cheese_pos,
+        )
+    
+@struct.dataclass
+class FixedCheeseLevelMutator(base.LevelMutator):
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        
+        return level.replace(
+            wall_map=level.wall_map,
+            initial_mouse_pos=level.initial_mouse_pos,
+            cheese_pos=level.cheese_pos,
         )
     
 
@@ -911,14 +936,14 @@ class LevelSolver(base.LevelSolver):
           mazes. If we wanted to solve very large mazes, we could by changing
           to a single source shortest path algorithm.
         """
-        proxies = ['corner'] #where you define your proxies...
+        proxies = ['proxy_corner'] #where you define your proxies...
         # compute distance between mouse and cheese
         dir_dist = maze_solving.maze_directional_distances(level.wall_map)
         # calculate the distance for each proxy
         proxy_directions = {}
         # first, get the name of each proxy
         for proxy_name in proxies:
-            if proxy_name == 'corner':
+            if proxy_name == 'proxy_corner':
                 dir_dist_to_corner = dir_dist[
                     :,
                     :,
@@ -998,7 +1023,7 @@ class LevelSolver(base.LevelSolver):
 
         proxy_rewards = {}
         for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
-            if proxy_name == 'corner':
+            if proxy_name == 'proxy_corner':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],

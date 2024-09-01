@@ -37,18 +37,18 @@ def corner(
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
-    prob_mutate_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
     plr_buffer_size: int = 2048,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
+    plr_prob_replay: float = 0.5, #default 0.5
     plr_regret_estimator: str = "PVL",
-    plr_robust: bool = True,
+    plr_robust: bool = False,
     # for accel
     num_mutate_steps: int = 6,
+    prob_mutate_shift: float = 0.0,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -60,7 +60,7 @@ def corner(
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
     train_proxy_critic: bool = False,
-    proxy_name: str = "corner",
+    proxy_name: str = "proxy_corner",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
@@ -150,10 +150,12 @@ def corner(
     # if mutating cheese, mostly stay in the restricted region
     biased_cheese_mutator = MixtureLevelMutator(
         mutators=(
-            # teleport cheese to the corner
+            # teleport cheese to the corner or do not move the cheese
+            #cheese_in_the_corner.FixedCheeseLevelMutator(),
             cheese_in_the_corner.CornerCheeseLevelMutator(
                 corner_size=env_corner_size,
             ),
+
             # teleport cheese to a random position
             cheese_in_the_corner.ScatterCheeseLevelMutator(),
         ),
