@@ -21,6 +21,8 @@ def plr_compute_scores(
     advantages: Array,              # float[num_levels, num_steps]
     proxy_advantages: Array | None, # optional float[num_levels, num_steps]
     levels: Level,                  # Level[num_levels]
+    max_ever_returns: Array,        # float[num_levels]
+    discount_rate: float,
 ) -> Array:                         # float[num_levels]
     """
     Compute 'score' for level prioritisation, using a named scoring method.
@@ -48,6 +50,8 @@ def plr_compute_scores(
             as they are meant to be based on the rollouts. However, for
             ORACLE versions of the scores (used for evaluating estimators)
             they are provided here.
+    * max_ever_returns
+    * discount_rate
 
     Returns:
 
@@ -104,7 +108,7 @@ def plr_compute_scores(
             )
             level_solver = cheese_in_the_corner.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -116,7 +120,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
                 )
@@ -130,7 +134,7 @@ def plr_compute_scores(
             )
             level_solver = cheese_in_the_corner.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -142,7 +146,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
             )
@@ -157,7 +161,7 @@ def plr_compute_scores(
             )
             level_solver = cheese_on_a_dish.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -169,7 +173,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
                 )
@@ -184,7 +188,7 @@ def plr_compute_scores(
             )
             level_solver = cheese_on_a_dish.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             #print('transition',rollouts.transitions.env_state.level)
             #levels = rollouts.transitions.env_state.level[:,0]
@@ -200,7 +204,7 @@ def plr_compute_scores(
 
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
                 )
@@ -214,7 +218,7 @@ def plr_compute_scores(
             )
             level_solver = cheese_on_a_pile.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -226,7 +230,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
             )
@@ -241,7 +245,7 @@ def plr_compute_scores(
             )
             level_solver = cheese_on_a_pile.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -253,7 +257,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
                 )
@@ -267,7 +271,7 @@ def plr_compute_scores(
             )
             level_solver = minimaze.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -279,7 +283,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
             )
@@ -293,7 +297,7 @@ def plr_compute_scores(
             )
             level_solver = minimaze.LevelSolver(
                 env=env,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
             )
             eval_on_benchmark_returns = level_solver.vmap_level_value(
                 level_solver.vmap_solve(levels),
@@ -305,7 +309,7 @@ def plr_compute_scores(
             )
             eval_off_level_set = experience.compute_rollout_metrics(
                 rollouts=rollouts,
-                discount_rate=0.999,
+                discount_rate=discount_rate,
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
             )
@@ -320,9 +324,50 @@ def plr_compute_scores(
             true_reward = eval_off_level_set['lvl_avg_return_hist']
             proxy_reward = eval_off_level_set['proxy_pile']['lvl_avg_return_hist']
             return jnp.maximum(true_reward - proxy_reward, 0)
-        case "maxmc":
-            raise NotImplementedError # TODO
+        case "maxmc-paper":
+            return max_ever_returns - rollouts.transitions.value.mean(axis=1)
+        case "maxmc-initial":
+            return max_ever_returns - rollouts.transitions.value[:,0]
+        case "maxmc-critic":
+            return jax.vmap(
+                maxmc_critic,
+                in_axes=(0,0,None,0),
+            )(
+                rollouts.transitions.value,
+                rollouts.transitions.done,
+                discount_rate,
+                max_ever_returns,
+            )
+        case "maxmc-actor":
+            vmap_average_return = jax.vmap(
+                experience.compute_average_return,
+                in_axes=(0,0,None),
+            )
+            average_returns = vmap_average_return(
+                rollouts.transitions.reward,
+                rollouts.transitions.done,
+                discount_rate,
+            )
+            return max_ever_returns - average_returns
         case _:
             raise ValueError("Invalid return estimator name.")
 
+
+def maxmc_critic(
+    values,             # float[num_steps]
+    dones,              # bool[num_steps]
+    discount_rate,      # float
+    max_ever_return,    # float
+) -> float:
+    def _step(t, value_and_done):
+        value, done = value_and_done
+        discounted_value = discount_rate**t * value
+        t_next = (1-done) * (t + 1)
+        return t_next, discounted_value
+    _, discounted_values = jax.lax.scan(
+        _step,
+        0,
+        (values, dones),
+    )
+    return max_ever_return - discounted_values.mean()
 

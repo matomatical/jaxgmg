@@ -143,6 +143,7 @@ def run(
             prob_replay=plr_prob_replay,
             regret_estimator=plr_regret_estimator,
             robust=plr_robust,
+            discount_rate=ppo_gamma,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
