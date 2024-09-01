@@ -226,7 +226,7 @@ class Env(base.Env):
             done,
             {
                 'proxy_rewards': {
-                    'corner': proxy_reward,
+                    'proxy_corner': proxy_reward,
                 },
             },
         )
@@ -911,14 +911,14 @@ class LevelSolver(base.LevelSolver):
           mazes. If we wanted to solve very large mazes, we could by changing
           to a single source shortest path algorithm.
         """
-        proxies = ['corner'] #where you define your proxies...
+        proxies = ['proxy_corner'] #where you define your proxies...
         # compute distance between mouse and cheese
         dir_dist = maze_solving.maze_directional_distances(level.wall_map)
         # calculate the distance for each proxy
         proxy_directions = {}
         # first, get the name of each proxy
         for proxy_name in proxies:
-            if proxy_name == 'corner':
+            if proxy_name == 'proxy_corner':
                 dir_dist_to_corner = dir_dist[
                     :,
                     :,
@@ -998,7 +998,7 @@ class LevelSolver(base.LevelSolver):
 
         proxy_rewards = {}
         for proxy_name, proxy_directions in soln.directional_distance_to_proxies.items():
-            if proxy_name == 'corner':
+            if proxy_name == 'proxy_corner':
                 optimal_dist = proxy_directions[
                     state.mouse_pos[0],
                     state.mouse_pos[1],
