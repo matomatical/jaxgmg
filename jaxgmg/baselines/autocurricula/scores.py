@@ -173,6 +173,13 @@ def plr_compute_score(
                 discount_rate=discount_rate,
                 max_ever_return=max_ever_return,
             )
+        case "maxmc-critic-balanced":
+            original_score = regret_maxmc_critic_balanced(
+                values=rollout.transitions.value,
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                max_ever_return=max_ever_return,
+            )
         case "maxmc-actor":
             original_score = regret_maxmc_actor(
                 rewards=rollout.transitions.reward,
@@ -216,6 +223,13 @@ def plr_compute_score(
             )
         case "maxmc-critic":
             proxy_score = regret_maxmc_critic(
+                values=rollout.transitions.proxy_value,
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                max_ever_return=max_ever_proxy_return,
+            )
+        case "maxmc-critic-balanced":
+            proxy_score = regret_maxmc_critic_balanced(
                 values=rollout.transitions.proxy_value,
                 dones=rollout.transitions.done,
                 discount_rate=discount_rate,
@@ -316,8 +330,12 @@ def regret_maxmc_critic(
         
         Return_{max ever} - 1/T sum_{t=0}^T \gamma^t Value(s_t).
     
-    TODO: now I think we don't currently handle multiple episodes in the
-    level correctly.
+    Note:
+
+    * For multi-episode rollouts, this takes the average over steps rather
+      than over epsiodes, which biases the value-function-based return
+      estimate towards the average value prediction of longer episodes within
+      the rollout. See `regret_maxmc_critic_balanced` for a corrected version.
     """
     def _step(t, value_and_done):
         value, done = value_and_done
@@ -329,9 +347,58 @@ def regret_maxmc_critic(
         0,
         (values, dones),
     )
-    # TODO: take mean over episodes of mean within episodes of discounted value
-    # instead of mean over all steps...
     return max_ever_return - discounted_values.mean()
+
+
+def regret_maxmc_critic_balanced(
+    values: Array,             # float[num_steps]
+    dones: Array,              # bool[num_steps]
+    discount_rate: float,      # float
+    max_ever_return: float,    # float
+) -> float:
+    """
+    Estimate regret for a level from a single episode as
+        
+        Return_{max ever} - 1/T sum_{t=0}^T \gamma^t Value(s_t).
+
+    Estimate the regret for a multi-episode rollout as the average of the
+    per-episode averages.
+    """
+    # compute discounted values
+    def _forward_step(t_and_discount, value_and_done):
+        t, discount = t_and_discount
+        value, done = value_and_done
+        # compute discounted value
+        discounted_value = discount * value
+        # update carry (reset on done)
+        next_discount = jnp.where(done, 1, discount * discount_rate)
+        next_t = jnp.where(done, 0, t + 1)
+        return (next_t, next_discount), (t + 1, discounted_value)
+    _, (ts, discounted_values) = jax.lax.scan(
+        _forward_step,
+        (0, 1.0),
+        (values, dones),
+    )
+    # compute episode lengths
+    def _backward_step(next_step_episode_length, t_and_done):
+        t, done = t_and_done
+        this_step_episode_length = jnp.where(
+            done,
+            t,
+            next_step_episode_length,
+        )
+        return this_step_episode_length, this_step_episode_length
+    _, Ts = jax.lax.scan(
+        _backward_step,
+        0,
+        (ts, dones),
+        reverse=True,
+    )
+    # now discounted_values are the values at each step and Ts are their
+    # respective episode lengths: normalise and compute the average
+    mean_discounted_values = (discounted_values / Ts).sum() / dones.sum()
+    # turn this into regret
+    return max_ever_return - mean_discounted_values
 
 
 def regret_maxmc_actor(
