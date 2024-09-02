@@ -122,7 +122,9 @@ def run(
     
     print(f"configuring curriculum with {ued=}...")
     if plr_proxy_shaping and not train_proxy_critic:
-        raise ValueError("plr_proxy_shaping requires train_proxy_critic")
+        print("WARNING: plr_proxy_shaping without train_proxy_critic")
+        print("WARNING: (proxy_value terms will be untrained)")
+        print("WARNING: (this invalidates most estimators)")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
         gen = dr_infinite.CurriculumGenerator(
