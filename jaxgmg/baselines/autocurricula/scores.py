@@ -3,20 +3,366 @@ import functools
 import jax
 import jax.numpy as jnp
 from chex import Array
-from jaxgmg.environments.base import Level
 
+from jaxgmg.baselines import experience
 from jaxgmg.baselines.experience import Rollout
+
+# hack for computing oracle regrets
+from jaxgmg.environments.base import Level
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import cheese_on_a_pile
 from jaxgmg.environments import minigrid_maze
-from jaxgmg.baselines import experience
 
+
+# # # 
+# Compute scores for a batch of levels
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=["scoring_method", "proxy_shaping", "proxy_name"],
+)
+def plr_compute_scores(
+    # which scoring method?
+    scoring_method: str,
+    # data for computing scores
+    rollouts: Rollout,                      # Rollout[num_levels] with Transition[num_steps]
+    max_ever_returns: Array,                # float[num_levels]
+    advantages: Array,                      # float[num_levels, num_steps]
+    discount_rate: float,
+    # how much proxy shaping?
+    proxy_shaping: bool,
+    proxy_name: str | None,
+    proxy_shaping_coeff: float | None,      # optional float
+    # data for computing proxy scores
+    max_ever_proxy_returns: Array | None,   # optional float[num_levels]
+    proxy_advantages: Array | None,         # optional float[num_levels, num_steps]
+    # data for computing oracle scores (HACK)
+    levels: Level,                          # Level[num_levels]
+) -> Array:                                 # float[num_levels]
+    """
+    Compute prioritisation 'scores' for a batch of levels using a named
+    scoring method.
+    
+    Inputs:
+
+    * scoring_method : str (static)
+            One of a specific number of scoring methods. Usually this the
+            name of a regret estimator. See below for a list of methods.
+    * rollouts : Rollout[num_levels] with Transition[num_steps].
+            The experience data from which the scores should be computed.
+    * max_ever_returns : float[num_levels]
+            Used as an estimate of the optimal return achievable for a level
+            for maxMC regret estimators methods.
+    * advantages : float[num_levels, num_steps]
+            When training with PPO, we probably have already computed the
+            GAEs from the rollouts. In order to skip computing them again
+            for score methods that use them, provide them here.
+    * discount_rate: float
+            Used in several regret estimation methods.
+    * proxy_shaping : bool
+            Whether to compute a proxy score and shape the score with this.
+    * proxy_name : str
+            The key to use for accessing the proxy reward in the rollout.
+    * proxy_shaping_coeff : optional float in [0, 1]
+            The coefficient to use for shaping. If proxy shaping, the score
+            is computed on both true reward data and proxy reward data, and
+            the returned score is:
+            
+                original_score - proxy_shaping_coeff * proxy_score
+
+            This is equivalent to linearly interpolating between
+            original_score and (orginal_score - proxy_score) with
+            proxy_shaping_coeff as the interpolation proportion.
+    * max_ever_proxy_returns : optional float[num_levels]
+            Used as an estimate of the optimal proxy return achievable for a
+            level for maxMC regret estimators. (Only used if proxy_shaping.)
+    * proxy_advantages : optional float[num_levels, num_steps] or None
+            When training with PPO, we probably have already computed the
+            GAEs of the proxy reward from the rollouts. In order to skip
+            computing them again for score methods that use them, provide
+            them here. (Only used if proxy_shaping.)
+    * levels : Level[num_levels]
+            The levels probably shouldn't be needed for computing the scores,
+            as they are meant to be based on the rollouts. However, for
+            ORACLE versions of the scores (used for evaluating estimators)
+            they are provided here.
+
+    Returns:
+
+    * scores : float[num_levels]
+            One score for each level.
+    """
+    return jax.vmap(
+        plr_compute_score,
+        in_axes=(
+            None,   # scoring method (static, don't vmap)
+            0,      # rollouts
+            0,      # max ever returns
+            0,      # advantages
+            None,   # discount rate (don't vmap)
+            None,   # proxy shaping (static, don't vmap)
+            None,   # proxy name (static, don't vmap)
+            None,   # proxy coefficient (don't vmap)
+            0 if proxy_shaping and max_ever_proxy_returns is not None else None,
+            0 if proxy_shaping and proxy_advantages is not None else None,
+            0,      # levels
+        ),
+    )(
+        scoring_method,         # str (static)
+        rollouts,               # Rollout[vmap(num_levels)] with Transition[num_steps]
+        max_ever_returns,       # float[vmap(num_levels)]
+        advantages,             # float[vmap(num_levels), num_steps]
+        discount_rate,          # float
+        proxy_shaping,          # bool (static)
+        proxy_name,             # str (static)
+        proxy_shaping_coeff,    # float
+        max_ever_proxy_returns, # float[vmap(num_levels)]
+        proxy_advantages,       # float[vmap(num_levels), num_steps]
+        levels,                 # Level[vmap(num_levels)]
+    )
+
+
+# # # 
+# Compute scores for a single level
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=["scoring_method", "proxy_shaping", "proxy_name"],
+)
+def plr_compute_score(
+    scoring_method: str,
+    rollout: Rollout,               # Rollout with Transition[num_steps]
+    max_ever_return: float,
+    advantages: Array,              # float[num_steps]
+    discount_rate: float,
+    proxy_shaping: bool,
+    proxy_name: str,
+    proxy_shaping_coeff: float | None,
+    max_ever_proxy_return: float | None,
+    proxy_advantages: Array | None, # float[num_steps] (optional)
+    level: Level,                   # Level
+) -> float:
+    # compute the score on the original reward data
+    match scoring_method.lower():
+        case "absgae":
+            original_score = l1_value_loss(
+                advantages=advantages,
+            )
+        case "pvl":
+            original_score = regret_pvl(
+                advantages=advantages,
+            )
+        case "maxmc-paper": 
+            original_score = regret_maxmc_paper(
+                values=rollout.transitions.value,
+                max_ever_return=max_ever_return,
+            )
+        case "maxmc-initial":
+            original_score = regret_maxmc_initial(
+                values=rollout.transitions.value,
+                max_ever_return=max_ever_return,
+            )
+        case "maxmc-critic":
+            original_score = regret_maxmc_critic(
+                values=rollout.transitions.value,
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                max_ever_return=max_ever_return,
+            )
+        case "maxmc-actor":
+            original_score = regret_maxmc_actor(
+                rewards=rollout.transitions.reward,
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                max_ever_return=max_ever_return,
+            )
+        # case "oracle":
+        #     original_score = regret_oracle(
+        #         level=level,
+        #         values=rollout.transitions.value,
+        #         dones=rollout.transitions.done,
+        #         discount_rate=discount_rate,
+        #     )
+        case _:
+            raise ValueError(f"Unknown scoring method {scoring_method!r}")
+
+    # if not proxy shaping, we're done
+    if not proxy_shaping:
+        return original_score
+
+    # else continue to compute the proxy score based on the proxy reward daya
+    match scoring_method.lower():
+        case "absgae":
+            proxy_score = l1_value_loss(
+                advantages=proxy_advantages,
+            )
+        case "pvl":
+            proxy_score = regret_pvl(
+                advantages=proxy_advantages,
+            )
+        case "maxmc-paper": 
+            proxy_score = regret_maxmc_paper(
+                values=rollout.transitions.proxy_value,
+                max_ever_return=max_ever_proxy_return,
+            )
+        case "maxmc-initial":
+            proxy_score = regret_maxmc_initial(
+                values=rollout.transitions.proxy_value,
+                max_ever_return=max_ever_proxy_return,
+            )
+        case "maxmc-critic":
+            proxy_score = regret_maxmc_critic(
+                values=rollout.transitions.proxy_value,
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                max_ever_return=max_ever_proxy_return,
+            )
+        case "maxmc-actor":
+            proxy_score = regret_maxmc_actor(
+                rewards=rollout.transitions.info["proxy_rewards"][proxy_name],
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                max_ever_return=max_ever_proxy_return,
+            )
+        # case "oracle":
+        #     proxy_score = proxy_regret_oracle(
+        #         level=level,
+        #         values=rollout.transitions.value,
+        #         dones=rollout.transitions.done,
+        #         discount_rate=discount_rate,
+        #     )
+        case _:
+            raise ValueError(f"Unknown proxy scoring method {scoring_method!r}")
+
+    # then use the proxy score to shape the original score
+    return original_score - proxy_shaping_coeff * proxy_score
+
+
+# # # 
+# Different kinds of score functions
+
+
+def l1_value_loss(
+    advantages: Array,          # float[num_steps]
+) -> float:
+    """
+    Estimate replayability as the average of the magnitude of the GAE
+    (equivalent to the L1 value loss where PPO trains with the L2 value
+    loss).
+
+    Notes:
+
+    * Not an estimate of regret: see positive value loss.
+    """
+    return jnp.abs(advantages).mean()
+
+
+def regret_pvl(
+    advantages: Array,          # float[num_steps]
+) -> float:
+    """
+    Estimate regret of a level using the average of the positive GAEs. This
+    is a biased estimate of regret that is heavily dependent on the value
+    network and current policy.
+    """
+    return jnp.maximum(advantages, 0).mean()
+        
+
+def regret_maxmc_paper(
+    values: Array,              # float[num_steps]
+    max_ever_return: float,
+) -> float:
+    """
+    Estimate regret for a level from a single episode as
+        
+        Return_{max ever} - 1/T sum_{t=0}^T Value(s_t).
+    
+    TODO:
+
+    * This is what they suggest in the robust PLR paper, but I think it
+      doesn't make sense because we need to discount the value predictions
+      from later in the episodes.
+    * I think we don't currently handle multiple episode rollouts correctly,
+      we should average within episodes and then average over the results
+      (which also means we need to know `dones` sequence).
+    """
+    return max_ever_return - values.mean()
+
+
+def regret_maxmc_initial(
+    values: Array,              # float[num_steps]
+    max_ever_return: float,
+) -> float:
+    """
+    Estimate regret for a level as
+        
+        Return_{max ever} - Value(s_0).
+    """
+    return max_ever_return - values[0]
+
+
+def regret_maxmc_critic(
+    values: Array,             # float[num_steps]
+    dones: Array,              # bool[num_steps]
+    discount_rate: float,      # float
+    max_ever_return: float,    # float
+) -> float:
+    """
+    Estimate regret for a level from a single episode as
+        
+        Return_{max ever} - 1/T sum_{t=0}^T \gamma^t Value(s_t).
+    
+    TODO: now I think we don't currently handle multiple episodes in the
+    level correctly.
+    """
+    def _step(t, value_and_done):
+        value, done = value_and_done
+        discounted_value = discount_rate**t * value
+        t_next = (1-done) * (t + 1)
+        return t_next, discounted_value
+    _, discounted_values = jax.lax.scan(
+        _step,
+        0,
+        (values, dones),
+    )
+    # TODO: take mean over episodes of mean within episodes of discounted value
+    # instead of mean over all steps...
+    return max_ever_return - discounted_values.mean()
+
+
+def regret_maxmc_actor(
+    rewards: Array,             # float[num_steps]
+    dones: Array,               # bool[num_steps]
+    discount_rate: float,
+    max_ever_return: float,
+) -> float:
+    """
+    Estimate regret for a level from a single episode as
+
+        Return_{max ever} - sum_{t=0}^T \gamma^t r_t.
+
+    That is, the empirical average return achieved by the policy is used for
+    the return of the policy, and the empirical max ever return on this level
+    is used for the return of the optimal policy.
+    """
+    average_return = experience.compute_average_return(
+        rewards=rewards,
+        dones=dones,
+        discount_rate=discount_rate,
+    )
+    return max_ever_return - average_return
+
+
+# # # 
+# Old methods (TODO: refactor)
 
 
 @functools.partial(jax.jit, static_argnames=["regret_estimator"])
-def plr_compute_scores(
+def plr_compute_scores_old(
     regret_estimator: str,
     rollouts: Rollout,              # Rollout[num_levels] with Transition[num_steps]
     advantages: Array,              # float[num_levels, num_steps]
@@ -26,76 +372,7 @@ def plr_compute_scores(
     max_ever_proxy_returns: Array,  # float[num_levels]
     discount_rate: float,
 ) -> Array:                         # float[num_levels]
-    """
-    Compute 'score' for level prioritisation, using a named scoring method.
-    
-    Inputs:
-
-    * regret_estimator : str (static)
-            One of a specific number of regret estimation methods. This
-            determines the type of score quantity that is computed. Not all
-            of these are actually estimators of regret, that's a historical
-            name, we should probably change it to the more generic 'method'.
-            See below for a list of methods.
-    * rollouts : Rollout[num_levels] with Transition[num_steps].
-            The experience data from which the score should be computed.
-    * advantages : float[num_levels, num_steps]
-            When training with PPO, we probably have already computed the
-            GAEs from the rollouts. In order to skip computing them again,
-            provide them here.
-    * proxy_advantages : optional float[num_levels, num_steps] or None
-            When training with PPO, we probably have already computed the
-            GAEs of the proxy reward from the rollouts. In order to skip
-            computing them again, provide them here.
-    * levels : Level[num_levels]
-            The levels probably shouldn't be needed for computing the scores,
-            as they are meant to be based on the rollouts. However, for
-            ORACLE versions of the scores (used for evaluating estimators)
-            they are provided here.
-    * max_ever_returns
-    * discount_rate
-
-    Returns:
-
-    * scores : float[num_levels]
-            One score for each level.
-    
-    Methods (not case sensitive):
-
-    * 'absGAE': L1 value loss or absolute value of the GAE. Used in the
-      original PLR paper.
-    * 'PVL': poxitive value loss, or max(GAE, 0). Used in the Robust PLR
-      paper.
-    * Methods under development:
-      * TODO: document the various oracle and proxy-shaped regret
-        definitions...
-    * Methods not yet implemented:
-      * 'MaxMC' (TODO): Maximum Monte-Carlo estimate of the regret. Requires
-        tracking the highest return ever achieved for a level. Not yet
-        implemented.
-
-    Dev notes: This function is seriously in need of some refactoring after
-    the various deadlines are over and we have a chance.
-    
-    * We should make providing advantages of both types optional and have a
-      default so it is actually optional.
-    * We should be doing this with vmap rather than manually mapping
-      everything across the levels axis. Not sure why I didn't realise that
-      immediately.
-    * It's unsustainable to define a separate method for each environment and
-      proxy. Rethink that.
-    * We should actually implement MaxMC. This probably involves having the
-      UED methods track the max return achieved in the episodes.
-    """
     match regret_estimator.lower():
-        case "absgae":
-            return jnp.abs(advantages).mean(axis=1)
-        case "pvl":
-            return jnp.maximum(advantages, 0).mean(axis=1)
-        case "regret_diff_pvl":
-            pvl = jnp.maximum(advantages, 0).mean(axis=1)
-            proxy_pvl = jnp.maximum(proxy_advantages, 0).mean(axis=1)
-            return pvl - proxy_pvl
         case "proxy_regret_corner":
             # true_reward = rollouts.transitions.reward.sum(axis=1)
             # proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
@@ -510,26 +787,7 @@ def plr_compute_scores(
             maxmc_true = max_ever_returns - true_average_returns
             maxmc_proxy = max_ever_proxy_returns - proxy_average_returns
             return maxmc_true - proxy_average_returns
-
         case _:
             raise ValueError("Invalid return estimator name.")
-        
 
-def maxmc_critic(
-    values,             # float[num_steps]
-    dones,              # bool[num_steps]
-    discount_rate,      # float
-    max_ever_return,    # float
-) -> float:
-    def _step(t, value_and_done):
-        value, done = value_and_done
-        discounted_value = discount_rate**t * value
-        t_next = (1-done) * (t + 1)
-        return t_next, discounted_value
-    _, discounted_values = jax.lax.scan(
-        _step,
-        0,
-        (values, dones),
-    )
-    return max_ever_return - discounted_values.mean()
 

@@ -49,6 +49,11 @@ def corner(
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_shift: float = 0.0,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "proxy_corner",
+    plr_proxy_shaping_coeff: float = 0.5,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -59,8 +64,6 @@ def corner(
     ppo_proxy_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    train_proxy_critic: bool = False,
-    proxy_name: str = "proxy_corner",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
@@ -242,6 +245,10 @@ def corner(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -251,8 +258,6 @@ def corner(
         ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
         ppo_max_grad_norm=ppo_max_grad_norm,
         ppo_lr_annealing=ppo_lr_annealing,
-        train_proxy_critic=train_proxy_critic,
-        proxy_name=proxy_name,
         num_minibatches_per_epoch=num_minibatches_per_epoch,
         num_epochs_per_cycle=num_epochs_per_cycle,
         num_total_env_steps=num_total_env_steps,
@@ -308,6 +313,11 @@ def dish(
     prob_mutate_step: float = 0.95,
     prob_mutate_cheese_or_dish: float = 0.0,
     prob_mutate_shift: float = 0.0,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "proxy_dish",
+    plr_proxy_shaping_coeff: float = 0.5,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -318,8 +328,6 @@ def dish(
     ppo_proxy_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    train_proxy_critic: bool = False,
-    proxy_name: str = "proxy_dish",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
@@ -474,6 +482,10 @@ def dish(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -483,8 +495,6 @@ def dish(
         ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
         ppo_max_grad_norm=ppo_max_grad_norm,
         ppo_lr_annealing=ppo_lr_annealing,
-        train_proxy_critic=train_proxy_critic,
-        proxy_name=proxy_name,
         num_minibatches_per_epoch=num_minibatches_per_epoch,
         num_epochs_per_cycle=num_epochs_per_cycle,
         num_total_env_steps=num_total_env_steps,
@@ -550,6 +560,11 @@ def pile(
     prob_mutate_cheese_or_pile: float = 0.0,
     prob_mutate_objects_count_on_pile: float = 0.2,
     prob_mutate_shift: float = 0.0,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "proxy_pile",
+    plr_proxy_shaping_coeff: float = 0.5,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -560,8 +575,6 @@ def pile(
     ppo_proxy_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    train_proxy_critic: bool = False,
-    proxy_name: str = "proxy_pile",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
@@ -726,6 +739,10 @@ def pile(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -735,8 +752,6 @@ def pile(
         ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
         ppo_max_grad_norm=ppo_max_grad_norm,
         ppo_lr_annealing=ppo_lr_annealing,
-        train_proxy_critic=train_proxy_critic,
-        proxy_name=proxy_name,
         num_minibatches_per_epoch=num_minibatches_per_epoch,
         num_epochs_per_cycle=num_epochs_per_cycle,
         num_total_env_steps=num_total_env_steps,
@@ -800,6 +815,7 @@ def keys(
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
     train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
     proxy_name: str = "keys",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
@@ -922,6 +938,10 @@ def keys(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -931,8 +951,6 @@ def keys(
         ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
         ppo_max_grad_norm=ppo_max_grad_norm,
         ppo_lr_annealing=ppo_lr_annealing,
-        train_proxy_critic=train_proxy_critic,
-        proxy_name=proxy_name,
         num_minibatches_per_epoch=num_minibatches_per_epoch,
         num_epochs_per_cycle=num_epochs_per_cycle,
         num_total_env_steps=num_total_env_steps,
@@ -985,6 +1003,11 @@ def minimaze(
     # for accel
     num_mutate_steps: int = 6,
     prob_mutate_shift: float = 0.1,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "proxy_corner",
+    plr_proxy_shaping_coeff: float = 0.5,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -995,8 +1018,6 @@ def minimaze(
     ppo_proxy_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    train_proxy_critic: bool = False,
-    proxy_name: str = "proxy_corner",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
@@ -1393,6 +1414,10 @@ def minimaze(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1402,8 +1427,6 @@ def minimaze(
         ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
         ppo_max_grad_norm=ppo_max_grad_norm,
         ppo_lr_annealing=ppo_lr_annealing,
-        train_proxy_critic=train_proxy_critic,
-        proxy_name=proxy_name,
         num_minibatches_per_epoch=num_minibatches_per_epoch,
         num_epochs_per_cycle=num_epochs_per_cycle,
         num_total_env_steps=num_total_env_steps,
@@ -1439,6 +1462,19 @@ def memory_test(
     net_cnn_type: str = "mlp",
     net_rnn_type: str = "ff",
     net_width: int = 64,
+    # curriculum
+    ued: str = "dr",
+    plr_buffer_size: int = 2048,
+    plr_temperature: float = 0.1,
+    plr_staleness_coeff: float = 0.1,
+    plr_prob_replay: float = 0.5,
+    plr_regret_estimator: str = "PVL",
+    plr_robust: bool = True,
+    # proxy augmentation
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "",
+    plr_proxy_shaping_coeff: float = 0.5,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1449,18 +1485,8 @@ def memory_test(
     ppo_proxy_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    train_proxy_critic: bool = False,
-    proxy_name: str = "",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
-    # curriculum
-    ued: str = "dr",
-    plr_buffer_size: int = 2048,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",
-    plr_robust: bool = True,
     # training dimensions
     num_total_env_steps: int = 1000_000,
     num_env_steps_per_cycle: int = 64,
@@ -1526,6 +1552,10 @@ def memory_test(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1535,8 +1565,6 @@ def memory_test(
         ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
         ppo_max_grad_norm=ppo_max_grad_norm,
         ppo_lr_annealing=ppo_lr_annealing,
-        train_proxy_critic=train_proxy_critic,
-        proxy_name=proxy_name,
         num_minibatches_per_epoch=num_minibatches_per_epoch,
         num_epochs_per_cycle=num_epochs_per_cycle,
         num_total_env_steps=num_total_env_steps,

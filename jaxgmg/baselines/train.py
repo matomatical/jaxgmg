@@ -59,6 +59,11 @@ def run(
     net_cnn_type: str,
     net_rnn_type: str,
     net_width: int,
+    # proxy augmentation config
+    train_proxy_critic: bool,
+    plr_proxy_shaping: bool,
+    proxy_name: str,
+    plr_proxy_shaping_coeff: float,
     # ued config
     ued: str,
     prob_shift: float,
@@ -79,8 +84,6 @@ def run(
     ppo_proxy_critic_coeff: float,
     ppo_max_grad_norm: float,
     ppo_lr_annealing: bool,
-    train_proxy_critic: bool,
-    proxy_name: str,
     num_minibatches_per_epoch: int,
     num_epochs_per_cycle: int,
     # training run dimensions
@@ -118,6 +121,8 @@ def run(
 
     
     print(f"configuring curriculum with {ued=}...")
+    if plr_proxy_shaping and not train_proxy_critic:
+        raise ValueError("plr_proxy_shaping requires train_proxy_critic")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
     if ued == "dr":
         gen = dr_infinite.CurriculumGenerator(
@@ -137,13 +142,19 @@ def run(
         gen = plr.CurriculumGenerator(
             level_generator=train_level_generator,
             level_metrics=level_metrics,
+            # replay buffer sampling
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
-            prob_replay=plr_prob_replay,
-            regret_estimator=plr_regret_estimator,
+            # replay dynamics
             robust=plr_robust,
+            prob_replay=plr_prob_replay,
+            # scoring
+            scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
+            proxy_shaping=plr_proxy_shaping,
+            proxy_name=proxy_name,
+            proxy_shaping_coeff=plr_proxy_shaping_coeff,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -155,12 +166,19 @@ def run(
             level_generator=train_level_generator,
             level_metrics=level_metrics,
             level_mutator=level_mutator,
+            # replay buffer sampling
             buffer_size=plr_buffer_size,
             temperature=plr_temperature,
             staleness_coeff=plr_staleness_coeff,
-            prob_replay=plr_prob_replay,
-            regret_estimator=plr_regret_estimator,
+            # replay dynamics
             robust=plr_robust,
+            prob_replay=plr_prob_replay,
+            # scoring
+            scoring_method=plr_regret_estimator,
+            discount_rate=ppo_gamma,
+            proxy_shaping=plr_proxy_shaping,
+            proxy_name=proxy_name,
+            proxy_shaping_coeff=plr_proxy_shaping_coeff,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
