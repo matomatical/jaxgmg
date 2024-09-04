@@ -236,13 +236,7 @@ class Env(base.Env):
         state = state.replace(got_goal=state.got_goal | got_goal)
 
         #check if hero got to proxy goal
-        proxy_pos = jnp.array([1, 1])
-        got_proxy_corner = (state.hero_pos == proxy_pos).all()
-        got_proxy_first_time = got_proxy_corner & ~state.got_proxy
-        state = state.replace(got_proxy=state.got_proxy | got_proxy_corner)
-
-        
-        proxy_pos = jnp.array([1, 1])
+        proxy_pos = jnp.array([0, 0])
         got_proxy_corner = (state.hero_pos == proxy_pos).all()
         got_proxy_first_time = got_proxy_corner & ~state.got_proxy
         state = state.replace(got_proxy=state.got_proxy | got_proxy_corner)
