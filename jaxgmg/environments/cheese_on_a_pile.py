@@ -1444,6 +1444,7 @@ class LevelParser(base.LevelParser):
     """
     height: int
     width: int
+    split_elements: int
     char_map = {
         '#': Channel.WALL,
         '@': Channel.MOUSE,

@@ -55,26 +55,7 @@ def img2str(im, colormap=None):
         for row in im
     ]) + _reset
 
-
-def dict2str(dct):
-    def dict2lines(dct, depth):
-        for key, value in dct.items():
-            if isinstance(value, dict):
-                yield (depth, key, '')
-                yield from dict2lines(value, depth+1)
-            else:
-                yield (depth, key, value)
-    def render(value):
-        if isinstance(value, jax.Array) and value.shape != ():
-            return f'{value.dtype}{value.shape}'
-        else:
-            return str(value)
-    return '\n'.join([
-        '  '*depth + (key + ':').ljust(48-2*depth) + render(value)
-        for depth, key, value in dict2lines(dct, 1)
-    ])
-
-
+    
 # # # 
 # Rendering data / images / plots to stdout
 
@@ -115,6 +96,37 @@ def print_img(im, colormap=None):
     print(img2str, colormap=colormap)
 
 
+def filter_and_render_metrics(
+    metrics,
+    include_gifs: bool,
+    include_imgs: bool,
+    include_hists: bool,
+) -> str:
+    # parse
+    metrics_tree = linearise_dict(metrics)
+    # filter and render
+    lines_out = []
+    for depth, key, val in metrics_tree:
+        # filter
+        if key.endswith("_hist") and not include_hists:
+            continue
+        if key.endswith("_gif") and not include_gifs:
+            continue
+        if key.endswith("_img") and not include_imgs:
+            continue
+        # render key
+        indented_key = "  "*depth + key + ":"
+        # render val
+        if val is None:
+            rendered_val = ''
+        elif isinstance(val, jax.Array) and val.shape != ():
+            rendered_val = f'{val.dtype}{val.shape}'
+        else:
+            rendered_val = str(val)
+        lines_out.append(f"  {indented_key:<46s}{rendered_val}")
+    return '\n'.join(lines_out)
+
+
 # # # 
 # Transforming dictionaries
 
@@ -128,6 +140,29 @@ def flatten_dict(nested_dict, separator='/'):
         else:
             merged_dict[key] = inner_dict
     return merged_dict
+
+
+def linearise_dict(dct):
+    """
+    Transform a nested dict into a list of indented keys/vals:
+
+    For example:
+
+        >>> linearise_dict({'a': {'b': 0}, 'c': 1))
+        [
+          (0, 'a', None),
+            (1, 'b', 0),
+          (0, 'c', 1),
+        ]
+    """
+    def go(dct, depth):
+        for key, value in dct.items():
+            if isinstance(value, dict):
+                yield (depth, key, None)
+                yield from go(value, depth+1)
+            else:
+                yield (depth, key, value)
+    return list(go(dct, 0))
 
 
 # # # 
@@ -277,7 +312,12 @@ def wandb_gif(frames, fps=12):
     )
             
 
-def wandb_flatten_and_wrap(metrics):
+def wandb_flatten_and_wrap_metrics(
+    metrics,
+    include_gifs: bool,
+    include_imgs: bool,
+    include_hists: bool,
+):
     """
     W&B expects certain data to be wrapped with their custom wrappers,
     namely histograms, images, and videos. Also, nested dictionaries should
@@ -288,11 +328,14 @@ def wandb_flatten_and_wrap(metrics):
     metrics_wandb = {}
     for key, val in metrics_flat.items():
         if key.endswith("_hist"):
-            metrics_wandb[key] = wandb.Histogram(val)
+            if include_hists:
+                metrics_wandb[key] = wandb.Histogram(val)
         elif key.endswith("_gif"):
-            metrics_wandb[key] = wandb_gif(val)
+            if include_gifs:
+                metrics_wandb[key] = wandb_gif(val)
         elif key.endswith("_img"):
-            metrics_wandb[key] = wandb_img(val)
+            if include_imgs:
+                metrics_wandb[key] = wandb_img(val)
         else:
             metrics_wandb[key] = val
     return metrics_wandb

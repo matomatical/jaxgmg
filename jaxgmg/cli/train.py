@@ -37,14 +37,12 @@ def corner(
     # ued config
     ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
-    # for domain randomisation
     num_train_levels: int = 2048,
-    # for plr
     plr_buffer_size: int = 2048,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5, #default 0.5
-    plr_regret_estimator: str = "PVL",
+    plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = False,
     # for accel
     num_mutate_steps: int = 6,
@@ -70,25 +68,24 @@ def corner(
     num_total_env_steps: int = 20_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    # training animation dimensions
-    train_gifs: bool = True,
-    train_gif_grid_width: int = 16,
-    # evals config
-    num_cycles_per_eval: int = 64,
-    num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 512,
-    # big evals config
-    num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
-    eval_gif_grid_width: int = 16,
-    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
-    # logging
-    num_cycles_per_log: int = 64,
-    console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = True,                # whether to log metrics to wandb
-    wandb_project: str = "test_plr",
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
+    wandb_project: str = "test",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
+    level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # checkpointing
     checkpointing: bool = True,             # keep checkpoints? (default: yes)
     keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
@@ -433,16 +430,18 @@ def corner(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
-        train_gifs=train_gifs,
-        train_gif_grid_width=train_gif_grid_width,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
-        eval_gif_grid_width=eval_gif_grid_width,
-        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
         checkpointing=checkpointing,
         keep_all_checkpoints=keep_all_checkpoints,
         max_num_checkpoints=max_num_checkpoints,
@@ -475,7 +474,7 @@ def dish(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
@@ -504,24 +503,23 @@ def dish(
     num_total_env_steps: int = 20_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    # training animation dimensions
-    train_gifs: bool = True,
-    train_gif_grid_width: int = 16,
-    # evals config
-    num_cycles_per_eval: int = 64,
-    num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 512,
-    # big evals config
-    num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
-    eval_gif_grid_width: int = 16,
-    # logging
-    num_cycles_per_log: int = 64,
-    console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = True,                 # whether to log metrics to wandb
-    wandb_project: str = "plr_dish",
-    wandb_entity: str = None,
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
+    wandb_project: str = "test",
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
     # checkpointing
     checkpointing: bool = True,             # keep checkpoints? (default: yes)
     keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
@@ -877,16 +875,18 @@ def dish(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
-        train_gifs=train_gifs,
-        train_gif_grid_width=train_gif_grid_width,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
-        eval_gif_grid_width=eval_gif_grid_width,
-        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
         checkpointing=checkpointing,
         keep_all_checkpoints=keep_all_checkpoints,
         max_num_checkpoints=max_num_checkpoints,
@@ -928,7 +928,7 @@ def pile(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
@@ -958,24 +958,23 @@ def pile(
     num_total_env_steps: int = 300_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    # training animation dimensions
-    train_gifs: bool = True,
-    train_gif_grid_width: int = 16,
-    # evals config
-    num_cycles_per_eval: int = 64,
-    num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 512,
-    # big evals config
-    num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
-    eval_gif_grid_width: int = 16,
-    # logging
-    num_cycles_per_log: int = 64,
-    console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
-    wandb_project: str = "proxy_test_multiple_dish_final",
-    wandb_entity: str = None,
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
+    wandb_project: str = "test",
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
     # checkpointing
     checkpointing: bool = True,             # keep checkpoints? (default: yes)
     keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
@@ -1341,16 +1340,18 @@ def pile(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
-        train_gifs=train_gifs,
-        train_gif_grid_width=train_gif_grid_width,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
-        eval_gif_grid_width=eval_gif_grid_width,
-        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
         checkpointing=checkpointing,
         keep_all_checkpoints=keep_all_checkpoints,
         max_num_checkpoints=max_num_checkpoints,
@@ -1386,7 +1387,7 @@ def keys(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
@@ -1407,24 +1408,23 @@ def keys(
     num_total_env_steps: int = 20_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    # training animation dimensions
-    train_gifs: bool = True,
-    train_gif_grid_width: int = 16,
-    # evals config
-    num_cycles_per_eval: int = 64,
-    num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 512,
-    # big evals config
-    num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
-    eval_gif_grid_width: int = 16,
-    # logging
-    num_cycles_per_log: int = 64,
-    console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
     wandb_project: str = "test",
-    wandb_entity: str = None,
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
     # checkpointing
     checkpointing: bool = True,             # keep checkpoints? (default: yes)
     keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
@@ -1549,16 +1549,18 @@ def keys(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
-        train_gifs=train_gifs,
-        train_gif_grid_width=train_gif_grid_width,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
-        eval_gif_grid_width=eval_gif_grid_width,
-        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
         checkpointing=checkpointing,
         keep_all_checkpoints=keep_all_checkpoints,
         max_num_checkpoints=max_num_checkpoints,
@@ -1591,7 +1593,7 @@ def minimaze(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
+    plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 6,
@@ -1617,24 +1619,23 @@ def minimaze(
     num_total_env_steps: int = 20_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
-    # training animation dimensions
-    train_gifs: bool = True,
-    train_gif_grid_width: int = 16,
-    # evals config
-    num_cycles_per_eval: int = 64,
-    num_eval_levels: int = 256,
-    num_env_steps_per_eval: int = 512,
-    # big evals config
-    num_cycles_per_big_eval: int = 1024,    # roughly 9M env steps
-    eval_gif_grid_width: int = 16,
-    # logging
-    num_cycles_per_log: int = 64,
-    console_log: bool = True,               # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
     wandb_project: str = "test",
-    wandb_entity: str = None,
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
     # checkpointing
     checkpointing: bool = True,             # keep checkpoints? (default: yes)
     keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
@@ -2035,16 +2036,18 @@ def minimaze(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
-        train_gifs=train_gifs,
-        train_gif_grid_width=train_gif_grid_width,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=num_cycles_per_big_eval,
-        eval_gif_grid_width=eval_gif_grid_width,
-        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
         checkpointing=checkpointing,
         keep_all_checkpoints=keep_all_checkpoints,
         max_num_checkpoints=max_num_checkpoints,
@@ -2071,7 +2074,7 @@ def memory_test(
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "PVL",
+    plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # proxy augmentation
     train_proxy_critic: bool = False,
@@ -2094,21 +2097,23 @@ def memory_test(
     num_total_env_steps: int = 1000_000,
     num_env_steps_per_cycle: int = 64,
     num_parallel_envs: int = 64,
-    # training animation dimensions
-    train_gifs: bool = True,
-    train_gif_grid_width: int = 8,
-    # evals config
-    num_cycles_per_eval: int = 1024,
-    num_eval_levels: int = 8,
-    num_env_steps_per_eval: int = 128,
-    # logging
-    num_cycles_per_log: int = 16,
-    console_log: bool = False,              # whether to log metrics to stdout
-    wandb_log: bool = False,                # whether to log metrics to wandb
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
     wandb_project: str = "test",
-    wandb_entity: str = None,
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
     # checkpointing
     checkpointing: bool = False,
     keep_all_checkpoints: bool = False,
@@ -2176,16 +2181,18 @@ def memory_test(
         num_total_env_steps=num_total_env_steps,
         num_env_steps_per_cycle=num_env_steps_per_cycle,
         num_parallel_envs=num_parallel_envs,
-        train_gifs=train_gifs,
-        train_gif_grid_width=train_gif_grid_width,
-        num_cycles_per_eval=num_cycles_per_eval,
-        num_eval_levels=num_eval_levels,
-        num_env_steps_per_eval=num_env_steps_per_eval,
-        num_cycles_per_big_eval=1024,
-        eval_gif_grid_width=4,
-        num_cycles_per_log=num_cycles_per_log,
         console_log=console_log,
         wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
         checkpointing=checkpointing,
         keep_all_checkpoints=keep_all_checkpoints,
         max_num_checkpoints=max_num_checkpoints,

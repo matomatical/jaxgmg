@@ -84,25 +84,25 @@ def run(
     ppo_proxy_critic_coeff: float,
     ppo_max_grad_norm: float,
     ppo_lr_annealing: bool,
+    # training run dimensions
     num_minibatches_per_epoch: int,
     num_epochs_per_cycle: int,
-    # training run dimensions
     num_total_env_steps: int,
     num_env_steps_per_cycle: int,
     num_parallel_envs: int,
-    # training animation dimensions
-    train_gifs: bool,
-    train_gif_grid_width: int,
-    # evals config
-    num_cycles_per_eval: int,
-    num_eval_levels: int,
-    num_env_steps_per_eval: int,
-    num_cycles_per_big_eval: int,
-    eval_gif_grid_width: int,
-    # logging config
-    num_cycles_per_log: int,
+    # logging and evals config
     console_log: bool,
     wandb_log: bool,
+    log_gifs: bool,
+    log_imgs: bool,
+    log_hists: bool,
+    num_cycles_per_log: int,
+    num_cycles_per_gifs: int,
+    num_cycles_per_eval: int,
+    num_cycles_per_big_eval: int,
+    evals_num_env_steps: int,
+    evals_num_levels: int,
+    gif_grid_width: int,
     # checkpointing config
     checkpointing: bool,
     keep_all_checkpoints: bool,
@@ -196,12 +196,12 @@ def run(
     print(f"configuring eval batches from {len(eval_level_generators)} level generators...")
     rng_evals, rng_setup = jax.random.split(rng_setup)
     for levels_name, level_generator in eval_level_generators.items():
-        print(f"  generating {num_eval_levels} {levels_name!r} levels...")
+        print(f"  generating {evals_num_levels} {levels_name!r} levels...")
         eval_name = f"batch-{levels_name}"
         rng_eval_levels, rng_evals = jax.random.split(rng_evals)
         levels = level_generator.vsample(
             rng_eval_levels,
-            num_levels=num_eval_levels,
+            num_levels=evals_num_levels,
         )
         if level_solver is not None:
             print("  also solving generated levels...")
@@ -210,8 +210,8 @@ def run(
                 levels,
             )
             levels_eval = evals.FixedLevelsEvalWithBenchmarkReturns(
-                num_levels=num_eval_levels,
-                num_steps=num_env_steps_per_eval,
+                num_levels=evals_num_levels,
+                num_steps=evals_num_env_steps,
                 discount_rate=ppo_gamma,
                 levels=levels,
                 benchmarks=benchmark_returns,
@@ -221,25 +221,28 @@ def run(
             )
         else:
             levels_eval = evals.FixedLevelsEval(
-                num_levels=num_eval_levels,
-                num_steps=num_env_steps_per_eval,
+                num_levels=evals_num_levels,
+                num_steps=evals_num_env_steps,
                 discount_rate=ppo_gamma,
                 levels=levels,
                 env=env,
                 period=num_cycles_per_eval,
             )
-        rollouts_eval = evals.AnimatedRolloutsEval(
-            num_levels=num_eval_levels,
-            levels=levels,
-            num_steps=env.max_steps_in_episode,
-            gif_grid_width=eval_gif_grid_width,
-            env=env,
-            period=num_cycles_per_big_eval,
-        )
-        evals_dict[eval_name] = evals.EvalList.create(
-            levels_eval,
-            rollouts_eval,
-        )
+        if log_gifs:
+            rollouts_eval = evals.AnimatedRolloutsEval(
+                num_levels=evals_num_levels,
+                levels=levels,
+                num_steps=env.max_steps_in_episode,
+                gif_grid_width=gif_grid_width,
+                env=env,
+                period=num_cycles_per_gifs,
+            )
+            evals_dict[eval_name] = evals.EvalList.create(
+                levels_eval,
+                rollouts_eval,
+            )
+        else:
+            evals_dict[eval_name] = levels_eval
 
 
     print(f"configuring evals for {len(fixed_eval_levels)} fixed eval levels...")
@@ -247,7 +250,7 @@ def run(
         print(f"  registering fixed level {level_name!r}")
         eval_name = f"fixed-{level_name}"
         solo_eval = evals.SingleLevelEval(
-            num_steps=num_env_steps_per_eval,
+            num_steps=evals_num_env_steps,
             discount_rate=ppo_gamma,
             level=level,
             env=env,
@@ -273,7 +276,7 @@ def run(
                 grid_shape=grid_shape,
                 env=env,
                 discount_rate=ppo_gamma,
-                num_steps=num_env_steps_per_eval,
+                num_steps=evals_num_env_steps,
                 period=num_cycles_per_big_eval,
             )
             evals_dict[eval_name] = evals.EvalList.create(
@@ -289,6 +292,7 @@ def run(
     # select architecture
     print(f"  {net_cnn_type=}")
     print(f"  {net_rnn_type=}")
+    print(f"  {net_width=}")
     net = networks.Impala(
         num_actions=env.num_actions,
         cnn_type=net_cnn_type,
@@ -379,7 +383,6 @@ def run(
     for t in range(num_total_cycles):
         rng_t, rng_train = jax.random.split(rng_train)
         log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
-        first_cycle = (t == 0)
         if log_cycle:
             metrics = collections.defaultdict(dict)
         
@@ -435,10 +438,10 @@ def run(
                 benchmark_returns=None,
                 benchmark_proxies=None,
             )
-            if train_gifs:
+            if log_gifs and t % num_cycles_per_gifs == 0:
                 train_metrics['rollouts_gif'] = experience.animate_rollouts(
                     rollouts=rollouts,
-                    grid_width=train_gif_grid_width,
+                    grid_width=gif_grid_width,
                     env=env,
                 )
             metrics[f'train-{batch_type_name}'].update(train_metrics)
@@ -531,8 +534,8 @@ def run(
             })
 
 
-        # define metrics during first cycle
-        if first_cycle and wandb_log:
+        # define undefined metrics
+        if wandb_log:
             wandb.define_metric("step/env-step-all-after")
             wandb.define_metric("step/ppo-update-after")
             util.wandb_define_metrics(
@@ -548,9 +551,21 @@ def run(
 
         # periodic logging to console/wandb
         if log_cycle and console_log:
-            progress.write("\n".join(["="*59, util.dict2str(metrics), "="*59]))
+            metrics_str = util.filter_and_render_metrics(
+                metrics,
+                include_gifs=log_gifs,
+                include_imgs=log_imgs,
+                include_hists=log_hists,
+            )
+            progress.write(f'{"="*59}\n{metrics_str}\n{"="*59}')
         if log_cycle and wandb_log:
-            wandb.log(step=t, data=util.wandb_flatten_and_wrap(metrics))
+            data = util.wandb_flatten_and_wrap_metrics(
+                metrics,
+                include_gifs=log_gifs,
+                include_imgs=log_imgs,
+                include_hists=log_hists,
+            )
+            wandb.log(step=t, data=data)
 
         
         # periodic checkpointing
