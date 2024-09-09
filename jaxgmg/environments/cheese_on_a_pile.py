@@ -15,8 +15,6 @@ Classes:
   gymnax-style interface (see `base` module for specifics of the interface).
 * `LevelGenerator` class, provides `sample` method for randomly sampling a
   level.
-* `LevelParser` class, provides a `parse` and `parse_batch` method for
-  designing Level structs based on ASCII depictions.
 """
 
 import enum
@@ -603,6 +601,10 @@ class Env(base.Env):
         return discounted_reward
 
 
+# # # 
+# Level generation
+
+
 @struct.dataclass
 class LevelGenerator(base.LevelGenerator):
     """
@@ -623,13 +625,16 @@ class LevelGenerator(base.LevelGenerator):
     * max_cheese_radius : int (>=0)
             the cheese will spawn within this many steps away from the
             location of the dish.
+    * split_elements : int {0, 1, 2, 3, 4, 5, 6}
+            how many items (dish, etc.) should be placed on the same square
+            as the cheese?
     """
     height: int = 13
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     max_cheese_radius: int = 0
     max_dish_radius: int = 0
-    split_elements: int = 0 # how many items should be placed with the cheese, max is six
+    split_elements: int = 0
     
     def __post_init__(self):
         # validate cheese radius
@@ -1401,6 +1406,125 @@ class MoveObjectsPileLevelMutator(base.LevelMutator):
                 napkin_pos = final_spawn[5],
             )
 
+
+# # # 
+# Level parsing
+
+
+@struct.dataclass
+class LevelParser(base.LevelParser):
+    """
+    Level parser for Cheese on a Pile environment. Given some parameters
+    determining level shape, provides a `parse` method that converts an ASCII
+    depiction of a level into a Level struct. Also provides a `parse_batch`
+    method that parses a list of level strings into a single vectorised Level
+    PyTree object.
+
+    * height : int (>= 3)
+            The number of rows in the grid representing the maze
+            (including top and bottom boundary rows)
+    * width : int (>= 3)
+            The number of columns in the grid representing the maze
+            (including left and right boundary rows)
+    * split_elements : int, 0 to 6 inclusive)
+            How many objects should be placed with the cheese?
+    * char_map : optional, dict{str: int}
+            The keys in this dictionary are the symbols the parser will look
+            to define the location of the walls and each of the items. The
+            default map is as follows:
+            * The character '#' maps to `Channel.WALL`.
+            * The character '@' maps to `Channel.MOUSE`.
+            * The character 'd' maps to `Channel.DISH` representing the pile
+              of objects.
+            * The character 'c' maps to `Channel.CHEESE`.
+            * The character 'b' maps to `len(Channel)`, i.e. none of the
+              above, representing *both* the cheese and pile of objects.
+            * The character '.' maps to `len(Channel)+1`, i.e. none of
+              the above, representing the absence of an item.
+    """
+    height: int
+    width: int
+    char_map = {
+        '#': Channel.WALL,
+        '@': Channel.MOUSE,
+        'd': Channel.DISH,
+        'c': Channel.CHEESE,
+        'b': len(Channel),   # BOTH
+        '.': len(Channel)+1, # PATH
+        # TODO: I should switch these to using a standalone enum...
+    }
+
+
+    def parse(self, level_str):
+        """
+        Convert an ASCII string depiction of a level into a Level struct.
+        """
+        # parse into grid of IntEnum elements
+        level_grid = [
+            [self.char_map[e] for e in line.split()]
+            for line in level_str.strip().splitlines()
+        ]
+        assert len(level_grid) == self.height, "wrong height"
+        assert all([len(r) == self.width for r in level_grid]), "wrong width"
+        level_map = jnp.asarray(level_grid)
+        
+        # extract wall map
+        wall_map = (level_map == Channel.WALL)
+        assert wall_map[0,:].all(), "top border incomplete"
+        assert wall_map[:,0].all(), "left border incomplete"
+        assert wall_map[-1,:].all(), "bottom border incomplete"
+        assert wall_map[:,-1].all(), "right border incomplete"
+        
+        # extract cheese position
+        cheese_map = (
+            (level_map == Channel.CHEESE)
+            | (level_map == len(Channel)) # both napkin and cheese
+        )
+        assert cheese_map.sum() == 1, "there must be exactly one cheese"
+        cheese_pos = jnp.concatenate(
+            jnp.where(cheese_map, size=1)
+        )
+        
+        # extract napkin position
+        napkin_map = (
+            (level_map == Channel.DISH)
+            | (level_map == len(Channel)) # both napkin and cheese
+        )
+        assert napkin_map.sum() == 1, "there must be exactly one pile of objects"
+        napkin_pos = jnp.concatenate(
+            jnp.where(napkin_map, size=1)
+        )
+
+        # allocate the remaining objects to either the napkin or the cheese
+        # pile.
+        dish_pos   = cheese_pos if self.split_elements >= 1 else napkin_pos
+        fork_pos   = cheese_pos if self.split_elements >= 2 else napkin_pos
+        spoon_pos  = cheese_pos if self.split_elements >= 3 else napkin_pos
+        glass_pos  = cheese_pos if self.split_elements >= 4 else napkin_pos
+        mug_pos    = cheese_pos if self.split_elements >= 5 else napkin_pos
+        # check if all the items are supposed to be on the same position
+        if self.split_elements == 6:
+            assert (cheese_pos == napkin_pos).all()
+
+        # extract mouse spawn position
+        mouse_spawn_map = (level_map == Channel.MOUSE)
+        assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
+        initial_mouse_pos = jnp.concatenate(
+            jnp.where(mouse_spawn_map, size=1)
+        )
+
+        return Level(
+            wall_map=wall_map,
+            initial_mouse_pos=initial_mouse_pos,
+            cheese_pos=cheese_pos,
+            dish_pos=dish_pos,
+            fork_pos=fork_pos,
+            spoon_pos=spoon_pos,
+            glass_pos=glass_pos,
+            mug_pos=mug_pos,
+            napkin_pos=napkin_pos,
+        )
+    
 
 # # # 
 # Level solvers

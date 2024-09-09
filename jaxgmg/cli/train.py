@@ -97,6 +97,7 @@ def corner(
     config = locals()
     util.print_config(config)
 
+
     print("configuring environment...")
     env = cheese_in_the_corner.Env(
         obs_level_of_detail=obs_level_of_detail,
@@ -104,6 +105,7 @@ def corner(
         penalize_time=env_penalize_time,
         terminate_after_cheese_and_corner=env_terminate_after_corner,
     )
+
 
     print("configuring level generators...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -138,13 +140,15 @@ def corner(
         )
     else:
         train_level_generator = orig_level_generator
-    
+
+
     print("configuring level classifier...")
     def classify_level_is_shift(level: Level) -> bool:
         return jnp.logical_or(
             level.cheese_pos[0] != 1,
             level.cheese_pos[1] != 1,
         )
+
 
     print("configuring level mutator...")
     # if mutating cheese, mostly stay in the restricted region
@@ -175,18 +179,21 @@ def corner(
         ),
         num_steps=num_mutate_steps,
     )
-    
+
+
     print("configuring level solver...")
     level_solver = cheese_in_the_corner.LevelSolver(
         env=env,
         discount_rate=ppo_gamma,
     )
-            
+
+
     print("configuring level metrics...")
     level_metrics = cheese_in_the_corner.LevelMetrics(
         env=env,
         discount_rate=ppo_gamma,
     )
+
 
     print("configuring eval level generators...")
     if prob_shift > 0.0:
@@ -202,13 +209,173 @@ def corner(
             "shift": shift_level_generator,
             "tree": tree_level_generator,
         }
-    
-    print("configuring fixed eval levels...")
-    fixed_eval_levels = {
-        "random1": orig_level_generator.sample(jax.random.key(1)),
-        "random2": orig_level_generator.sample(jax.random.key(2)),
-        "random3": orig_level_generator.sample(jax.random.key(3)),
-    }
+
+
+    print("configuring parser and parsing fixed eval levels...")
+    if env_size == 15:
+        level_parser_15 = cheese_in_the_corner.LevelParser(
+            height=15,
+            width=15,
+        )
+        fixed_eval_levels = {
+            'sixteen-rooms-corner': level_parser_15.parse("""
+                # # # # # # # # # # # # # # # 
+                # * . . # . . # . . # . . . #
+                # . . . . . . . . . # . . . #
+                # . . . # . . # . . . . . . #
+                # # . # # # . # # . # # # . #
+                # . . . # . . . . . . . . . #
+                # . . . . . . # . . # . . . #
+                # # # . # . # # . # # # . # #
+                # . . . # . . . . . # . . . #
+                # . . . # . . # . . . . . . #
+                # . # # # # . # # . # . # # #
+                # . . . # . . # . . # . . . #
+                # . . . . . . # . . . . @ . #
+                # . . . # . . . . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'sixteen-rooms-2-corner': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # * . . # . . . . . # . . . #
+                # . . . . . . # . . # . . . #
+                # . . . # . . # . . # . . . #
+                # # # # # . # # . # # # . # #
+                # . . . # . . # . . . . . . #
+                # . . . . . . # . . # . . . #
+                # # . # # # # # . # # # # # #
+                # . . . # . . # . . # . . . #
+                # . . . # . . . . . . . . . #
+                # # # . # # . # # . # # # # #
+                # . . . # . . # . . # . . . #
+                # . . . . . . # . . . . @ . #
+                # . . . # . . # . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth-2-corner': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # * # . . . . . . . . . . . #
+                # . # . # # # # # # # # # . #
+                # . # . # . . . . . . . # . #
+                # . # . # . # # # # # . # . #
+                # . # . # . # . . . # . # . #
+                # . . . # . # . # . # . # . #
+                # # # # # . # @ # . # . # . #
+                # . . . # . # # # . # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # # # # # # # . # . #
+                # . # . . . . . . . . . # . #
+                # . # # # # # # # # # # # . #
+                # . . . . . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . # @ . . . # . . #
+                # . # # # . # # # # . # # . #
+                # . # . . . . . . . . . . . #
+                # . # # # # # # # # . # # # #
+                # . . . . . . . . # . . . . #
+                # # # # # # # . # # # # # . #
+                # . . . . # . . # . . . . . #
+                # . # # . . . # # . # # # # #
+                # . . # . # . . # . . . # . #
+                # # . # . # # . # # # . # . #
+                # # . # . . # . . . # . . . #
+                # # . # # . # # # . # # # . #
+                # . . . # . . * # . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . # . # . . . . # . . #
+                # . # . # . # # # # . . . # #
+                # . # . . . . . . . . # . . #
+                # . # # # # # # # # . # # # #
+                # . . . # . . # . # . # . * #
+                # # # . # . # # . # . # . . #
+                # @ # . # . . . . # . # # . #
+                # . # . # # . # # # . . # . #
+                # . # . . # . . # # # . # . #
+                # . # # . # # . # . # . # . #
+                # . # . . . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . . . # . . . # . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze-3': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . @ # . # . . . . . . #
+                # . # # # # . # . # # # # . #
+                # . # . . . . # . # . . . . #
+                # . . . # # # # . # . # . # #
+                # # # . # . . . . # . # . . #
+                # . . . # . # # . # . # # . #
+                # . # . # . # . . # . . # * #
+                # . # . # . # . # # # . # # #
+                # . # . . . # . # . # . . . #
+                # . # # # . # . # . # # # . #
+                # . # . . . # . # . . . # . #
+                # . # . # # # . # . # . # . #
+                # . # . . . # . . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'small-corridor': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # * # . # . # . #
+                # @ # # # # # # # # # # # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . . . . . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'four-rooms-small': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . @ # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . . . . . . . . #
+                # # # . # # # # # # . # # # #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . * . . #
+                # . . . . . . . . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'perfect-maze-15x15': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . # . . . # . # . . . . . #
+                # . # . # . # . # . # . # # #
+                # * . . # . # . . . # . . . #
+                # # # # # . # # # . # # # . #
+                # . . . # . . . # . # . # . #
+                # . # . # # # . # . # . # . #
+                # . # . . . . . # . . . # . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . . . #
+                # . # # # # # # # . # # # # #
+                # . # . . . . . # . . . . @ #
+                # . # . # # # . # # # # # . #
+                # . . . # . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+        }
+    else:
+        print("(unsupported size for fixed evals)")
+        fixed_eval_levels = {}
+
 
     print("configuring heatmap splayer...")
     match level_splayer:
@@ -220,6 +387,7 @@ def corner(
             splayer_fn = cheese_in_the_corner.splay_cheese_and_mouse 
         case _:
             raise ValueError(f'unknown level splayer {level_splayer!r}')
+
 
     train.run(
         seed=seed,
@@ -357,6 +525,7 @@ def dish(
     config = locals()
     util.print_config(config)
 
+
     print("configuring environment...")
     env = cheese_on_a_dish.Env(
         terminate_after_cheese_and_dish=env_terminate_after_dish,
@@ -364,6 +533,7 @@ def dish(
         img_level_of_detail=img_level_of_detail,
         penalize_time=env_penalize_time,
     )
+
 
     print("configuring level generators...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -390,14 +560,16 @@ def dish(
         )
     else:
         train_level_generator = orig_level_generator
-    
+
+
     print("configuring level classifier...")
     def classify_level_is_shift(level: Level) -> bool:
         return jnp.logical_or(
             level.cheese_pos[0] != level.dish_pos[0],
             level.cheese_pos[1] != level.dish_pos[1],
         )
-    
+
+
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -410,7 +582,8 @@ def dish(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
-    
+
+
     print("configuring level mutator...")
     biased_cheese_on_dish_mutator = MixtureLevelMutator(
         mutators=(
@@ -441,18 +614,220 @@ def dish(
         num_steps=num_mutate_steps,
     )
 
+
     print("TODO: implement level solver...")
-    
+
+
     print("configuring level metrics...")
     level_metrics = cheese_on_a_dish.LevelMetrics(
         env=env,
         discount_rate=ppo_gamma,
     )
 
+
     print("TODO: implement level splayers for heatmap evals...")
-    
-    print("TODO: configure parser and fixed eval levels...")
-    
+
+
+    print("configuring parser and parsing fixed eval levels...")
+    if env_size == 15:
+        level_parser_15 = cheese_on_a_dish.LevelParser(
+            height=15,
+            width=15,
+        )
+        fixed_eval_levels = {
+            'sixteen-rooms': level_parser_15.parse("""
+                # # # # # # # # # # # # # # # 
+                # . . . # . . # . . # . . . #
+                # . @ . . . . . . . # . . . #
+                # . . . # . . # . . . . . . #
+                # # . # # # . # # . # # # . #
+                # . . . # . . . . . . . . . #
+                # . . . . . . # . . # . . . #
+                # # # . # . # # . # # # . # #
+                # . . . # . . . . . # . . . #
+                # . . . # . . # . . . . . . #
+                # . # # # # . # # . # . # # #
+                # . . . # . . # . . # . . . #
+                # . . . . . . # . . . . b . #
+                # . . . # . . . . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'sixteen-rooms-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . # . . . . . # . . . #
+                # . @ . . . . # . . # . . . #
+                # . . . # . . # . . # . . . #
+                # # # # # . # # . # # # . # #
+                # . . . # . . # . . . . . . #
+                # . . . . . . # . . # . . . #
+                # # . # # # # # . # # # # # #
+                # . . . # . . # . . # . . . #
+                # . . . # . . . . . . . . . #
+                # # # . # # . # # . # # # # #
+                # . . . # . . # . . # . . . #
+                # . . . . . . # . . . . b . #
+                # . . . # . . # . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . # . #
+                # . # . # # # # # # # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # . # # # . # . # . #
+                # . # . # . # b # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . . . # . . . # . # . #
+                # . # # # # # # # # # . # . #
+                # . . . . . # . . . . . # . #
+                # # # # # . # . # # # # # . #
+                # @ . . . . # . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # @ # . . . . . . . . . . . #
+                # . # . # # # # # # # # # . #
+                # . # . # . . . . . . . # . #
+                # . # . # . # # # # # . # . #
+                # . # . # . # . . . # . # . #
+                # . . . # . # . # . # . # . #
+                # # # # # . # b # . # . # . #
+                # . . . # . # # # . # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # # # # # # # . # . #
+                # . # . . . . . . . . . # . #
+                # . # # # # # # # # # # # . #
+                # . . . . . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth-flipped': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . # . #
+                # . # . # # # # # # # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # . # # # . # . # . #
+                # . # . # . # b # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . . . # . . . # . #
+                # . # . # # # # # # # # # . #
+                # . # . . . . . # . . . . . #
+                # . # # # # # . # . # # # # #
+                # . . . . . . . # . . . . @ #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . # @ . . . # . . #
+                # . # # # . # # # # . # # . #
+                # . # . . . . . . . . . . . #
+                # . # # # # # # # # . # # # #
+                # . . . . . . . . # . . . . #
+                # # # # # # # . # # # # # . #
+                # . . . . # . . # . . . . . #
+                # . # # . . . # # . # # # # #
+                # . . # . # . . # . . . # . #
+                # # . # . # # . # # # . # . #
+                # # . # . . # . . . # . . . #
+                # # . # # . # # # . # # # . #
+                # . . . # . . b # . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . # . # . . . . # . . #
+                # . # . # . # # # # . . . # #
+                # . # . . . . . . . . # . . #
+                # . # # # # # # # # . # # # #
+                # . . . # . . # . # . # . b #
+                # # # . # . # # . # . # . . #
+                # @ # . # . . . . # . # # . #
+                # . # . # # . # # # . . # . #
+                # . # . . # . . # # # . # . #
+                # . # # . # # . # . # . # . #
+                # . # . . . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . . . # . . . # . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze-3': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . @ # . # . . . . . . #
+                # . # # # # . # . # # # # . #
+                # . # . . . . # . # . . . . #
+                # . . . # # # # . # . # . # #
+                # # # . # . . . . # . # . . #
+                # . . . # . # # . # . # # . #
+                # . # . # . # . . # . . # b #
+                # . # . # . # . # # # . # # #
+                # . # . . . # . # . # . . . #
+                # . # # # . # . # . # # # . #
+                # . # . . . # . # . . . # . #
+                # . # . # # # . # . # . # . #
+                # . # . . . # . . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'small-corridor': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # b # . # . # . #
+                # @ # # # # # # # # # # # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . . . . . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'four-rooms-small': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . @ # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . . . . . . . . #
+                # # # . # # # # # # . # # # #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . b . . #
+                # . . . . . . . . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'perfect-maze-15x15': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . # . . . # . # . . . . . #
+                # . # . # . # . # . # . # # #
+                # b . . # . # . . . # . . . #
+                # # # # # . # # # . # # # . #
+                # . . . # . . . # . # . # . #
+                # . # . # # # . # . # . # . #
+                # . # . . . . . # . . . # . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . . . #
+                # . # # # # # # # . # # # # #
+                # . # . . . . . # . . . . @ #
+                # . # . # # # . # # # # # . #
+                # . . . # . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+        }
+    else:
+        print("(unsupported size for fixed evals)")
+        fixed_eval_levels = {}
+
+
     train.run(
         seed=seed,
         env=env,
@@ -461,7 +836,7 @@ def dish(
         level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
-        fixed_eval_levels={},
+        fixed_eval_levels=fixed_eval_levels,
         heatmap_splayer_fn=None,
         classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
@@ -599,6 +974,7 @@ def pile(
     config = locals()
     util.print_config(config)
 
+
     print("configuring environment...")
     env = cheese_on_a_pile.Env(
         terminate_after_cheese_and_pile=env_terminate_after_pile,
@@ -608,6 +984,7 @@ def pile(
         img_level_of_detail=img_level_of_detail,
         penalize_time=env_penalize_time,
     )
+
 
     print("configuring level generators...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -638,14 +1015,16 @@ def pile(
         )
     else:
         train_level_generator = orig_level_generator
-    
+
+
     print("configuring level classifier...")
     def classify_level_is_shift(level: Level) -> bool:
         return jnp.logical_or(
             level.cheese_pos[0] != level.napkin_pos[0],
             level.cheese_pos[1] != level.napkin_pos[1],
         )
-    
+
+
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -659,8 +1038,8 @@ def pile(
             "shift": shift_level_generator,
         }
 
+
     print("configuring level mutator...")
-    
     biased_cheese_on_pile_mutator = MixtureLevelMutator(
         mutators=(
             # teleport cheese on pile
@@ -693,18 +1072,221 @@ def pile(
         num_steps=num_mutate_steps,
     )
 
+
     print("TODO: implement level solver...") # this should be done but let's double check how to integrate it
-    
+
+
     print("configuring level metrics...")
     level_metrics = cheese_on_a_pile.LevelMetrics(
         env=env,
         discount_rate=ppo_gamma,
     )
-    
+
+
     print("TODO: implement level splayers for heatmap evals...")
-    
-    print("TODO: configure parser and fixed eval levels...")
-    
+
+
+    print("configuring parser and parsing fixed eval levels...")
+    if env_size == 15:
+        level_parser_15 = cheese_on_a_pile.LevelParser(
+            height=15,
+            width=15,
+            split_elements=split_elements_train,
+        )
+        fixed_eval_levels = {
+            'sixteen-rooms': level_parser_15.parse("""
+                # # # # # # # # # # # # # # # 
+                # . . . # . . # . . # . . . #
+                # . @ . . . . . . . # . . . #
+                # . . . # . . # . . . . . . #
+                # # . # # # . # # . # # # . #
+                # . . . # . . . . . . . . . #
+                # . . . . . . # . . # . . . #
+                # # # . # . # # . # # # . # #
+                # . . . # . . . . . # . . . #
+                # . . . # . . # . . . . . . #
+                # . # # # # . # # . # . # # #
+                # . . . # . . # . . # . . . #
+                # . . . . . . # . . . . b . #
+                # . . . # . . . . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'sixteen-rooms-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . # . . . . . # . . . #
+                # . @ . . . . # . . # . . . #
+                # . . . # . . # . . # . . . #
+                # # # # # . # # . # # # . # #
+                # . . . # . . # . . . . . . #
+                # . . . . . . # . . # . . . #
+                # # . # # # # # . # # # # # #
+                # . . . # . . # . . # . . . #
+                # . . . # . . . . . . . . . #
+                # # # . # # . # # . # # # # #
+                # . . . # . . # . . # . . . #
+                # . . . . . . # . . . . b . #
+                # . . . # . . # . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . # . #
+                # . # . # # # # # # # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # . # # # . # . # . #
+                # . # . # . # b # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . . . # . . . # . # . #
+                # . # # # # # # # # # . # . #
+                # . . . . . # . . . . . # . #
+                # # # # # . # . # # # # # . #
+                # @ . . . . # . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # @ # . . . . . . . . . . . #
+                # . # . # # # # # # # # # . #
+                # . # . # . . . . . . . # . #
+                # . # . # . # # # # # . # . #
+                # . # . # . # . . . # . # . #
+                # . . . # . # . # . # . # . #
+                # # # # # . # b # . # . # . #
+                # . . . # . # # # . # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # # # # # # # . # . #
+                # . # . . . . . . . . . # . #
+                # . # # # # # # # # # # # . #
+                # . . . . . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'labyrinth-flipped': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . # . #
+                # . # . # # # # # # # . # . #
+                # . # . # . . . . . # . # . #
+                # . # . # . # # # . # . # . #
+                # . # . # . # b # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . . . # . . . # . #
+                # . # . # # # # # # # # # . #
+                # . # . . . . . # . . . . . #
+                # . # # # # # . # . # # # # #
+                # . . . . . . . # . . . . @ #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . # @ . . . # . . #
+                # . # # # . # # # # . # # . #
+                # . # . . . . . . . . . . . #
+                # . # # # # # # # # . # # # #
+                # . . . . . . . . # . . . . #
+                # # # # # # # . # # # # # . #
+                # . . . . # . . # . . . . . #
+                # . # # . . . # # . # # # # #
+                # . . # . # . . # . . . # . #
+                # # . # . # # . # # # . # . #
+                # # . # . . # . . . # . . . #
+                # # . # # . # # # . # # # . #
+                # . . . # . . b # . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze-2': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . # . # . . . . # . . #
+                # . # . # . # # # # . . . # #
+                # . # . . . . . . . . # . . #
+                # . # # # # # # # # . # # # #
+                # . . . # . . # . # . # . b #
+                # # # . # . # # . # . # . . #
+                # @ # . # . . . . # . # # . #
+                # . # . # # . # # # . . # . #
+                # . # . . # . . # # # . # . #
+                # . # # . # # . # . # . # . #
+                # . # . . . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . . . # . . . # . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'standard-maze-3': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . @ # . # . . . . . . #
+                # . # # # # . # . # # # # . #
+                # . # . . . . # . # . . . . #
+                # . . . # # # # . # . # . # #
+                # # # . # . . . . # . # . . #
+                # . . . # . # # . # . # # . #
+                # . # . # . # . . # . . # b #
+                # . # . # . # . # # # . # # #
+                # . # . . . # . # . # . . . #
+                # . # # # . # . # . # # # . #
+                # . # . . . # . # . . . # . #
+                # . # . # # # . # . # . # . #
+                # . # . . . # . . . # . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'small-corridor': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . . . . . . . . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # b # . # . # . #
+                # @ # # # # # # # # # # # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . # . # . # . # . # . # . #
+                # . . . . . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'four-rooms-small': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . @ # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . . . . . . . . #
+                # # # . # # # # # # . # # # #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . b . . #
+                # . . . . . . . . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # . . . . . . # . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+            'perfect-maze-15x15': level_parser_15.parse("""
+                # # # # # # # # # # # # # # #
+                # . # . . . # . # . . . . . #
+                # . # . # . # . # . # . # # #
+                # b . . # . # . . . # . . . #
+                # # # # # . # # # . # # # . #
+                # . . . # . . . # . # . # . #
+                # . # . # # # . # . # . # . #
+                # . # . . . . . # . . . # . #
+                # . # # # # # # # # # # # . #
+                # . # . . . . . . . . . . . #
+                # . # # # # # # # . # # # # #
+                # . # . . . . . # . . . . @ #
+                # . # . # # # . # # # # # . #
+                # . . . # . . . . . . . . . #
+                # # # # # # # # # # # # # # #
+            """),
+        }
+    else:
+        print("(unsupported size for fixed evals)")
+        fixed_eval_levels = {}
+
+
     train.run(
         seed=seed,
         env=env,
@@ -713,7 +1295,7 @@ def pile(
         level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
-        fixed_eval_levels={},
+        fixed_eval_levels=fixed_eval_levels,
         heatmap_splayer_fn=None,
         classify_level_is_shift=classify_level_is_shift,
         net_cnn_type=net_cnn_type,
@@ -838,12 +1420,14 @@ def keys(
     config = locals()
     util.print_config(config)
 
+
     print("configuring environment...")
     env = keys_and_chests.Env(
         obs_level_of_detail=obs_level_of_detail,
         img_level_of_detail=img_level_of_detail,
         penalize_time=env_penalize_time,
     )
+
 
     print("configuring level generators...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -876,10 +1460,12 @@ def keys(
         )
     else:
         train_level_generator = orig_level_generator
-    
+
+
     print("TODO: define level classifier")
     classify_level_is_shift = None
-    
+
+
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -892,15 +1478,20 @@ def keys(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
-    
+
+
     print("TODO: implement level solver...")
-    
+
+
     print("TODO: implement level metrics...")
-    
+
+
     print("TODO: implement level splayers for heatmap evals...")
-    
+
+
     print("TODO: configure parser and fixed eval levels...")
-    
+
+
     train.run(
         seed=seed,
         env=env,
@@ -1034,6 +1625,7 @@ def minimaze(
     config = locals()
     util.print_config(config)
 
+
     print("configuring environment...")
     env = minigrid_maze.Env(
         obs_height=obs_height,
@@ -1042,6 +1634,7 @@ def minimaze(
         img_level_of_detail=img_level_of_detail,
         penalize_time=env_penalize_time,
     )
+
 
     print("configuring level generators...")
     maze_generator = maze_generation.get_generator_class_from_name(
@@ -1068,14 +1661,16 @@ def minimaze(
         )
     else:
         train_level_generator = orig_level_generator
-    
+
+
     print("configuring level classifier...")
     def classify_level_is_shift(level: Level) -> bool:
         return jnp.logical_or(
             level.goal_pos[0] != 1,
             level.goal_pos[1] != 1,
         )
-    
+
+
     print("configuring eval level generators...")
     if prob_shift > 0.0:
         eval_level_generators = {
@@ -1088,6 +1683,7 @@ def minimaze(
             "orig": orig_level_generator,
             "shift": shift_level_generator,
         }
+
 
     print("configuring level mutator...")
     biased_goal_mutator = MixtureLevelMutator(
@@ -1118,16 +1714,20 @@ def minimaze(
         num_steps=num_mutate_steps,
     )
 
+
     print("TODO: implement level solver...")
-    
+
+
     print("configuring level metrics...")
     level_metrics = minigrid_maze.LevelMetrics(
         env=env,
         discount_rate=ppo_gamma,
     )
-    
+
+
     print("TODO: implement level splayers for heatmap evals...")
-    
+
+
     print("configuring parser and parsing fixed eval levels...")
     level_parser_15 = minigrid_maze.LevelParser(height=15, width=15)
     level_parser_19 = minigrid_maze.LevelParser(height=19, width=19)
@@ -1372,6 +1972,7 @@ def minimaze(
         """),
     }
 
+
     train.run(
         seed=seed,
         env=env,
@@ -1493,6 +2094,7 @@ def memory_test(
     config = locals()
     util.print_config(config)
 
+
     print("configuring environment...")
     env = minigrid_maze.Env(
         obs_height=obs_height,
@@ -1502,8 +2104,10 @@ def memory_test(
         penalize_time=env_penalize_time,
     )
 
+
     print("configuring level generators...")
     orig_level_generator = minigrid_maze.MemoryTestLevelGenerator()
+
 
     train.run(
         seed=seed,
