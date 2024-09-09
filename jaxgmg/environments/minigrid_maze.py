@@ -1439,13 +1439,13 @@ class LevelMetrics(base.LevelMetrics):
                 'prop_walls_hist': prop_walls,
                 'prop_walls_avg': prop_walls.mean(),
                 'prop_walls_wavg': prop_walls @ weights,
-                # superimposed layout and position maps
-                'wall_map_avg_img': util.viridis(wall_map.mean(axis=0)),
-                'wall_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', wall_map, weights)),
-                'hero_map_avg_img': util.viridis(hero_map.mean(axis=0)),
-                'hero_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', hero_map, weights)),
-                'goal_map_avg_img': util.viridis(goal_map.mean(axis=0)),
-                'goal_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', goal_map, weights)),
+                # # superimposed layout and position maps
+                # 'wall_map_avg_img': util.viridis(wall_map.mean(axis=0)),
+                # 'wall_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', wall_map, weights)),
+                # 'hero_map_avg_img': util.viridis(hero_map.mean(axis=0)),
+                # 'hero_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', hero_map, weights)),
+                # 'goal_map_avg_img': util.viridis(goal_map.mean(axis=0)),
+                # 'goal_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', goal_map, weights)),
             },
             'distances': {
                 # solvability

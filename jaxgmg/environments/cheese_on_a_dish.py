@@ -1648,15 +1648,15 @@ class LevelMetrics(base.LevelMetrics):
                 'prop_walls_hist': prop_walls,
                 'prop_walls_avg': prop_walls.mean(),
                 'prop_walls_wavg': prop_walls @ weights,
-                # superimposed layout and position maps
-                'wall_map_avg_img': util.viridis(wall_map.mean(axis=0)),
-                'wall_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', wall_map, weights)),
-                'mouse_map_avg_img': util.viridis(mouse_map.mean(axis=0)),
-                'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
-                'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
-                'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
-                'dish_map_avg_img': util.viridis(dish_map.mean(axis=0)),
-                'dish_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
+                # # superimposed layout and position maps
+                # 'wall_map_avg_img': util.viridis(wall_map.mean(axis=0)),
+                # 'wall_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', wall_map, weights)),
+                # 'mouse_map_avg_img': util.viridis(mouse_map.mean(axis=0)),
+                # 'mouse_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', mouse_map, weights)),
+                # 'cheese_map_avg_img': util.viridis(cheese_map.mean(axis=0)),
+                # 'cheese_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', cheese_map, weights)),
+                # 'dish_map_avg_img': util.viridis(dish_map.mean(axis=0)),
+                # 'dish_map_wavg_img': util.viridis(jnp.einsum('lhw,l->hw', dish_map, weights)),
 
             },
             'distances': {
