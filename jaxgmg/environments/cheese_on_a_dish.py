@@ -501,7 +501,7 @@ class LevelGenerator(base.LevelGenerator):
             dish_pos[1],
         ]
 
-        near_dish = (distance_to_dish <= self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
+        near_dish = (distance_to_dish == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
         #remove the walls from the near_dish mask
 
         rng_spawn_cheese, rng = jax.random.split(rng)
@@ -513,6 +513,15 @@ class LevelGenerator(base.LevelGenerator):
         )
 
         wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
+
+        # ensure dish is not on the border
+        top_left_corner_pos = jnp.array((0, 0))
+        dish_hit_corner = (dish_pos == top_left_corner_pos).all()
+        dish_pos = jax.lax.select(
+                dish_hit_corner,
+                cheese_pos,
+                dish_pos,
+        )
 
         return Level(
             wall_map=wall_map,
@@ -963,21 +972,19 @@ class CheeseOnDishLevelMutator(base.LevelMutator):
             new_cheese_pos[1],
         ]
 
-        near_cheese = (distance_to_cheese <= self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
+        near_cheese = (distance_to_cheese == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
         #remove the walls from the near_dish mask
         #near_dish_nowall = near_dish | (near_dish & no_wall)
+
+        no_wall = ~new_wall_map.flatten()
 
         rng_spawn_dish, rng = jax.random.split(rng)
         new_dish_pos = jax.random.choice(
             key=rng_spawn_dish,
             a=coords,
-            p = near_cheese & ~border,
+            p = near_cheese & ~border & no_wall,
         )
 
-        new_wall_map = new_wall_map.at[
-            new_dish_pos[0],
-            new_dish_pos[1],
-        ].set(False)
 
         # upon collision with mouse, transpose cheese with mouse
         cheese_hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
@@ -994,6 +1001,19 @@ class CheeseOnDishLevelMutator(base.LevelMutator):
                 level.dish_pos,
                 level.initial_mouse_pos,
         )
+
+        top_left_corner_pos = jnp.array((0, 0))
+        dish_hit_corner = (new_dish_pos == top_left_corner_pos).all()
+        new_dish_pos = jax.lax.select(
+                dish_hit_corner,
+                level.dish_pos,
+                new_dish_pos,
+        )
+
+        new_wall_map = new_wall_map.at[
+            new_dish_pos[0],
+            new_dish_pos[1],
+        ].set(False)
 
         return level.replace(
             wall_map=new_wall_map,
