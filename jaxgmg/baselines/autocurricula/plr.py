@@ -12,11 +12,13 @@ import jax.numpy as jnp
 from flax import struct
 from chex import PRNGKey, Array
 
+from jaxgmg.baselines import experience
+from jaxgmg.baselines.autocurricula.prioritisation import plr_replay_probs
+from jaxgmg.baselines.autocurricula.scores import plr_compute_scores
+
 from jaxgmg.environments.base import Level, LevelGenerator, LevelMetrics
 from jaxgmg.baselines.experience import Rollout
 from jaxgmg.baselines.autocurricula import base
-from jaxgmg.baselines.autocurricula.prioritisation import plr_replay_probs
-from jaxgmg.baselines.autocurricula.scores import plr_compute_scores
 
 
 @struct.dataclass
@@ -24,7 +26,11 @@ class AnnotatedLevel:
     level: Level
     last_score: float
     last_visit_time: int
-    first_visit_time: int           # note: only used for metrics
+    # information for maxmc methods
+    max_ever_return: float
+    max_ever_proxy_return: float    # proxy returns for maxmc
+    # additional annotations for metrics
+    first_visit_time: int
 
 
 @struct.dataclass
@@ -40,12 +46,19 @@ class GeneratorState(base.GeneratorState):
 class CurriculumGenerator(base.CurriculumGenerator):
     level_generator: LevelGenerator
     level_metrics: LevelMetrics | None
+    # replay buffer
     buffer_size: int
     temperature: float
     staleness_coeff: float
-    prob_replay: float
-    regret_estimator: str                   # "absGAE", "PVL", todo: "maxMC"
+    # replay dynamics
     robust: bool
+    prob_replay: float
+    # scoring
+    scoring_method: str
+    discount_rate: float
+    proxy_shaping: bool
+    proxy_name: str | None
+    proxy_shaping_coeff: float | None
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -73,6 +86,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 last_score=initial_scores,
                 last_visit_time=initial_time,
                 first_visit_time=initial_time,
+                max_ever_return=jnp.zeros(self.buffer_size),
+                max_ever_proxy_return=jnp.zeros(self.buffer_size),
             ),
             num_replay_batches=0,
             prev_P_replay=jnp.zeros(self.buffer_size),
@@ -169,18 +184,21 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,              # float[num_levels, num_steps]
         proxy_advantages: Array | None, # float[num_levels, num_steps]
     ) -> GeneratorState:
-        # estimate scores of these levels from the rollouts
-        scores = plr_compute_scores(
-            regret_estimator=self.regret_estimator,
+        # perform both a replay-type update and a new-type update
+        replay_next_state = self._replay_update(
+            state,
             rollouts=rollouts,
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
         )
-    
-        # perform both a replay-type update and a new-type update
-        replay_next_state = self._replay_update(state, scores)
-        new_next_state = self._new_update(state, levels, scores)
+        new_next_state = self._new_update(
+            state,
+            rollouts=rollouts,
+            advantages=advantages,
+            proxy_advantages=proxy_advantages,
+            levels=levels,
+        )
         # and keep the result corresponding to the previous batch's type
         next_state = jax.tree.map(
             lambda r, n: jnp.where(state.prev_batch_was_replay, r, n),
@@ -193,12 +211,61 @@ class CurriculumGenerator(base.CurriculumGenerator):
     def _replay_update(
         self,
         state: GeneratorState,
-        scores: Array,
+        rollouts: Rollout,
+        advantages: Array,
+        proxy_advantages: Array,
+        levels: Level,  # Level[num_levels]
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a replay batch, update the
         state.
         """
+        # update the max returns
+        new_max_returns = jax.vmap(
+            experience.compute_maximum_return,
+            in_axes=(0,0,None),
+        )(
+            rollouts.transitions.reward,
+            rollouts.transitions.done,
+            self.discount_rate,
+        )
+        old_max_returns = state.buffer.max_ever_return[
+            state.prev_batch_level_ids
+        ]
+        max_max_returns = jnp.maximum(
+            new_max_returns,
+            old_max_returns,
+        )
+        # update the proxy max returns
+        new_proxy_max_returns = jax.vmap(
+            experience.compute_maximum_return,
+            in_axes=(0,0,None),
+        )(
+            rollouts.transitions.info['proxy_rewards'][self.proxy_name],
+            rollouts.transitions.done,
+            self.discount_rate,
+        )
+        old_proxy_max_returns = state.buffer.max_ever_proxy_return[
+            state.prev_batch_level_ids
+        ]
+        max_proxy_max_returns = jnp.maximum(
+            new_proxy_max_returns,
+            old_proxy_max_returns,
+        )
+        # compute the scores of these levels from the rollouts
+        scores = plr_compute_scores(
+            scoring_method=self.scoring_method,
+            rollouts=rollouts,
+            max_ever_returns=max_max_returns,
+            advantages=advantages,
+            discount_rate=self.discount_rate,
+            proxy_shaping=self.proxy_shaping,
+            proxy_name=self.proxy_name,
+            proxy_shaping_coeff=self.proxy_shaping_coeff,
+            max_ever_proxy_returns=max_proxy_max_returns,
+            proxy_advantages=proxy_advantages,
+            levels=levels,
+        )
         # replace the scores of the replayed level ids with the new scores
         # and mark those levels as just visited
         return state.replace(
@@ -209,6 +276,12 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 last_visit_time=state.buffer.last_visit_time
                     .at[state.prev_batch_level_ids]
                     .set(state.num_replay_batches + 1),
+                max_ever_return=state.buffer.max_ever_return
+                    .at[state.prev_batch_level_ids]
+                    .set(max_max_returns),
+                max_ever_proxy_return=state.buffer.max_ever_proxy_return
+                    .at[state.prev_batch_level_ids]
+                    .set(max_proxy_max_returns),
             ),
             num_replay_batches=state.num_replay_batches + 1,
         )
@@ -217,13 +290,50 @@ class CurriculumGenerator(base.CurriculumGenerator):
     def _new_update(
         self,
         state: GeneratorState,
+        rollouts: Rollout,
+        advantages: Array,
+        proxy_advantages: Array,
         levels: Level,  # Level[num_levels]
-        scores: Array,  # float[num_levels]
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a new batch (not a replay
         batch), update the state.
         """
+        # initialise the max returns
+        max_returns = jax.vmap(
+            experience.compute_maximum_return,
+            in_axes=(0,0,None),
+        )(
+            rollouts.transitions.reward,
+            rollouts.transitions.done,
+            self.discount_rate,
+        )
+        # initialise the proxy max returns
+        proxy_max_returns = jax.vmap(
+            experience.compute_maximum_return,
+            in_axes=(0,0,None),
+        )(
+            rollouts.transitions.info['proxy_rewards'][self.proxy_name],
+            rollouts.transitions.done, 
+            self.discount_rate,
+        )
+
+        # compute the initial scores from these rollouts
+        scores = plr_compute_scores(
+            scoring_method=self.scoring_method,
+            rollouts=rollouts,
+            max_ever_returns=max_returns,
+            advantages=advantages,
+            discount_rate=self.discount_rate,
+            proxy_shaping=self.proxy_shaping,
+            proxy_name=self.proxy_name,
+            proxy_shaping_coeff=self.proxy_shaping_coeff,
+            max_ever_proxy_returns=proxy_max_returns,
+            proxy_advantages=proxy_advantages,
+            levels=levels,
+        )
+
+        # on to updating the buffer...
         num_levels, = scores.shape
 
         # identify the num_levels levels with lowest replay potential
@@ -239,6 +349,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
             last_score=scores,
             last_visit_time=time_now,
             first_visit_time=time_now,
+            max_ever_return=max_returns,
+            max_ever_proxy_return=proxy_max_returns,
         )
 
         # concatenate the low-potential levels and the challenger levels

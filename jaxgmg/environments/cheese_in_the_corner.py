@@ -861,11 +861,13 @@ class LevelSolution(base.LevelSolution):
     level: Level
     directional_distance_to_cheese: chex.Array
 
+
 @struct.dataclass
 class LevelSolutionProxies(base.LevelSolutionProxies):
     level: Level
     #you have a dictionary of proxies, and have an entry for each proxy. so create a dict of proxies, where each entry has a name for a proxy and a corresponding chex.array
     directional_distance_to_proxies: dict[str, chex.Array]
+
 
 @struct.dataclass
 class LevelSolver(base.LevelSolver):
@@ -910,6 +912,7 @@ class LevelSolver(base.LevelSolver):
             level=level,
             directional_distance_to_cheese=dir_dist_to_cheese,
         )
+
 
     @functools.partial(jax.jit, static_argnames=('self',)) #proxies is a list with a name of strings for various proxies
     def solve_proxy(self, level: Level) -> LevelSolutionProxies:
@@ -959,6 +962,7 @@ class LevelSolver(base.LevelSolver):
             directional_distance_to_proxies=proxy_directions,
         )
     
+
     @functools.partial(jax.jit, static_argnames=('self',))
     def state_value(self, soln: LevelSolution, state: EnvState) -> float:
         """
@@ -1050,7 +1054,8 @@ class LevelSolver(base.LevelSolver):
                 raise ValueError(f"Proxy {proxy_name} not recognized") #corner is the only proxy in this environment, did not implement any other
         
         return proxy_rewards
-    
+
+
     @functools.partial(jax.jit, static_argnames=('self',))
     def state_action_values(
         self,

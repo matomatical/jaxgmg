@@ -498,6 +498,56 @@ def compute_average_return(
     return average_return
 
 
+@jax.jit
+def compute_maximum_return(
+    rewards: Array,         # float[num_steps]
+    dones: Array,           # bool[num_steps]
+    discount_rate: float,
+) -> float:
+    """
+    Given a sequence of (reward, done) pairs, compute the maximum return for
+    any episode represented in the sequence.
+
+    Parameters:
+
+    * rewards : float[num_steps]
+            Scalar rewards delivered at the conclusion of each timestep.
+    * dones : bool[num_steps]
+            True indicates the reward was delivered as the episode
+            terminated.
+    * discount_rate : float
+            The return is exponentially discounted sum of future rewards in
+            the episode, this is the discount rate for that discounting.
+
+    Returns:
+
+    * maximum_return : float
+            The maximum of the returns for each episode represented in the
+            sequence of (reward, done) pairs.
+    """
+    # compute per-step returns
+    def _accumulate_return(
+        next_step_return,
+        this_step_reward_and_done,
+    ):
+        reward, done = this_step_reward_and_done
+        this_step_return = reward + (1-done) * discount_rate * next_step_return
+        return this_step_return, this_step_return
+    _, per_step_returns = jax.lax.scan(
+        _accumulate_return,
+        0,
+        (rewards, dones),
+        reverse=True,
+    )
+
+    # identify start of each episode
+    first_steps = jnp.roll(dones, 1).at[0].set(True)
+    
+    # maximum returns at the start of each episode
+    max_first_step_returns = jnp.max(first_steps * per_step_returns)
+    return max_first_step_returns
+
+
 # # # 
 # Generalised advantage estimation, for rollouts and batches
 
