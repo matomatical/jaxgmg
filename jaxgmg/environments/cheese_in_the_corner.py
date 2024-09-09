@@ -711,6 +711,18 @@ class CornerCheeseLevelMutator(base.LevelMutator):
             new_cheese_col,
         ].set(False)
 
+        #if cheese is not in the corner, leave it there -> ADDING THIS TO SEE IF THIS IS THE PROBLEM FOR ACCEL PERFORMING POORLY
+        
+        # corner_pos = jnp.array([1,1])
+        # cheese_hit_corner = (level.cheese_pos == corner_pos).all()
+        # new_cheese_pos = jax.lax.select(
+        #     cheese_hit_corner,
+        #     new_cheese_pos,
+        #     level.cheese_pos,
+        # )
+        
+        
+            
         # upon collision with mouse, transpose cheese with mouse
         hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
         new_initial_mouse_pos = jax.lax.select(
@@ -718,11 +730,24 @@ class CornerCheeseLevelMutator(base.LevelMutator):
             level.cheese_pos,
             level.initial_mouse_pos,
         )
+        
 
         return level.replace(
             wall_map=new_wall_map,
             initial_mouse_pos=new_initial_mouse_pos,
             cheese_pos=new_cheese_pos,
+        )
+    
+@struct.dataclass
+class FixedCheeseLevelMutator(base.LevelMutator):
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        
+        return level.replace(
+            wall_map=level.wall_map,
+            initial_mouse_pos=level.initial_mouse_pos,
+            cheese_pos=level.cheese_pos,
         )
     
 

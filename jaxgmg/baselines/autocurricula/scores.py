@@ -540,7 +540,6 @@ def regret_oracle_actor(
     return oracle_max_return - average_return
 
 
-
 # # # 
 # Old methods (TODO: refactor)
 
@@ -560,6 +559,33 @@ def plr_compute_scores_old(
         case "proxy_regret_corner":
             # true_reward = rollouts.transitions.reward.sum(axis=1)
             # proxy_reward = rollouts.transitions.info['proxy_rewards']['corner'].sum(axis=1)
+            env = cheese_in_the_corner.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_corner=False,
+            )
+            level_solver = cheese_in_the_corner.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+            true_reward = eval_off_level_set['lvl_avg_return_hist']
+            proxy_reward = eval_off_level_set['proxy_corner']['lvl_avg_return_hist']
+            return jnp.maximum(true_reward - proxy_reward, 0)
+        case "true_regret_corner":
             env = cheese_in_the_corner.Env(
                 obs_level_of_detail=0,
                 penalize_time=False,
@@ -824,6 +850,169 @@ def plr_compute_scores_old(
                 benchmark_returns=eval_on_benchmark_returns,
                 benchmark_proxies=eval_of_proxy_benchmark_returns,
                 )
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            regret_proxy_reward = eval_off_level_set['proxy_dish']['lvl_benchmark_regret_hist_proxy_dish']
+            return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
+        case "true_regret_dish":
+            env = cheese_on_a_dish.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_dish= False,
+            )
+            level_solver = cheese_on_a_dish.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            #print('transition',rollouts.transitions.env_state.level)
+            #levels = rollouts.transitions.env_state.level[:,0]
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            return jnp.maximum(regret_true_reward ,0)
+        case "relative_true_regret_pile":
+            env = cheese_on_a_pile.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_pile= False,
+            )
+            level_solver = cheese_on_a_pile.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+            )
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            regret_proxy_reward = eval_off_level_set['proxy_pile']['lvl_benchmark_regret_hist_proxy_pile']
+            return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
+        case "true_regret_pile":
+            env = cheese_on_a_pile.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_pile= False,
+            )
+            level_solver = cheese_on_a_pile.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+                )
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            return jnp.maximum(regret_true_reward ,0)
+        case "true_regret_minigrid_maze":
+            env = minigrid_maze.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese=False,
+            )
+            level_solver = minigrid_maze.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+            )
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            return jnp.maximum(regret_true_reward ,0)
+        case "relative_true_regret_minigrid_maze":
+            env = minigrid_maze.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese=False,
+            )
+            level_solver = minigrid_maze.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+            )
+            regret_true_reward = eval_off_level_set['lvl_benchmark_regret_hist']
+            regret_proxy_reward = eval_off_level_set['proxy_corner']['lvl_benchmark_regret_hist_proxy_corner']
+            return jnp.maximum(regret_true_reward - regret_proxy_reward,0)
+        case "proxy_regret_dish":
+            env = cheese_on_a_dish.Env(
+                obs_level_of_detail=0,
+                penalize_time=False,
+                terminate_after_cheese_and_dish=False,
+            )
+            level_solver = cheese_on_a_dish.LevelSolver(
+                env=env,
+                discount_rate=0.999,
+            )
+            eval_on_benchmark_returns = level_solver.vmap_level_value(
+                level_solver.vmap_solve(levels),
+                levels
+            )
+            eval_of_proxy_benchmark_returns = level_solver.vmap_level_value_proxy(
+                level_solver.vmap_solve_proxies(levels),
+                levels,
+            )
+            eval_off_level_set = experience.compute_rollout_metrics(
+                rollouts=rollouts,
+                discount_rate=0.999,
+                benchmark_returns=eval_on_benchmark_returns,
+                benchmark_proxies=eval_of_proxy_benchmark_returns,
+            )
             true_reward = eval_off_level_set['lvl_avg_return_hist']
             proxy_reward = eval_off_level_set['proxy_dish']['lvl_avg_return_hist']
             return jnp.maximum(true_reward - proxy_reward, 0)
