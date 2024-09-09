@@ -40,14 +40,14 @@ def corner(
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
-    plr_buffer_size: int = 2048,
+    plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5, #default 0.5
     plr_regret_estimator: str = "PVL",
     plr_robust: bool = False,
     # for accel
-    num_mutate_steps: int = 6,
+    num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
@@ -178,7 +178,7 @@ def corner(
                 ),
                 biased_cheese_mutator,
             ),
-            mixing_probs=(1/3,1/3,1/3),
+            mixing_probs=(10/12,1/12,1/12),
         ),
         num_steps=num_mutate_steps,
     )
@@ -457,7 +457,7 @@ def dish(
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = False,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 12,
+    max_cheese_radius_shift: int = 10,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -471,14 +471,14 @@ def dish(
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
-    plr_buffer_size: int = 2048,
+    plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     plr_robust: bool = True,
     # for accel
-    num_mutate_steps: int = 6,
+    num_mutate_steps: int = 12,
     prob_mutate_wall: float = 0.60,
     prob_mutate_step: float = 0.95,
     prob_mutate_cheese_or_dish: float = 0.0,
@@ -617,7 +617,7 @@ def dish(
                 ),
                 biased_cheese_on_dish_mutator,
             ),
-            mixing_probs=(1/3,1/3,1/3),
+            mixing_probs=(10/12,1/12,1/12),
         ),
         num_steps=num_mutate_steps,
     )
@@ -904,13 +904,13 @@ def pile(
     split_elements_train:int = 0,
     split_elements_shift:int = 0,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 12,
+    max_cheese_radius_shift: int = 10,
     # these two are not relevant and can be ignored for now (they may come
     # useful in next implementations)
     max_dish_radius: int = 0,
     max_dish_radius_shift: int= 0,
     # other env stuff
-    env_terminate_after_pile: bool = True,
+    env_terminate_after_pile: bool = False,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -924,14 +924,14 @@ def pile(
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
-    plr_buffer_size: int = 2048,
+    plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     plr_robust: bool = True,
     # for accel
-    num_mutate_steps: int = 6,
+    num_mutate_steps: int = 12,
     prob_mutate_wall: float = 0.60,
     prob_mutate_step: float = 0.95,
     prob_mutate_cheese_or_pile: float = 0.0,
@@ -1080,7 +1080,7 @@ def pile(
                 ),
                 biased_cheese_on_pile_mutator,
             ),
-            mixing_probs=(1/3,1/3,1/3),
+            mixing_probs=(10/12,1/12,1/12),
         ),
         num_steps=num_mutate_steps,
     )
@@ -1382,7 +1382,7 @@ def keys(
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
-    plr_buffer_size: int = 2048,
+    plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
@@ -1587,14 +1587,14 @@ def minimaze(
     # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
-    plr_buffer_size: int = 2048,
+    plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
     plr_prob_replay: float = 0.5,
     plr_regret_estimator: str = "PVL",      # "PVL" or "absGAE" (todo "maxMC")
     plr_robust: bool = True,
     # for accel
-    num_mutate_steps: int = 6,
+    num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.1,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
@@ -1730,7 +1730,7 @@ def minimaze(
                 ),
                 biased_goal_mutator,
             ),
-            mixing_probs=(1/3,1/3,1/3),
+            mixing_probs=(10/12,1/12,1/12),
         ),
         num_steps=num_mutate_steps,
     )
