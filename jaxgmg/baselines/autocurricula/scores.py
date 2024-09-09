@@ -8,6 +8,7 @@ from jaxgmg.baselines import experience
 from jaxgmg.baselines.experience import Rollout
 
 # hack for computing oracle regrets
+from jaxgmg.procgen import maze_solving
 from jaxgmg.environments.base import Level
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
@@ -187,13 +188,14 @@ def plr_compute_score(
                 discount_rate=discount_rate,
                 max_ever_return=max_ever_return,
             )
-        # case "oracle":
-        #     original_score = regret_oracle(
-        #         level=level,
-        #         values=rollout.transitions.value,
-        #         dones=rollout.transitions.done,
-        #         discount_rate=discount_rate,
-        #     )
+        case "oracle-actor":
+            original_score = regret_oracle_actor(
+                level=level,
+                rewards=rollout.transitions.reward,
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                proxy_oracle=False,
+            )
         case _:
             raise ValueError(f"Unknown scoring method {scoring_method!r}")
 
@@ -242,13 +244,14 @@ def plr_compute_score(
                 discount_rate=discount_rate,
                 max_ever_return=max_ever_proxy_return,
             )
-        # case "oracle":
-        #     proxy_score = proxy_regret_oracle(
-        #         level=level,
-        #         values=rollout.transitions.value,
-        #         dones=rollout.transitions.done,
-        #         discount_rate=discount_rate,
-        #     )
+        case "oracle-actor":
+            proxy_score = regret_oracle_actor(
+                level=level,
+                rewards=rollout.transitions.info["proxy_rewards"][proxy_name],
+                dones=rollout.transitions.done,
+                discount_rate=discount_rate,
+                proxy_oracle=True,
+            )
         case _:
             raise ValueError(f"Unknown proxy scoring method {scoring_method!r}")
 
@@ -422,6 +425,120 @@ def regret_maxmc_actor(
         discount_rate=discount_rate,
     )
     return max_ever_return - average_return
+
+
+@functools.partial(jax.jit, static_argnames=["proxy_oracle"])
+def regret_oracle_actor(
+    level: Level,
+    rewards: Array,             # float[num_steps]
+    dones: Array,               # float[num_steps]
+    discount_rate: float,
+    proxy_oracle: bool,         # static
+) -> float:
+    """
+    Estimate regret for a level by combining an empirical average of the
+    current policy's return with an analytically-computed known optimal
+    return.
+
+        Return_{max oracle} - sum_{t=0}^T \gamma^t r_t.
+
+    Notes:
+
+    * The oracle assumes there is no linear time penalty and no time limit.
+      It will therefore give wrong results for other environment
+      configurations.
+    * The oracle assumes the action space is to move in a cardinal direction.
+      For environments like minigrid_maze it will give an incorrect result
+      because it does not account for the need to take left/right turn
+      actions.
+
+    Implementation notes:
+
+    * The current implementation depends on internal details of the level in
+      a way it shouldn't need to, meaning it only works for certain levels
+      and it solves the level every time this function is called.
+    * This (and the configuration limitation) should be fixed when time
+      allows by having the caller solve the level once when it is created
+      with a provided, configured level solver, and pass in the oracle
+      returns here (instead of the level, like maxmc).
+    """
+    if isinstance(level, cheese_in_the_corner.Level):
+        if not proxy_oracle:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.cheese_pos[0],
+                level.cheese_pos[1],
+            ]
+        else:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                1,
+                1,
+            ]
+        oracle_max_return = discount_rate ** goal_dist
+    elif isinstance(level, cheese_on_a_dish.Level):
+        if not proxy_oracle:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.cheese_pos[0],
+                level.cheese_pos[1],
+            ]
+        else:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.dish_pos[0],
+                level.dish_pos[1],
+            ]
+        oracle_max_return = discount_rate ** goal_dist
+    elif isinstance(level, cheese_on_a_pile.Level):
+        if not proxy_oracle:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.cheese_pos[0],
+                level.cheese_pos[1],
+            ]
+        else:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.napkin_pos[0],
+                level.napkin_pos[1],
+            ]
+        oracle_max_return = discount_rate ** goal_dist
+    elif isinstance(level, minigrid_maze.Level):
+        if not proxy_oracle:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_hero_pos[0],
+                level.initial_hero_pos[1],
+                level.goal_pos[0],
+                level.goal_pos[1],
+            ]
+        else:
+            goal_dist = maze_solving.maze_distances(level.wall_map)[
+                level.initial_hero_pos[0],
+                level.initial_hero_pos[1],
+                level.goal_pos[0],
+                level.goal_pos[1],
+            ]
+        # TODO: this doesn't take into account the action space
+        oracle_max_return = discount_rate ** goal_dist
+    else:
+        raise ValueError(f"Unsupported level type for oracle regret.")
+
+    # no oracle for average return, just use the provided experience
+    average_return = experience.compute_average_return(
+        rewards=rewards,
+        dones=dones,
+        discount_rate=discount_rate,
+    )
+
+    return oracle_max_return - average_return
+
 
 
 # # # 

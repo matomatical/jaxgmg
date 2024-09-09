@@ -24,6 +24,7 @@ def maze_distances(grid):
 
             A value of `inf` indicates that there is no path from the
             source to the destination.
+
     Notes:
 
     * The dist matrix is symmetric so the distinction between source and
