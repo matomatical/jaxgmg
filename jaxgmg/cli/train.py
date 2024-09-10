@@ -171,9 +171,17 @@ def corner(
     if chain_mutate:
         if step_mutate:
             level_mutator = ChainLevelMutator(mutators=(
-                # mutate walls (n-2 steps)
+                # mutate walls or step mouse (n-2 steps)
                 IteratedLevelMutator(
-                    mutator=cheese_in_the_corner.ToggleWallLevelMutator(),
+                    mutator=MixtureLevelMutator(
+                        mutators=(
+                            cheese_in_the_corner.ToggleWallLevelMutator(),
+                            cheese_in_the_corner.StepMouseLevelMutator(
+                                transpose_with_cheese_on_collision=False,
+                            ),
+                        ),
+                        mixing_probs=(1/2,1/2),
+                    ),
                     num_steps=num_mutate_steps - 2,
                 ),
                 # maybe scatter mouse (1 step)
@@ -191,17 +199,9 @@ def corner(
             ))
         else:
             level_mutator = ChainLevelMutator(mutators=(
-                # mutate walls or step mouse (n-2 steps)
+                # mutate walls (n-2 steps)
                 IteratedLevelMutator(
-                    mutator=MixtureLevelMutator(
-                        mutators=(
-                            cheese_in_the_corner.ToggleWallLevelMutator(),
-                            cheese_in_the_corner.StepMouseLevelMutator(
-                                transpose_with_cheese_on_collision=False,
-                            ),
-                        ),
-                        mixing_probs=(1/2,1/2),
-                    ),
+                    mutator=cheese_in_the_corner.ToggleWallLevelMutator(),
                     num_steps=num_mutate_steps - 2,
                 ),
                 # maybe scatter mouse (1 step)

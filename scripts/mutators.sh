@@ -33,16 +33,19 @@ for i in {0..4}; do
     if [ $SLURM_ARRAY_TASK_ID -eq $((j + 0)) ]; then
         jaxgmg train corner "${flags[@]}" \
             --wandb-name binom-mut$num_mutations \
+            --num-mutate-steps $num_mutations \
             --no-chain-mutate \
             --no-step-mutate;
     elif [ $SLURM_ARRAY_TASK_ID -eq $((j + 1)) ]; then
         jaxgmg train corner "${flags[@]}" \
             --wandb-name chain-mut$num_mutations \
+            --num-mutate-steps $num_mutations \
             --chain-mutate \
             --no-step-mutate;
     elif [ $SLURM_ARRAY_TASK_ID -eq $((j + 2)) ]; then
         jaxgmg train corner "${flags[@]}" \
             --wandb-name steps-mut$num_mutations \
+            --num-mutate-steps $num_mutations \
             --chain-mutate \
             --step-mutate;
     fi
