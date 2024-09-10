@@ -19,8 +19,9 @@ flags=(
     --net-rnn-type ff
     --net-width 256
     --num-total-env-steps 500_000_000
+    --level-splayer "cheese-and-mouse"
     --ued accel
-    --plr-regret-estimator maxmc-actor
+    --plr-regret-estimator "maxmc-actor"
     --plr-robust
     --plr-prob-replay 0.8
 );
