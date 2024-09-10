@@ -15,7 +15,8 @@ from jaxgmg.baselines import train
 
 from jaxgmg.environments.base import Level
 from jaxgmg.environments.base import MixtureLevelGenerator
-from jaxgmg.environments.base import MixtureLevelMutator, IteratedLevelMutator
+from jaxgmg.environments.base import MixtureLevelMutator, IdentityLevelMutator
+from jaxgmg.environments.base import ChainLevelMutator, IteratedLevelMutator
 
 from jaxgmg import util
 
@@ -48,6 +49,8 @@ def corner(
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
+    chain_mutate: bool = False,
+    step_mutate: bool = False,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
     plr_proxy_shaping: bool = False,
@@ -156,30 +159,82 @@ def corner(
     biased_cheese_mutator = MixtureLevelMutator(
         mutators=(
             # teleport cheese to the corner or do not move the cheese
-            #cheese_in_the_corner.FixedCheeseLevelMutator(),
             cheese_in_the_corner.CornerCheeseLevelMutator(
                 corner_size=env_corner_size,
             ),
-
             # teleport cheese to a random position
             cheese_in_the_corner.ScatterCheeseLevelMutator(),
         ),
         mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
     )
-    # overall, rotate between wall/mouse/cheese mutations uniformly
-    level_mutator = IteratedLevelMutator(
-        mutator=MixtureLevelMutator(
-            mutators=(
-                cheese_in_the_corner.ToggleWallLevelMutator(),
-                cheese_in_the_corner.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
+    # overall, rotate between wall/mouse/cheese mutations at random
+    if chain_mutate:
+        if step_mutate:
+            level_mutator = ChainLevelMutator(mutators=(
+                # mutate walls (n-2 steps)
+                IteratedLevelMutator(
+                    mutator=cheese_in_the_corner.ToggleWallLevelMutator(),
+                    num_steps=num_mutate_steps - 2,
                 ),
+                # maybe scatter mouse (1 step)
+                MixtureLevelMutator(
+                    mutators=(
+                        cheese_in_the_corner.ScatterMouseLevelMutator(
+                            transpose_with_cheese_on_collision=False,
+                        ),
+                        IdentityLevelMutator(),
+                    ),
+                    mixing_probs=(1/2,1/2),
+                ),
+                # biased scatter cheese (1 step)
                 biased_cheese_mutator,
+            ))
+        else:
+            level_mutator = ChainLevelMutator(mutators=(
+                # mutate walls or step mouse (n-2 steps)
+                IteratedLevelMutator(
+                    mutator=MixtureLevelMutator(
+                        mutators=(
+                            cheese_in_the_corner.ToggleWallLevelMutator(),
+                            cheese_in_the_corner.StepMouseLevelMutator(
+                                transpose_with_cheese_on_collision=False,
+                            ),
+                        ),
+                        mixing_probs=(1/2,1/2),
+                    ),
+                    num_steps=num_mutate_steps - 2,
+                ),
+                # maybe scatter mouse (1 step)
+                MixtureLevelMutator(
+                    mutators=(
+                        cheese_in_the_corner.ScatterMouseLevelMutator(
+                            transpose_with_cheese_on_collision=False,
+                        ),
+                        IdentityLevelMutator(),
+                    ),
+                    mixing_probs=(1/2,1/2),
+                ),
+                # biased scatter cheese (1 step)
+                biased_cheese_mutator,
+            ))
+    else:
+        level_mutator = IteratedLevelMutator(
+            mutator=MixtureLevelMutator(
+                mutators=(
+                    cheese_in_the_corner.ToggleWallLevelMutator(),
+                    cheese_in_the_corner.ScatterMouseLevelMutator(
+                        transpose_with_cheese_on_collision=False,
+                    ),
+                    biased_cheese_mutator,
+                ),
+                mixing_probs=(
+                    (num_mutate_steps - 2) / num_mutate_steps,
+                    1 / num_mutate_steps,
+                    1 / num_mutate_steps,
+                ),
             ),
-            mixing_probs=(10/12,1/12,1/12),
-        ),
-        num_steps=num_mutate_steps,
-    )
+            num_steps=num_mutate_steps,
+        )
 
 
     print("configuring level solver...")

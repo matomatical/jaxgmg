@@ -452,6 +452,15 @@ class LevelMutator:
 
 
 @struct.dataclass
+class IdentityLevelMutator(LevelMutator):
+
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+        return level
+
+
+@struct.dataclass
 class MixtureLevelMutator(LevelMutator):
     mutators: tuple[LevelMutator, ...]
     mixing_probs: tuple[float, ...]
@@ -496,6 +505,23 @@ class IteratedLevelMutator(LevelMutator):
             level,
             jax.random.split(rng, self.num_steps),
         )
+        return level
+
+
+@struct.dataclass
+class ChainLevelMutator(LevelMutator):
+    mutators: tuple[LevelMutator, ...]
+
+
+    @functools.partial(jax.jit, static_argnames=["self"])
+    def mutate_level(
+        self,
+        rng: chex.PRNGKey,
+        level: Level,
+    ) -> Level:
+        for mutator in self.mutators:
+            rng_mutate, rng = jax.random.split(rng)
+            level = mutator.mutate_level(rng, level)
         return level
 
 
@@ -547,12 +573,12 @@ class LevelSolution:
     Represent a solution to some level. All fields come from subclass.
     """
 
+
 @struct.dataclass
 class LevelSolutionProxies:
     """
     Represent a solution to some level. All fields come from subclass.
     """
-
 
 
 @struct.dataclass
