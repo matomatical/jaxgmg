@@ -420,17 +420,24 @@ def wandb_run(f):
     return g
 
 
+_global_defined_metrics = set()
+
+
 def wandb_define_metrics(
     example_metrics: dict,
     step_metric_prefix_mapping: str,
 ):
+    global _global_defined_metrics
     for metric_name in flatten_dict(example_metrics):
+        if metric_name in _global_defined_metrics:
+            continue
         for prefix in step_metric_prefix_mapping:
             if metric_name.startswith(prefix):
                 wandb.define_metric(
                     metric_name,
                     step_metric=step_metric_prefix_mapping[prefix],
                 )
+                _global_defined_metrics.add(metric_name)
                 break
 
 
