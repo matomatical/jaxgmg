@@ -49,7 +49,7 @@ def corner(
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
-    chain_mutate: bool = False,
+    chain_mutate: bool = True,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
     plr_proxy_shaping: bool = False,
@@ -963,6 +963,7 @@ def pile(
     prob_mutate_cheese_or_pile: float = 0.0,
     prob_mutate_objects_count_on_pile: float = 0.2,
     prob_mutate_shift: float = 0.0,
+    chain_mutate: bool = True,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
     plr_proxy_shaping: bool = False,
@@ -1093,22 +1094,45 @@ def pile(
         ),
         mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
     )
-    # overall, rotate between wall/mouse/cheese mutations uniformly
-    level_mutator = IteratedLevelMutator(
-        mutator=MixtureLevelMutator(
-            mutators=(
-                cheese_on_a_pile.ToggleWallLevelMutator(),
-                cheese_on_a_pile.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_pile_on_collision=False,
-                    split_elements=split_elements_shift,
-                ),
-                biased_cheese_on_pile_mutator,
+    # overall
+    if chain_mutate:
+        level_mutator = ChainLevelMutator(mutators=(
+            # mutate walls (n-2 steps)
+            IteratedLevelMutator(
+                mutator=cheese_on_a_pile.ToggleWallLevelMutator(),
+                num_steps=num_mutate_steps - 2,
             ),
-            mixing_probs=(10/12,1/12,1/12),
-        ),
-        num_steps=num_mutate_steps,
-    )
+            # maybe scatter mouse (1 step) else another wall toggle
+            MixtureLevelMutator(
+                mutators=(
+                    cheese_on_a_pile.ScatterMouseLevelMutator(
+                        transpose_with_cheese_on_collision=False,
+                        transpose_with_pile_on_collision=False,
+                        split_elements=split_elements_shift,
+                    ),
+                    cheese_on_a_pile.ToggleWallLevelMutator(),
+                ),
+                mixing_probs=(1/2,1/2),
+            ),
+            # biased scatter cheese (1 step)
+            biased_cheese_on_pile_mutator,
+        ))
+    else:
+        level_mutator = IteratedLevelMutator(
+            mutator=MixtureLevelMutator(
+                mutators=(
+                    cheese_on_a_pile.ToggleWallLevelMutator(),
+                    cheese_on_a_pile.ScatterMouseLevelMutator(
+                        transpose_with_cheese_on_collision=False,
+                        transpose_with_pile_on_collision=False,
+                        split_elements=split_elements_shift,
+                    ),
+                    biased_cheese_on_pile_mutator,
+                ),
+                mixing_probs=(10/12,1/12,1/12),
+            ),
+            num_steps=num_mutate_steps,
+        )
 
 
     print("TODO: implement level solver...") # this should be done but let's double check how to integrate it
