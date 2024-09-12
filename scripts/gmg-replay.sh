@@ -25,8 +25,6 @@ flags=(
     --plr-proxy-shaping-coeff 0.5
 );
 prob_shift_array=(0.0003 0.001 0.003 0.01 0.03);
-accel_prob_replay_array=(0.7 0.5);
-plr_prob_replay_array=(0.5 0.33);
 
 source jaxgmg.venv/bin/activate
 for i in {0..4}; do
