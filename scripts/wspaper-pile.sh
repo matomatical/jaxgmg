@@ -82,6 +82,7 @@ for i in {0..2}; do
                 --ued dr \
                 --num-total-env-steps 250_000_000;
         fi
+    done
 done
 deactivate
 
