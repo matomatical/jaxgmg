@@ -2025,7 +2025,12 @@ class LevelMetrics(base.LevelMetrics):
             state = self.env._reset(level)
             rgb = self.env.render_state(state)
             return rgb
-        rendered_levels = jax.vmap(render_level)(levels)
+        _, top_16_level_ids = jax.lax.top_k(weights, k=16)
+        top_16_levels = jax.tree.map(
+            lambda leaf: leaf[top_16_level_ids],
+            levels,
+        )
+        rendered_levels = jax.vmap(render_level)(top_16_levels)
         rendered_levels_pad = jnp.pad(
             rendered_levels,
             pad_width=((0, 0), (0, 1), (0, 1), (0, 0)),
@@ -2033,12 +2038,12 @@ class LevelMetrics(base.LevelMetrics):
         rendered_levels_grid = einops.rearrange(
             rendered_levels_pad,
             '(level_h level_w) h w c -> (level_h h) (level_w w) c',
-            level_w=64,
+            level_w=4,
         )[:-1,:-1] # cut off last pixel of padding
 
         return {
             'layout': {
-                'levels_img': rendered_levels_grid,
+                'levels16_img': rendered_levels_grid,
                 # number of walls
                 'num_walls_hist': num_walls,
                 'num_walls_avg': num_walls.mean(),
