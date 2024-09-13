@@ -50,6 +50,7 @@ def corner(
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
+    mutate_cheese: bool = True,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
     plr_proxy_shaping: bool = False,
@@ -155,17 +156,21 @@ def corner(
 
     print("configuring level mutator...")
     # if mutating cheese, mostly stay in the restricted region
-    biased_cheese_mutator = MixtureLevelMutator(
-        mutators=(
-            # teleport cheese to the corner or do not move the cheese
-            cheese_in_the_corner.CornerCheeseLevelMutator(
-                corner_size=env_corner_size,
+    if mutate_cheese:
+        biased_cheese_mutator = MixtureLevelMutator(
+            mutators=(
+                # teleport cheese to the corner or do not move the cheese
+                cheese_in_the_corner.CornerCheeseLevelMutator(
+                    corner_size=env_corner_size,
+                ),
+                # teleport cheese to a random position
+                cheese_in_the_corner.ScatterCheeseLevelMutator(),
             ),
-            # teleport cheese to a random position
-            cheese_in_the_corner.ScatterCheeseLevelMutator(),
-        ),
-        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
-    )
+            mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+        )
+    else:
+        # replace the cheese mutation with something else
+        biased_cheese_mutator = cheese_in_the_corner.ToggleWallLevelMutator()
     # overall mutations
     if chain_mutate:
         level_mutator = ChainLevelMutator(mutators=(
@@ -504,9 +509,6 @@ def dish(
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 12,
-    prob_mutate_wall: float = 0.60,
-    prob_mutate_step: float = 0.95,
-    prob_mutate_cheese_or_dish: float = 0.0,
     prob_mutate_shift: float = 0.0,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
@@ -958,12 +960,9 @@ def pile(
     plr_robust: bool = True,
     # for accel
     num_mutate_steps: int = 12,
-    prob_mutate_wall: float = 0.60,
-    prob_mutate_step: float = 0.95,
-    prob_mutate_cheese_or_pile: float = 0.0,
-    prob_mutate_objects_count_on_pile: float = 0.2,
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
+    mutate_cheese_on_pile: bool = True,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
     plr_proxy_shaping: bool = False,
@@ -1079,21 +1078,25 @@ def pile(
 
 
     print("configuring level mutator...")
-    biased_cheese_on_pile_mutator = MixtureLevelMutator(
-        mutators=(
-            # teleport cheese on pile
-            cheese_on_a_pile.CheeseonPileLevelMutator(
-                max_cheese_radius=max_cheese_radius,
-                split_elements=split_elements_shift, # split elements shift and train should always be the same -> Will fix that
+    if mutate_cheese_on_pile:
+        biased_cheese_on_pile_mutator = MixtureLevelMutator(
+            mutators=(
+                # teleport cheese on pile
+                cheese_on_a_pile.CheeseonPileLevelMutator(
+                    max_cheese_radius=max_cheese_radius,
+                    split_elements=split_elements_shift, # split elements shift and train should always be the same -> Will fix that
+                ),
+                # teleport cheese and pile to a random different position, apart by max_cheese_radius
+                cheese_on_a_pile.CheeseonPileLevelMutator(
+                    max_cheese_radius=max_cheese_radius_shift,
+                    split_elements=split_elements_shift,
+                ),
             ),
-            # teleport cheese and pile to a random different position, apart by max_cheese_radius
-            cheese_on_a_pile.CheeseonPileLevelMutator(
-                max_cheese_radius=max_cheese_radius_shift,
-                split_elements=split_elements_shift,
-            ),
-        ),
-        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
-    )
+            mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+        )
+    else:
+        # replace this mutation with something else
+        biased_cheese_on_pile_mutator = cheese_on_a_pile.ToggleWallLevelMutator()
     # overall
     if chain_mutate:
         level_mutator = ChainLevelMutator(mutators=(
