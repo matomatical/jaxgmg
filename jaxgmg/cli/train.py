@@ -11,6 +11,8 @@ from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import cheese_on_a_pile
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import minigrid_maze
+from jaxgmg.environments import lava_land
+from jaxgmg.environments import follow_me
 from jaxgmg.baselines import train
 
 from jaxgmg.environments.base import Level
@@ -56,6 +58,7 @@ def corner(
     plr_proxy_shaping: bool = False,
     proxy_name: str = "proxy_corner",
     plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = False,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -79,7 +82,7 @@ def corner(
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
+    log_gifs: bool = False,
     log_imgs: bool = True,
     log_hists: bool = False,
     num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
@@ -237,7 +240,7 @@ def corner(
     else:
         eval_level_generators = {
             "orig": orig_level_generator,
-            "shift": shift_level_generator,
+            #"shift": shift_level_generator,
             "tree": tree_level_generator,
         }
 
@@ -447,6 +450,7 @@ def corner(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping= clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -968,6 +972,7 @@ def pile(
     plr_proxy_shaping: bool = False,
     proxy_name: str = "proxy_pile",
     plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -991,7 +996,7 @@ def pile(
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
+    log_gifs: bool = False,
     log_imgs: bool = True,
     log_hists: bool = False,
     num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
@@ -1379,6 +1384,7 @@ def pile(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1415,33 +1421,45 @@ def pile(
 @util.wandb_run
 def keys(
     # environment config
-    env_size: int = 13,
+    env_size: int = 15,
     env_layout: str = 'blocks',
-    env_num_keys_min: int = 1,
-    env_num_keys_max: int = 3,
-    env_num_keys_min_shift: int = 9,
-    env_num_keys_max_shift: int = 12,
-    env_num_chests_min: int = 12,
-    env_num_chests_max: int = 24,
+    env_num_keys_min: int = 5,
+    env_num_keys_max: int = 5,
+    env_num_keys_min_shift: int = 15,
+    env_num_keys_max_shift: int = 15,
+    env_num_chests_min: int = 15,
+    env_num_chests_max: int = 15,
+    env_num_chests_min_shift: int = 5,
+    env_num_chests_max_shift: int = 5,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
-    # policy config
+    #  policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
     prob_shift: float = 0.0,
-    # for domain randomisation
     num_train_levels: int = 2048,
     # for plr
     plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
+    plr_prob_replay: float = 0.5, #default 0.5
     plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = True,
+    plr_robust: bool = False,
+    # for accel
+    num_mutate_steps: int = 12,
+    prob_mutate_shift: float = 0.0,
+    chain_mutate: bool = True,
+    mutate_cheese: bool = True,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "keys",
+    plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1452,9 +1470,6 @@ def keys(
     ppo_proxy_critic_coeff: float = 0.5,
     ppo_max_grad_norm: float = 0.5,
     ppo_lr_annealing: bool = False,
-    train_proxy_critic: bool = False,
-    plr_proxy_shaping: bool = False,
-    proxy_name: str = "keys",
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
@@ -1464,7 +1479,7 @@ def keys(
     # logging and evals config
     console_log: bool = True,
     wandb_log: bool = True,
-    wandb_project: str = "test",
+    wandb_project: str = "keys_demo",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
@@ -1517,8 +1532,8 @@ def keys(
         maze_generator=maze_generator,
         num_keys_min=env_num_keys_min_shift,
         num_keys_max=env_num_keys_max_shift,
-        num_chests_min=env_num_chests_min,
-        num_chests_max=env_num_chests_max,
+        num_chests_min=env_num_chests_min_shift,
+        num_chests_max=env_num_chests_max_shift,
     )
     if prob_shift > 0.0:
         print("  mixing level generators with {prob_shift=}...")
@@ -1588,6 +1603,7 @@ def keys(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -1656,6 +1672,7 @@ def minimaze(
     plr_proxy_shaping: bool = False,
     proxy_name: str = "proxy_corner",
     plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -2075,6 +2092,7 @@ def minimaze(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -2134,6 +2152,7 @@ def memory_test(
     plr_proxy_shaping: bool = False,
     proxy_name: str = "",
     plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -2220,6 +2239,7 @@ def memory_test(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -2253,3 +2273,421 @@ def memory_test(
     )
 
 
+
+
+@util.wandb_run
+def follow(
+    # environment config
+    env_size: int = 15,
+    env_layout: str = 'blocks',
+    num_beacons: int = 6,
+    trustworthy_leader: bool = True,
+    trustworthy_leader_shift: bool = False,
+    obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
+    env_penalize_time: bool = False,
+    #  policy config
+    net_cnn_type: str = "large",
+    net_rnn_type: str = "ff",
+    net_width: int = 256,
+    # ued config
+    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    prob_shift: float = 0.0,
+    num_train_levels: int = 2048,
+    # for plr
+    plr_buffer_size: int = 4096,
+    plr_temperature: float = 0.1,
+    plr_staleness_coeff: float = 0.1,
+    plr_prob_replay: float = 0.5, #default 0.5
+    plr_regret_estimator: str = "maxmc-actor",
+    plr_robust: bool = False,
+    # for accel
+    num_mutate_steps: int = 12,
+    prob_mutate_shift: float = 0.0,
+    chain_mutate: bool = True,
+    mutate_cheese: bool = True,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "leader_distance",
+    plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
+    # PPO hyperparameters
+    ppo_lr: float = 0.00005,                # learning rate
+    ppo_gamma: float = 0.999,               # discount rate
+    ppo_clip_eps: float = 0.1,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.001,
+    ppo_critic_coeff: float = 0.5,
+    ppo_proxy_critic_coeff: float = 0.5,
+    ppo_max_grad_norm: float = 0.5,
+    ppo_lr_annealing: bool = False,
+    num_minibatches_per_epoch: int = 4,
+    num_epochs_per_cycle: int = 5,
+    # training dimensions
+    num_total_env_steps: int = 20_000_000,
+    num_env_steps_per_cycle: int = 128,
+    num_parallel_envs: int = 256,
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
+    wandb_project: str = "followme_demo",
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
+    wandb_group: str = None,
+    wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
+    # checkpointing
+    checkpointing: bool = True,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = 512,
+    # other
+    seed: int = 42,
+):
+    config = locals()
+    util.print_config(config)
+
+
+    print("configuring environment...")
+    env = follow_me.Env(
+        obs_level_of_detail=obs_level_of_detail,
+        img_level_of_detail=img_level_of_detail,
+        penalize_time=env_penalize_time,
+    )
+
+
+    print("configuring level generators...")
+    maze_generator = maze_generation.get_generator_class_from_name(
+        name=env_layout,
+    )()
+    orig_level_generator = follow_me.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        num_beacons=num_beacons,
+        trustworthy_leader=trustworthy_leader,
+    )
+    shift_level_generator = follow_me.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        num_beacons=num_beacons,
+        trustworthy_leader=trustworthy_leader_shift,
+    )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+
+
+    print("TODO: define level classifier")
+    classify_level_is_shift = None
+
+
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+
+
+    print("TODO: implement level solver...")
+
+
+    print("TODO: implement level metrics...")
+
+
+    print("TODO: implement level splayers for heatmap evals...")
+
+
+    print("TODO: configure parser and fixed eval levels...")
+
+
+    train.run(
+        seed=seed,
+        env=env,
+        train_level_generator=train_level_generator,
+        level_solver=None,
+        level_mutator=None,
+        level_metrics=None,
+        eval_level_generators=eval_level_generators,
+        fixed_eval_levels={},
+        heatmap_splayer_fn=None,
+        classify_level_is_shift=classify_level_is_shift,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
+        net_width=net_width,
+        ued=ued,
+        prob_shift=prob_shift,
+        num_train_levels=num_train_levels,
+        plr_buffer_size=plr_buffer_size,
+        plr_temperature=plr_temperature,
+        plr_staleness_coeff=plr_staleness_coeff,
+        plr_prob_replay=plr_prob_replay,
+        plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
+        ppo_lr=ppo_lr,
+        ppo_gamma=ppo_gamma,
+        ppo_clip_eps=ppo_clip_eps,
+        ppo_gae_lambda=ppo_gae_lambda,
+        ppo_entropy_coeff=ppo_entropy_coeff,
+        ppo_critic_coeff=ppo_critic_coeff,
+        ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
+        ppo_max_grad_norm=ppo_max_grad_norm,
+        ppo_lr_annealing=ppo_lr_annealing,
+        num_minibatches_per_epoch=num_minibatches_per_epoch,
+        num_epochs_per_cycle=num_epochs_per_cycle,
+        num_total_env_steps=num_total_env_steps,
+        num_env_steps_per_cycle=num_env_steps_per_cycle,
+        num_parallel_envs=num_parallel_envs,
+        console_log=console_log,
+        wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
+        checkpointing=checkpointing,
+        keep_all_checkpoints=keep_all_checkpoints,
+        max_num_checkpoints=max_num_checkpoints,
+        num_cycles_per_checkpoint=num_cycles_per_checkpoint,
+    )
+
+
+@util.wandb_run
+def lava(
+    # environment config
+    env_size: int = 15,
+    env_layout: str = 'blocks',
+    num_beacons: int = 6,
+    lava_threshold: float = -1.0,
+    lava_treshold_shift: float = -0.25,
+    obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
+    img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
+    env_penalize_time: bool = False,
+    #  policy config
+    net_cnn_type: str = "large",
+    net_rnn_type: str = "ff",
+    net_width: int = 256,
+    # ued config
+    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    prob_shift: float = 0.0,
+    num_train_levels: int = 2048,
+    # for plr
+    plr_buffer_size: int = 4096,
+    plr_temperature: float = 0.1,
+    plr_staleness_coeff: float = 0.1,
+    plr_prob_replay: float = 0.5, #default 0.5
+    plr_regret_estimator: str = "maxmc-actor",
+    plr_robust: bool = False,
+    # for accel
+    num_mutate_steps: int = 12,
+    prob_mutate_shift: float = 0.0,
+    chain_mutate: bool = True,
+    mutate_cheese: bool = True,
+    # for proxy augmented methods
+    train_proxy_critic: bool = False,
+    plr_proxy_shaping: bool = False,
+    proxy_name: str = "lava",
+    plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
+    # PPO hyperparameters
+    ppo_lr: float = 0.00005,                # learning rate
+    ppo_gamma: float = 0.999,               # discount rate
+    ppo_clip_eps: float = 0.1,
+    ppo_gae_lambda: float = 0.95,
+    ppo_entropy_coeff: float = 0.001,
+    ppo_critic_coeff: float = 0.5,
+    ppo_proxy_critic_coeff: float = 0.5,
+    ppo_max_grad_norm: float = 0.5,
+    ppo_lr_annealing: bool = False,
+    num_minibatches_per_epoch: int = 4,
+    num_epochs_per_cycle: int = 5,
+    # training dimensions
+    num_total_env_steps: int = 20_000_000,
+    num_env_steps_per_cycle: int = 128,
+    num_parallel_envs: int = 256,
+    # logging and evals config
+    console_log: bool = True,
+    wandb_log: bool = True,
+    wandb_project: str = "lavaland_demo",
+    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
+    wandb_group: str = None,
+    wandb_name: str = None,
+    log_gifs: bool = True,
+    log_imgs: bool = True,
+    log_hists: bool = False,
+    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = 512,
+    evals_num_levels: int = 256,
+    gif_grid_width: int = 16,
+    # checkpointing
+    checkpointing: bool = True,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = 512,
+    # other
+    seed: int = 42,
+):
+    config = locals()
+    util.print_config(config)
+
+
+    print("configuring environment...")
+    env = lava_land.Env(
+        obs_level_of_detail=obs_level_of_detail,
+        img_level_of_detail=img_level_of_detail,
+        penalize_time=env_penalize_time,
+    )
+
+
+    print("configuring level generators...")
+    maze_generator = maze_generation.get_generator_class_from_name(
+        name=env_layout,
+    )()
+    orig_level_generator = lava_land.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        lava_threshold=lava_threshold,
+    )
+    shift_level_generator = lava_land.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        lava_threshold=lava_treshold_shift,
+    )
+    if prob_shift > 0.0:
+        print("  mixing level generators with {prob_shift=}...")
+        train_level_generator = MixtureLevelGenerator(
+            level_generator1=orig_level_generator,
+            level_generator2=shift_level_generator,
+            prob_level1=1.0-prob_shift,
+        )
+    else:
+        train_level_generator = orig_level_generator
+
+
+    print("TODO: define level classifier")
+    classify_level_is_shift = None
+
+
+    print("configuring eval level generators...")
+    if prob_shift > 0.0:
+        eval_level_generators = {
+            "train": train_level_generator,
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+    else:
+        eval_level_generators = {
+            "orig": orig_level_generator,
+            "shift": shift_level_generator,
+        }
+
+
+    print("TODO: implement level solver...")
+
+
+    print("TODO: implement level metrics...")
+
+
+    print("TODO: implement level splayers for heatmap evals...")
+
+
+    print("TODO: configure parser and fixed eval levels...")
+
+
+    train.run(
+        seed=seed,
+        env=env,
+        train_level_generator=train_level_generator,
+        level_solver=None,
+        level_mutator=None,
+        level_metrics=None,
+        eval_level_generators=eval_level_generators,
+        fixed_eval_levels={},
+        heatmap_splayer_fn=None,
+        classify_level_is_shift=classify_level_is_shift,
+        net_cnn_type=net_cnn_type,
+        net_rnn_type=net_rnn_type,
+        net_width=net_width,
+        ued=ued,
+        prob_shift=prob_shift,
+        num_train_levels=num_train_levels,
+        plr_buffer_size=plr_buffer_size,
+        plr_temperature=plr_temperature,
+        plr_staleness_coeff=plr_staleness_coeff,
+        plr_prob_replay=plr_prob_replay,
+        plr_regret_estimator=plr_regret_estimator,
+        plr_robust=plr_robust,
+        train_proxy_critic=train_proxy_critic,
+        plr_proxy_shaping=plr_proxy_shaping,
+        proxy_name=proxy_name,
+        plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
+        ppo_lr=ppo_lr,
+        ppo_gamma=ppo_gamma,
+        ppo_clip_eps=ppo_clip_eps,
+        ppo_gae_lambda=ppo_gae_lambda,
+        ppo_entropy_coeff=ppo_entropy_coeff,
+        ppo_critic_coeff=ppo_critic_coeff,
+        ppo_proxy_critic_coeff=ppo_proxy_critic_coeff,
+        ppo_max_grad_norm=ppo_max_grad_norm,
+        ppo_lr_annealing=ppo_lr_annealing,
+        num_minibatches_per_epoch=num_minibatches_per_epoch,
+        num_epochs_per_cycle=num_epochs_per_cycle,
+        num_total_env_steps=num_total_env_steps,
+        num_env_steps_per_cycle=num_env_steps_per_cycle,
+        num_parallel_envs=num_parallel_envs,
+        console_log=console_log,
+        wandb_log=wandb_log,
+        log_gifs=log_gifs,
+        log_imgs=log_imgs,
+        log_hists=log_hists,
+        num_cycles_per_log=num_cycles_per_log,
+        num_cycles_per_eval=num_cycles_per_eval,
+        num_cycles_per_gifs=num_cycles_per_gifs,
+        num_cycles_per_big_eval=num_cycles_per_big_eval,
+        evals_num_env_steps=evals_num_env_steps,
+        evals_num_levels=evals_num_levels,
+        gif_grid_width=gif_grid_width,
+        checkpointing=checkpointing,
+        keep_all_checkpoints=keep_all_checkpoints,
+        max_num_checkpoints=max_num_checkpoints,
+        num_cycles_per_checkpoint=num_cycles_per_checkpoint,
+    )

@@ -23,7 +23,7 @@ from jaxgmg.environments import minigrid_maze
 
 @functools.partial(
     jax.jit,
-    static_argnames=["scoring_method", "proxy_shaping", "proxy_name"],
+    static_argnames=["scoring_method", "proxy_shaping", "proxy_name", "clipping"],
 )
 def plr_compute_scores(
     # which scoring method?
@@ -42,6 +42,7 @@ def plr_compute_scores(
     proxy_advantages: Array | None,         # optional float[num_levels, num_steps]
     # data for computing oracle scores (HACK)
     levels: Level,                          # Level[num_levels]
+    clipping: bool,          # whether to clip the score
 ) -> Array:                                 # float[num_levels]
     """
     Compute prioritisation 'scores' for a batch of levels using a named
@@ -110,6 +111,7 @@ def plr_compute_scores(
             0 if proxy_shaping and max_ever_proxy_returns is not None else None,
             0 if proxy_shaping and proxy_advantages is not None else None,
             0,      # levels
+            None,   # clipping (static, don't vmap)
         ),
     )(
         scoring_method,         # str (static)
@@ -123,6 +125,7 @@ def plr_compute_scores(
         max_ever_proxy_returns, # float[vmap(num_levels)]
         proxy_advantages,       # float[vmap(num_levels), num_steps]
         levels,                 # Level[vmap(num_levels)]
+        clipping,               # bool (static)
     )
 
 
@@ -132,7 +135,7 @@ def plr_compute_scores(
 
 @functools.partial(
     jax.jit,
-    static_argnames=["scoring_method", "proxy_shaping", "proxy_name"],
+    static_argnames=["scoring_method", "proxy_shaping", "proxy_name", "clipping"],
 )
 def plr_compute_score(
     scoring_method: str,
@@ -146,6 +149,7 @@ def plr_compute_score(
     max_ever_proxy_return: float | None,
     proxy_advantages: Array | None, # float[num_steps] (optional)
     level: Level,                   # Level
+    clipping: bool,
 ) -> float:
     # compute the score on the original reward data
     match scoring_method.lower():
@@ -255,8 +259,10 @@ def plr_compute_score(
         case _:
             raise ValueError(f"Unknown proxy scoring method {scoring_method!r}")
 
-    # then use the proxy score to shape the original score
-    return original_score - proxy_shaping_coeff * proxy_score
+    if clipping:
+        return jnp.maximum(original_score - proxy_shaping_coeff * proxy_score, 0)
+    else:
+        return original_score - proxy_shaping_coeff * proxy_score
 
 
 # # # 

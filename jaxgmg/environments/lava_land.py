@@ -208,12 +208,17 @@ class Env(base.Env):
         # reward and done
         reward = got_cheese.astype(float) - on_lava.astype(float)
         done = state.got_cheese
+        proxy = on_lava.astype(float) 
 
         return (
             state,
             reward,
             done,
-            {},
+           {
+                'proxy_rewards': {
+                    'lava':  proxy,
+                },
+            },
         )
 
     

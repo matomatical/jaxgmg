@@ -258,12 +258,20 @@ class Env(base.Env):
         # reward and done
         reward = got_next_beacon.astype(float)
         done = (state.mouse_next_beacon_id == num_beacons)
+        # check distance to leader
+        # complete here
+        agent_on_leader = (state.mouse_pos == state.leader_pos).all()
+        proxy = jax.lax.select(agent_on_leader, 1.0, 0.0)
 
         return (
             state,
             reward,
             done,
-            {},
+            {
+                'proxy_rewards': {
+                    'leader_distance':  proxy,
+                },
+            },
         )
 
     
@@ -460,7 +468,9 @@ class LevelGenerator(base.LevelGenerator):
             replace=False,
         )
         initial_mouse_pos = all_pos[0]
-        initial_leader_pos = all_pos[1]
+        initial_leader_pos = jax.lax.select(self.trustworthy_leader,initial_mouse_pos,all_pos[1])
+        #initial_leader_pos = initial_mouse_pos
+        #initial_leader_pos = all_pos[1]
         beacons_pos = all_pos[2:]
 
         # solve maze for leader and cache solution

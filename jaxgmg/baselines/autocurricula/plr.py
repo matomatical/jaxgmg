@@ -59,6 +59,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
     proxy_shaping: bool
     proxy_name: str | None
     proxy_shaping_coeff: float | None
+    clipping: bool
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -265,6 +266,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             max_ever_proxy_returns=max_proxy_max_returns,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            clipping = self.clipping,
         )
         # replace the scores of the replayed level ids with the new scores
         # and mark those levels as just visited
@@ -331,6 +333,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             max_ever_proxy_returns=proxy_max_returns,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            clipping = self.clipping,
         )
 
         # on to updating the buffer...

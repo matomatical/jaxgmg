@@ -64,6 +64,7 @@ def run(
     plr_proxy_shaping: bool,
     proxy_name: str,
     plr_proxy_shaping_coeff: float,
+    clipping: bool,
     # ued config
     ued: str,
     prob_shift: float,
@@ -157,6 +158,7 @@ def run(
             proxy_shaping=plr_proxy_shaping,
             proxy_name=proxy_name,
             proxy_shaping_coeff=plr_proxy_shaping_coeff,
+            clipping=clipping,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -181,6 +183,7 @@ def run(
             proxy_shaping=plr_proxy_shaping,
             proxy_name=proxy_name,
             proxy_shaping_coeff=plr_proxy_shaping_coeff,
+            clipping=clipping,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
