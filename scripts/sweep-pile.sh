@@ -38,7 +38,7 @@ for i in {0..1}; do
             x=$((i * 3 * 5 * 7 + j * 5 * 7 + k * 7))
             if [ $SLURM_ARRAY_TASK_ID -eq $((x + 0)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name dr-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:dr-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
@@ -47,7 +47,7 @@ for i in {0..1}; do
                     --num-total-env-steps 250_000_000;
             elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 1)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name plr:orig-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:plr:orig-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
@@ -58,7 +58,7 @@ for i in {0..1}; do
                     --num-total-env-steps 750_000_000;
             elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 2)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name plr:prox-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:plr:prox-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
@@ -70,7 +70,7 @@ for i in {0..1}; do
                     --num-total-env-steps 750_000_000;
             elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 3)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name accel:origc-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:accel:origc-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
@@ -82,7 +82,7 @@ for i in {0..1}; do
                     --chain-mutate --mutate-cheese-on-dish;
             elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 4)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name accel:proxc-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:accel:proxc-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
@@ -95,7 +95,7 @@ for i in {0..1}; do
                     --chain-mutate --mutate-cheese-on-dish;
             elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 5)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name accel:origb-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:accel:origb-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
@@ -107,7 +107,7 @@ for i in {0..1}; do
                     --no-chain-mutate --mutate-cheese-on-dish;
             elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 6)) ]; then
                 jaxgmg train dish "${flags[@]}" \
-                    --wandb-name accel:proxb-alpha:$prob_mutate_shift-seed:$seed \
+                    --wandb-name ch:$num_channels_dish-algo:accel:proxb-alpha:$prob_mutate_shift-seed:$seed \
                     --seed $seed \
                     --prob-shift $prob_mutate_shift \
                     --prob-mutate-shift $prob_mutate_shift \
