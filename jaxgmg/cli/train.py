@@ -450,7 +450,7 @@ def corner(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
-        clipping= clipping,
+        clipping=clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,
@@ -490,17 +490,20 @@ def dish(
     env_size: int = 13,
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = False,
-    max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 10,
+    num_channels_cheese: int = 1,           # (bool only) num redundant cheese channels
+    num_channels_dish: int = 1,             # (bool only) num redundant dish channels
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
+    # level generator config
+    cheese_on_dish: bool = False,
+    cheese_on_dish_shift: bool = True,
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -514,11 +517,14 @@ def dish(
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
+    chain_mutate: bool = True,
+    mutate_cheese_on_dish: bool = True,
     # for proxy augmented methods
     train_proxy_critic: bool = False,
     plr_proxy_shaping: bool = False,
     proxy_name: str = "proxy_dish",
     plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = False,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -567,6 +573,8 @@ def dish(
     print("configuring environment...")
     env = cheese_on_a_dish.Env(
         terminate_after_cheese_and_dish=env_terminate_after_dish,
+        num_channels_cheese=num_channels_cheese,
+        num_channels_dish=num_channels_dish,
         obs_level_of_detail=obs_level_of_detail,
         img_level_of_detail=img_level_of_detail,
         penalize_time=env_penalize_time,
@@ -581,13 +589,13 @@ def dish(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
-        max_cheese_radius=max_cheese_radius,  
+        cheese_on_dish=cheese_on_dish,
     )
     shift_level_generator = cheese_on_a_dish.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
-        max_cheese_radius=max_cheese_radius_shift,  
+        cheese_on_dish=cheese_on_dish_shift,  
     )
     if prob_shift > 0.0:
         print("  mixing level generators with {prob_shift=}...")
@@ -623,34 +631,65 @@ def dish(
 
 
     print("configuring level mutator...")
-    biased_cheese_on_dish_mutator = MixtureLevelMutator(
-        mutators=(
-            # teleport cheese and dish to a random position max_cheese_radius
-            cheese_on_a_dish.CheeseOnDishLevelMutator(
-                max_cheese_radius=max_cheese_radius,
-            ),
-            # teleport cheese and dish to a random different position, apart by max_cheese_radius
-            cheese_on_a_dish.CheeseOnDishLevelMutator(
-                max_cheese_radius=max_cheese_radius_shift,
-            ),
-        ),
-        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
-    )
-    # overall, rotate between wall/mouse/cheese mutations uniformly
-    level_mutator = IteratedLevelMutator(
-        mutator=MixtureLevelMutator(
+    if mutate_cheese_on_dish:
+        biased_cheese_on_dish_mutator = MixtureLevelMutator(
             mutators=(
-                cheese_on_a_dish.ToggleWallLevelMutator(),
-                cheese_on_a_dish.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_dish_on_collision=False,
+                # teleport cheese and dish to new same position
+                cheese_on_a_dish.CheeseOnDishLevelMutator(
+                    cheese_on_dish=cheese_on_dish,
                 ),
-                biased_cheese_on_dish_mutator,
+                # teleport cheese and dish to new different positions
+                cheese_on_a_dish.CheeseOnDishLevelMutator(
+                    cheese_on_dish=cheese_on_dish_shift,
+                ),
             ),
-            mixing_probs=(10/12,1/12,1/12),
-        ),
-        num_steps=num_mutate_steps,
-    )
+            mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
+        )
+    else:
+        # replace this mutation with something else
+        biased_cheese_on_dish_mutator = cheese_on_a_dish.ToggleWallLevelMutator()
+    # overall
+    if chain_mutate:
+        level_mutator = ChainLevelMutator(mutators=(
+            # mutate walls (n-2 steps)
+            IteratedLevelMutator(
+                mutator=cheese_on_a_dish.ToggleWallLevelMutator(),
+                num_steps=num_mutate_steps - 2,
+            ),
+            # maybe scatter mouse (1 step) else another wall toggle
+            MixtureLevelMutator(
+                mutators=(
+                    cheese_on_a_dish.ScatterMouseLevelMutator(
+                        transpose_with_cheese_on_collision=False,
+                        transpose_with_dish_on_collision=False,
+                    ),
+                    cheese_on_a_dish.ToggleWallLevelMutator(),
+                ),
+                mixing_probs=(1/2,1/2),
+            ),
+            # biased reposition cheese/dish (1 step)
+            biased_cheese_on_dish_mutator,
+        ))
+    else:
+        # rotate between wall/mouse/cheese mutations uniformly
+        level_mutator = IteratedLevelMutator(
+            mutator=MixtureLevelMutator(
+                mutators=(
+                    cheese_on_a_dish.ToggleWallLevelMutator(),
+                    cheese_on_a_dish.ScatterMouseLevelMutator(
+                        transpose_with_cheese_on_collision=False,
+                        transpose_with_dish_on_collision=False,
+                    ),
+                    biased_cheese_on_dish_mutator,
+                ),
+                mixing_probs=(
+                    (num_mutate_steps - 2) / num_mutate_steps,
+                    1 / num_mutate_steps,
+                    1 / num_mutate_steps,
+                ),
+            ),
+            num_steps=num_mutate_steps,
+        )
 
 
     print("TODO: implement level solver...")
@@ -893,6 +932,7 @@ def dish(
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
         plr_proxy_shaping_coeff=plr_proxy_shaping_coeff,
+        clipping=clipping,
         ppo_lr=ppo_lr,
         ppo_gamma=ppo_gamma,
         ppo_clip_eps=ppo_clip_eps,

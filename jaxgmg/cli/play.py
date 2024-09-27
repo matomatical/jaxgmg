@@ -7,7 +7,9 @@ import readchar
 import time
 
 import jax
+import jax.numpy as jnp
 import chex
+import einops
 
 from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import base
@@ -31,6 +33,7 @@ def play_forever(
     actions: list[str],
     level_generator: base.LevelGenerator,
     record: bool = False,
+    split_channels: bool = False,
     debug: bool = False,
 ):
     """
@@ -44,12 +47,33 @@ def play_forever(
         f"[s {actions[2]}] [d {actions[3]}] "
         "[r reset] [q quit]"
     )
+    def render(img):
+        if split_channels:
+            h, w, c = img.shape
+            refracted = jnp.zeros((3, h, w, c))
+            for i in range(c):
+                refracted = refracted.at[i%3,:,:,i].set(img[:,:,i])
+            padded = jnp.pad(
+                refracted,
+                pad_width=((0,0),(0,1),(0,1),(0,0)),
+                constant_values=0.5,
+            )
+            stacked = einops.rearrange(padded, 'rgb h w c -> (c h) w rgb')
+            padded_again = jnp.pad(
+                stacked,
+                pad_width=((1,0),(1,0),(0,0)),
+                constant_values=0.5,
+            )
+            return padded_again
+        else:
+            return img
+
     while playing:
         print("generating level...")
         rng_level, rng = jax.random.split(rng)
         level = level_generator.sample(rng_level)
         obs, state = env.reset_to_level(level)
-        img = env.render_state(state)
+        img = render(env.render_state(state))
 
         print("playing level...")
         print("initial state")
@@ -78,7 +102,7 @@ def play_forever(
             a = "wasd".index(key)
             rng_step, rng_steps = jax.random.split(rng_steps)
             obs, state, r, d, _ = env.step(rng_step, state, a)
-            img = env.render_state(state)
+            img = render(env.render_state(state))
             print(
                 "" if debug else f"\x1b[{lines+4}A",
                 f"action: {a} ({'uldr'[a]})",
@@ -114,6 +138,7 @@ def corner(
     corner_size: int            = 3,
     level_of_detail: int        = 8,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
@@ -139,6 +164,7 @@ def corner(
         env=env,
         actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )
@@ -150,19 +176,26 @@ def dish(
     layout: str                 = 'tree',
     max_cheese_radius: int      = 3,
     level_of_detail: int        = 8,
+    num_channels_cheese: int    = 1,
+    num_channels_dish: int      = 1,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
     """
     Interactive Cheese on a Dish environment.
     """
-    if level_of_detail not in {1,3,4,8}:
+    if level_of_detail not in {0,1,3,4,8}:
         raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
 
     rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_on_a_dish.Env(img_level_of_detail=level_of_detail)
+    env = cheese_on_a_dish.Env(
+        img_level_of_detail=level_of_detail,
+        num_channels_cheese=num_channels_cheese,
+        num_channels_dish=num_channels_dish,
+    )
     level_generator = cheese_on_a_dish.LevelGenerator(
         height=height,
         width=width,
@@ -176,6 +209,7 @@ def dish(
         env=env,
         actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )
@@ -189,6 +223,7 @@ def follow(
     trustworthy_leader: bool    = True,
     level_of_detail: int        = 8,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
@@ -215,6 +250,7 @@ def follow(
         env=env,
         actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )
@@ -230,6 +266,7 @@ def keys(
     num_chests_max: int         = 6,
     level_of_detail: int        = 8,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
@@ -258,6 +295,7 @@ def keys(
         env=env,
         actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )
@@ -270,6 +308,7 @@ def lava(
     lava_threshold: float       = -0.25,
     level_of_detail: int        = 8,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
@@ -295,6 +334,7 @@ def lava(
         env=env,
         actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )
@@ -310,6 +350,7 @@ def monsters(
     monster_optimality: float   = 3,
     level_of_detail: int        = 8,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
@@ -338,6 +379,7 @@ def monsters(
         env=env,
         actions=['up', 'left', 'down', 'right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )
@@ -351,6 +393,7 @@ def minimaze(
     layout: str                 = 'noise',
     level_of_detail: int        = 8,
     seed: int                   = 42,
+    split_channels: bool        = False,
     debug: bool                 = False,
     record: bool                = False,
 ):
@@ -379,6 +422,7 @@ def minimaze(
         env=env,
         actions=['forward', 'turn-left', 'wait', 'turn-right'],
         level_generator=level_generator,
+        split_channels=split_channels,
         debug=debug,
         record=record,
     )

@@ -101,23 +101,6 @@ class Action(enum.IntEnum):
     MOVE_RIGHT  = 3
 
 
-class Channel(enum.IntEnum):
-    """
-    The observations returned by the environment are an `h` by `w` by
-    `channel` Boolean array, where the final dimensions 0 through 4
-    indicate the following:
-
-    * `WALL`:   True in the locations where there is a wall.
-    * `MOUSE`:  True in the one location the mouse occupies.
-    * `CHEESE`: True in the one location the cheese occupies.
-    * `DISH`:   True in the one location the dish occupies.
-    """
-    WALL    = 0
-    MOUSE   = 1
-    CHEESE  = 2
-    DISH    = 3
-
-
 @struct.dataclass
 class Env(base.Env):
     """
@@ -135,6 +118,8 @@ class Env(base.Env):
       ends.
     """
     terminate_after_cheese_and_dish: bool = False
+    num_channels_cheese: int = 1
+    num_channels_dish: int = 1
 
 
     @property
@@ -142,10 +127,10 @@ class Env(base.Env):
         return len(Action)
 
 
-    def obs_type( self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
+    def obs_type(self, level: Level) -> PyTree[jax.ShapeDtypeStruct]:
         # TODO: only works for boolean observations...
         H, W = level.wall_map.shape
-        C = len(Channel)
+        C = 2 + self.num_channels_cheese + self.num_channels_dish
         return Observation(
             image=jax.ShapeDtypeStruct(
                 shape=(H, W, C),
@@ -225,7 +210,6 @@ class Env(base.Env):
         if self.terminate_after_cheese_and_dish:
             done = state.got_cheese & state.got_dish
         else:
-            #done = got_cheese
             done = state.got_cheese | state.got_dish
 
         return (
@@ -250,31 +234,47 @@ class Env(base.Env):
         Return a boolean grid observation.
         """
         H, W = state.level.wall_map.shape
-        C = len(Channel)
+        C = 2 + self.num_channels_cheese + self.num_channels_dish
         image = jnp.zeros((H, W, C), dtype=bool)
 
+        # allocate channels
+        wall_channel = 0
+        mouse_channel = 1
+        cheese_channels = tuple(range(
+            2,
+            2+self.num_channels_cheese,
+        ))
+        dish_channels = tuple(range(
+            2+self.num_channels_cheese,
+            2+self.num_channels_cheese+self.num_channels_dish,
+        ))
+
         # render walls
-        image = image.at[:, :, Channel.WALL].set(state.level.wall_map)
+        image = image.at[
+            :,
+            :,
+            wall_channel,
+        ].set(state.level.wall_map)
 
         # render mouse
         image = image.at[
             state.mouse_pos[0],
             state.mouse_pos[1],
-            Channel.MOUSE,
+            mouse_channel,
         ].set(True)
         
         # render cheese
         image = image.at[
             state.level.cheese_pos[0],
             state.level.cheese_pos[1],
-            Channel.CHEESE,
+            cheese_channels,
         ].set(~state.got_cheese)
         
         # render dish
         image = image.at[
             state.level.dish_pos[0],
             state.level.dish_pos[1],
-            Channel.DISH,
+            dish_channels,
         ].set(~state.got_dish)
 
         return Observation(image=image)
@@ -294,17 +294,22 @@ class Env(base.Env):
         image_bool = self._render_obs_bool(state).image
         H, W, _C = image_bool.shape
 
+        # parse out channels for walls, mouse, dish, cheese
+        wall_map = image_bool[:, :, 0]
+        mouse_map = image_bool[:, :, 1]
+        cheese_map = image_bool[:, :, 2] # any of 2:2+num_channels_cheese would work
+        dish_map = image_bool[:, :, -1] # any of -num_channels_dish:end would work 
+
         # find out, for each position, which object to render
         # (for each position pick the first true index top-down this list)
         sprite_priority_vector_grid = jnp.stack([
             # two objects
-            image_bool[:, :, Channel.CHEESE]
-                & image_bool[:, :, Channel.DISH],
+            cheese_map & dish_map,
             # one object
-            image_bool[:, :, Channel.WALL],
-            image_bool[:, :, Channel.MOUSE],
-            image_bool[:, :, Channel.CHEESE],
-            image_bool[:, :, Channel.DISH],
+            wall_map,
+            mouse_map,
+            cheese_map,
+            dish_map,
             # no objects, 'default' (always true)
             jnp.ones((H, W), dtype=bool),
         ])
@@ -347,74 +352,6 @@ class Env(base.Env):
         return self._render_obs_rgb(state, spritesheet).image
 
 
-    @functools.partial(jax.jit, static_argnames=('self',))
-    def optimal_value(
-        self,
-        level: Level,
-        discount_rate: float,
-    ) -> float:
-        """
-        Compute the optimal return from a given level (initial state) for a
-        given discount rate. Respects time penalties to reward and max
-        episode length.
-
-        Parameters:
-
-        * level : Level
-                The level to compute the optimal value for.
-        * discount_rate : float
-                The discount rate to apply in the formula for computing
-                return.
-        * The output also depends on the environment's reward function, which
-          depends on `self.penalize_time` and `self.max_steps_in_episode`.
-
-        Notes:
-
-        * With a steep discount rate or long episodes, this algorithm might
-          run into minor numerical issues where small contributions to the
-          return from late into the episode are lost.
-        * For VERY large mazes, solving the level will be pretty slow.
-
-        TODO:
-
-        * Solving the mazes currently uses all pairs shortest paths
-          algorithm, which is not efficient enough to work for very large
-          mazes. If we wanted to solve very large mazes, we could by changing
-          to a single source shortest path algorithm.
-        * Support computing the return from arbitrary states. This would be
-          not very difficult, requires taking note of `got_cheese` flag
-          and current time, and computing distance from mouse's current
-          position rather than initial position.
-        """
-        # compute distance between mouse and cheese
-        dist = maze_solving.maze_distances(level.wall_map)
-        optimal_dist = dist[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ]
-
-        # reward when we get the cheese is 1
-        reward = 1
-        
-        # maybe we apply an optional time penalty
-        penalized_reward = jnp.where(
-            self.penalize_time,
-            (1.0 - 0.9 * optimal_dist / self.max_steps_in_episode) * reward,
-            reward,
-        )
-        
-        # mask out rewards beyond the end of the episode
-        episodes_still_valid = (optimal_dist < self.max_steps_in_episode)
-        valid_reward = penalized_reward * episodes_still_valid
-
-        # discount the reward
-        discounted_reward = (discount_rate ** optimal_dist) * valid_reward
-
-        return discounted_reward
-
-
 # # # 
 # Level generator
 
@@ -436,20 +373,16 @@ class LevelGenerator(base.LevelGenerator):
             Provides the maze generation method to use (see module
             `maze_generation` for details).
             The default is a tree maze generator using Kruskal's algorithm.
-    * max_cheese_radius : int (>=0)
-            the cheese will spawn within this many steps away from the
-            location of the dish.
+    * cheese_on_dish : bool
+            whether the cheese will spawn on the same square as the dish, or
+            on its own square.
     """
     height: int = 13
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
-    max_cheese_radius: int = 0
+    cheese_on_dish: bool = True
     
-    def __post_init__(self):
-        # validate cheese radius
-        assert self.max_cheese_radius >= 0
-
-
+    
     @functools.partial(jax.jit, static_argnames=('self',))
     def sample(self, rng: chex.PRNGKey) -> Level:
         """
@@ -495,34 +428,20 @@ class LevelGenerator(base.LevelGenerator):
             p=no_wall & no_mouse,
         )
 
-        # cheese spawns in some remaining valid position near the dish
-        distance_to_dish = maze_solving.maze_distances(wall_map)[
-            dish_pos[0],
-            dish_pos[1],
-        ]
-
-        near_dish = (distance_to_dish == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
-        #remove the walls from the near_dish mask
-
-        rng_spawn_cheese, rng = jax.random.split(rng)
-        cheese_pos = jax.random.choice(
-            key=rng_spawn_cheese,
-            a=coords,
-            axis=0,
-            p=no_wall & no_mouse & near_dish,
-        )
-
-        wall_map = wall_map.at[cheese_pos[0], cheese_pos[1]].set(False)
-
-        # ensure dish is not on the border
-        top_left_corner_pos = jnp.array((0, 0))
-        dish_hit_corner = (dish_pos == top_left_corner_pos).all()
-        dish_pos = jax.lax.select(
-                dish_hit_corner,
-                cheese_pos,
-                dish_pos,
-        )
-
+        # cheese spawns...
+        if self.cheese_on_dish:
+            # ... on dish
+            cheese_pos = dish_pos
+        else:
+            # ... in some remaining valid position (possibly on dish)
+            rng_spawn_cheese, rng = jax.random.split(rng)
+            cheese_pos = jax.random.choice(
+                key=rng_spawn_cheese,
+                a=coords,
+                axis=0,
+                p=no_wall & no_mouse,
+            )
+        
         return Level(
             wall_map=wall_map,
             initial_mouse_pos=initial_mouse_pos,
@@ -932,88 +851,72 @@ class ScatterCheeseLevelMutator(base.LevelMutator):
 
 @struct.dataclass
 class CheeseOnDishLevelMutator(base.LevelMutator):
-    max_cheese_radius: int = 0
+    cheese_on_dish: bool
 
 
     @functools.partial(jax.jit, static_argnames=["self"])
     def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
         h, w = level.wall_map.shape
-        coords = einops.rearrange(jnp.indices((h, w)), 'c h w -> (h w) c')
-        # eliminate the border from coords
-        border = jnp.zeros((h, w), dtype=bool)
-        border = border.at[(0, h-1), :].set(True)
-        border = border.at[:, (0, w-1)].set(True)
-        border = border.flatten()
 
-        # teleport the cheese to a random location within bounds
-        rng_row, rng_col = jax.random.split(rng)
-        new_cheese_row = jax.random.choice(
+        # teleport the dish to a random location within bounds
+        rng_dish, rng = jax.random.split(rng)
+        rng_row, rng_col = jax.random.split(rng_dish)
+        new_dish_row = jax.random.choice(
             key=rng_row,
             a=jnp.arange(1, h-1),
         )
-        new_cheese_col = jax.random.choice(
+        new_dish_col = jax.random.choice(
             key=rng_col,
             a=jnp.arange(1, w-1),
         )
-        new_cheese_pos = jnp.array((
-            new_cheese_row,
-            new_cheese_col,
+        new_dish_pos = jnp.array((
+            new_dish_row,
+            new_dish_col,
         ))
         # carve through walls
         new_wall_map = level.wall_map.at[
-            new_cheese_pos[0],
-            new_cheese_pos[1],
-        ].set(False)
-
-        # place dish within max_cheese_radius of cheese
-        
-        distance_to_cheese = maze_solving.maze_distances(new_wall_map)[
-            new_cheese_pos[0],
-            new_cheese_pos[1],
-        ]
-
-        near_cheese = (distance_to_cheese == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
-        #remove the walls from the near_dish mask
-        #near_dish_nowall = near_dish | (near_dish & no_wall)
-
-        no_wall = ~new_wall_map.flatten()
-
-        rng_spawn_dish, rng = jax.random.split(rng)
-        new_dish_pos = jax.random.choice(
-            key=rng_spawn_dish,
-            a=coords,
-            p = near_cheese & ~border & no_wall,
-        )
-
-
-        # upon collision with mouse, transpose cheese with mouse
-        cheese_hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
-        new_initial_mouse_pos = jax.lax.select(
-                cheese_hit_mouse,
-                level.cheese_pos,
-                level.initial_mouse_pos,
-        )
-
-        # upon collision with dish, transpose mouse with dish
-        dish_hit_mouse = (new_dish_pos == level.initial_mouse_pos).all()
-        new_initial_mouse_pos = jax.lax.select(
-                dish_hit_mouse,
-                level.dish_pos,
-                level.initial_mouse_pos,
-        )
-
-        top_left_corner_pos = jnp.array((0, 0))
-        dish_hit_corner = (new_dish_pos == top_left_corner_pos).all()
-        new_dish_pos = jax.lax.select(
-                dish_hit_corner,
-                level.dish_pos,
-                new_dish_pos,
-        )
-
-        new_wall_map = new_wall_map.at[
             new_dish_pos[0],
             new_dish_pos[1],
         ].set(False)
+        # upon collision with mouse, transpose mouse with dish
+        dish_hit_mouse = (new_dish_pos == level.initial_mouse_pos).all()
+        new_initial_mouse_pos = jax.lax.select(
+            dish_hit_mouse,
+            level.dish_pos,
+            level.initial_mouse_pos,
+        )
+
+        # teleport the cheese to ...
+        if self.cheese_on_dish:
+            new_cheese_pos = new_dish_pos
+        else:
+            # teleport the cheese to a random location within bounds
+            rng_cheese, rng = jax.random.split(rng)
+            rng_row, rng_col = jax.random.split(rng_cheese)
+            new_cheese_row = jax.random.choice(
+                key=rng_row,
+                a=jnp.arange(1, h-1),
+            )
+            new_cheese_col = jax.random.choice(
+                key=rng_col,
+                a=jnp.arange(1, w-1),
+            )
+            new_cheese_pos = jnp.array((
+                new_cheese_row,
+                new_cheese_col,
+            ))
+            # carve through walls
+            new_wall_map = new_wall_map.at[
+                new_cheese_pos[0],
+                new_cheese_pos[1],
+            ].set(False)
+            # upon collision with mouse, transpose mouse with cheese
+            cheese_hit_mouse = (new_cheese_pos == new_initial_mouse_pos).all()
+            new_initial_mouse_pos = jax.lax.select(
+                cheese_hit_mouse,
+                level.cheese_pos,
+                new_initial_mouse_pos,
+            )
 
         return level.replace(
             wall_map=new_wall_map,
@@ -1025,6 +928,15 @@ class CheeseOnDishLevelMutator(base.LevelMutator):
 
 # # # 
 # Level parsing
+
+
+class Symbols(enum.IntEnum):
+    WALL    = 0
+    MOUSE   = 1
+    CHEESE  = 2
+    DISH    = 3
+    BOTH    = 4
+    NONE    = 5
 
 
 @struct.dataclass
@@ -1046,25 +958,22 @@ class LevelParser(base.LevelParser):
             The keys in this dictionary are the symbols the parser will look
             to define the location of the walls and each of the items. The
             default map is as follows:
-            * The character '#' maps to `Channel.WALL`.
-            * The character '@' maps to `Channel.MOUSE`.
-            * The character 'd' maps to `Channel.DISH`.
-            * The character 'c' maps to `Channel.CHEESE`.
-            * The character 'b' maps to `len(Channel)`, i.e. none of the
-              above, representing *both* the cheese and the dish.
-            * The character '.' maps to `len(Channel)+1`, i.e. none of
-              the above, representing the absence of an item.
+            * The character '#' maps to `Symbols.WALL`.
+            * The character '@' maps to `Symbols.MOUSE`.
+            * The character 'd' maps to `Symbols.DISH`.
+            * The character 'c' maps to `Symbols.CHEESE`.
+            * The character 'b' maps to `Symbols.BOTH` (cheese AND dish).
+            * The character '.' maps to `Symbols.NONE` (absense of item).
     """
     height: int
     width: int
     char_map = {
-        '#': Channel.WALL,
-        '@': Channel.MOUSE,
-        'd': Channel.DISH,
-        'c': Channel.CHEESE,
-        'b': len(Channel),   # BOTH
-        '.': len(Channel)+1, # PATH
-        # TODO: I should switch these to using a standalone enum...
+        '#': Symbols.WALL,
+        '@': Symbols.MOUSE,
+        'd': Symbols.DISH,
+        'c': Symbols.CHEESE,
+        'b': Symbols.BOTH,
+        '.': Symbols.NONE,
     }
 
 
@@ -1123,7 +1032,7 @@ class LevelParser(base.LevelParser):
         level_map = jnp.asarray(level_grid)
         
         # extract wall map
-        wall_map = (level_map == Channel.WALL)
+        wall_map = (level_map == Symbols.WALL)
         assert wall_map[0,:].all(), "top border incomplete"
         assert wall_map[:,0].all(), "left border incomplete"
         assert wall_map[-1,:].all(), "bottom border incomplete"
@@ -1131,8 +1040,8 @@ class LevelParser(base.LevelParser):
         
         # extract cheese position
         cheese_map = (
-            (level_map == Channel.CHEESE)
-            | (level_map == len(Channel)) # both dish and cheese
+            (level_map == Symbols.CHEESE)
+            | (level_map == Symbols.BOTH) # both dish and cheese
         )
         assert cheese_map.sum() == 1, "there must be exactly one cheese"
         cheese_pos = jnp.concatenate(
@@ -1141,8 +1050,8 @@ class LevelParser(base.LevelParser):
         
         # extract dish position
         dish_map = (
-            (level_map == Channel.DISH)
-            | (level_map == len(Channel)) # both dish and cheese
+            (level_map == Symbols.DISH)
+            | (level_map == Symbols.BOTH) # both dish and cheese
         )
         assert dish_map.sum() == 1, "there must be exactly one dish"
         dish_pos = jnp.concatenate(
@@ -1150,7 +1059,7 @@ class LevelParser(base.LevelParser):
         )
 
         # extract mouse spawn position
-        mouse_spawn_map = (level_map == Channel.MOUSE)
+        mouse_spawn_map = (level_map == Symbols.MOUSE)
         assert mouse_spawn_map.sum() == 1, "there must be exactly one mouse"
         initial_mouse_pos = jnp.concatenate(
             jnp.where(mouse_spawn_map, size=1)

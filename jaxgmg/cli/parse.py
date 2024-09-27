@@ -48,6 +48,52 @@ def corner(
 
 def dish(
     level_of_detail: int = 8,
+    num_channels_cheese: int = 1,
+    num_channels_dish: int = 1,
+):
+    """
+    Test the level parser from the Cheese on a Dish environment.
+    """
+    if level_of_detail not in {0,1,3,4,8}:
+        raise ValueError(f"invalid level of detail {level_of_detail}")
+    util.print_config(locals())
+
+    test_string = """
+        # # # # #
+        # . c . #
+        # @ # d #
+        # . . . #
+        # # # # #
+    """
+    print("test string:", test_string)
+
+    print("parsing...")
+    p = cheese_on_a_dish.LevelParser(
+        height=5,
+        width=5,
+    )
+    level = p.parse(test_string)
+    print("level:", level)
+
+    print("rendering...")
+    env = cheese_on_a_dish.Env(
+        img_level_of_detail=level_of_detail,
+        num_channels_cheese=num_channels_cheese,
+        num_channels_dish=num_channels_dish,
+    )
+    img = env.render_level(level)
+    if level_of_detail > 0:
+        print(util.img2str(img))
+    else:
+        for ch in range(img.shape[-1]):
+            print(f"channel {ch}")
+            print(util.img2str(img[:,:,ch]))
+
+
+def dish_multichannel(
+    level_of_detail: int = 8,
+    num_channels_cheese: int = 1,
+    num_channels_dish: int = 2,
 ):
     """
     Test the level parser from the Cheese on a Dish environment.
