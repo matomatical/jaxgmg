@@ -26,7 +26,7 @@ flags=(
 plr_proxy_shaping_coeff=0.3;
 seed_array=(0 1);
 prob_mutate_shift_array=(3e-3 1e-4 1e-1);
-num_chanels_dish_array=(1 3 6 12 24);
+num_channels_dish_array=(1 3 6 12 24);
 
 source jaxgmg.venv/bin/activate
 for i in {0..1}; do
