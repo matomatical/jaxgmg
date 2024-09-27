@@ -1085,7 +1085,9 @@ class LevelSolution(base.LevelSolution):
 @struct.dataclass
 class LevelSolutionProxies(base.LevelSolutionProxies):
     level: Level
-    #you have a dictionary of proxies, and have an entry for each proxy. so create a dict of proxies, where each entry has a name for a proxy and a corresponding chex.array
+    # you have a dictionary of proxies, and have an entry for each proxy. so
+    # create a dict of proxies, where each entry has a name for a proxy and a
+    # corresponding chex.array
     directional_distance_to_proxies: dict[str, chex.Array]
 
 

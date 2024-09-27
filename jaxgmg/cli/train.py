@@ -692,7 +692,11 @@ def dish(
         )
 
 
-    print("TODO: implement level solver...")
+    print("configuring level solver...")
+    level_solver = cheese_on_a_dish.LevelSolver(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
 
 
     print("configuring level metrics...")
@@ -909,7 +913,7 @@ def dish(
         seed=seed,
         env=env,
         train_level_generator=train_level_generator,
-        level_solver=None,
+        level_solver=level_solver,
         level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
@@ -1183,7 +1187,11 @@ def pile(
         )
 
 
-    print("TODO: implement level solver...") # this should be done but let's double check how to integrate it
+    print("configuring level solver...")
+    level_solver = cheese_on_a_pile.LevelSolver(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
 
 
     print("configuring level metrics...")
@@ -1401,7 +1409,7 @@ def pile(
         seed=seed,
         env=env,
         train_level_generator=train_level_generator,
-        level_solver=None,
+        level_solver=level_solver,
         level_mutator=level_mutator,
         level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
