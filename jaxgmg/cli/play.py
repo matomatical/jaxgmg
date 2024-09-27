@@ -174,7 +174,7 @@ def dish(
     height: int                 = 9,
     width: int                  = 9,
     layout: str                 = 'tree',
-    max_cheese_radius: int      = 3,
+    cheese_on_dish: bool        = True,
     level_of_detail: int        = 8,
     num_channels_cheese: int    = 1,
     num_channels_dish: int      = 1,
@@ -202,7 +202,7 @@ def dish(
         maze_generator=maze_generation.get_generator_class_from_name(
             name=layout
         )(),
-        max_cheese_radius=max_cheese_radius,
+        cheese_on_dish=cheese_on_dish,
     )
     play_forever(
         rng=rng,
