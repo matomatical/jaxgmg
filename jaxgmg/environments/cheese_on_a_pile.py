@@ -218,14 +218,7 @@ class Env(base.Env):
                 ahead_pos,
             )
         )
-            #got_dish=False,
-            #got_fork=False,
-            # got_spoon=False,
-            # got_glass=False,
-            # got_mug=False,
-            # got_napkin=False,
-            # got_table=False,
-            # got_oven=False,
+
 
         got_cheese = (state.mouse_pos == state.level.cheese_pos).all()
         got_cheese_first_time = got_cheese & ~state.got_cheese
@@ -631,6 +624,7 @@ class LevelGenerator(base.LevelGenerator):
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
     max_cheese_radius: int = 0
     max_dish_radius: int = 0
+    min_cheese_radius: int = 0
     split_elements: int = 0
     
     def __post_init__(self):
@@ -691,7 +685,11 @@ class LevelGenerator(base.LevelGenerator):
             napkin_pos[1],
         ]
 
-        near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
+        #near_napkin = (distance_to_napkin <= self.max_cheese_radius).flatten()
+        #it has to be both less than max and more than min
+        near_napkin = (distance_to_napkin <= self.max_cheese_radius) & (distance_to_napkin >= self.min_cheese_radius)
+        near_napkin = near_napkin.flatten()
+
 
         rng_spawn_cheese, rng = jax.random.split(rng)
         cheese_pos = jax.random.choice(
@@ -1056,6 +1054,109 @@ class StepCheeseLevelMutator(base.LevelMutator):
             napkin_pos = final_spawn[5],
         )
 
+@struct.dataclass
+class CheeseonPileLevelMutatorUP(base.LevelMutator): #updated version?
+    split_elements: int
+    max_cheese_radius: int
+    min_cheese_radius: int
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def mutate_level(self, rng: chex.PRNGKey, level: Level) -> Level:
+
+        h, w = level.wall_map.shape
+        coords = einops.rearrange(jnp.indices((h, w)), 'c h w -> (h w) c')
+
+        no_wall = ~level.wall_map.flatten()
+        no_mouse = jnp.ones_like(level.wall_map).at[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+        ].set(False).flatten()
+
+        rng_napkin, rng = jax.random.split(rng)
+        new_napkin_pos = jax.random.choice(
+            key=rng_napkin,
+            a =coords,
+            p =no_wall & no_mouse
+        )
+
+        distance_to_napkin = maze_solving.maze_distances(level.wall_map)[
+            new_napkin_pos[0],
+            new_napkin_pos[1],
+        ]
+
+        near_napkin = (distance_to_napkin <= self.max_cheese_radius) & (distance_to_napkin >= self.min_cheese_radius)
+        near_napkin = near_napkin.flatten()
+
+        rng_cheese, rng = jax.random.split(rng)
+        new_cheese_pos = jax.random.choice(
+            key=rng_cheese,
+            a =coords,
+            p =no_wall & no_mouse & near_napkin
+        )
+
+        top_left_corner_pos = jnp.array((0, 0))
+        napkin_hit_corner = (new_napkin_pos == top_left_corner_pos).all()
+        cheese_hit_corner = (new_cheese_pos == top_left_corner_pos).all()
+        new_napkin_pos = jax.lax.select(
+            napkin_hit_corner,
+            level.napkin_pos,
+            new_napkin_pos,
+        )
+
+        new_cheese_pos = jax.lax.select(
+            cheese_hit_corner,
+            level.cheese_pos,
+            new_cheese_pos,
+        )
+
+        napkin_hit_mouse = (new_napkin_pos == level.initial_mouse_pos).all()
+        cheese_hit_mouse = (new_cheese_pos == level.initial_mouse_pos).all()
+
+        new_napkin_pos = jax.lax.select(
+            napkin_hit_mouse,
+            level.napkin_pos,
+            new_napkin_pos,
+        )
+
+        new_cheese_pos = jax.lax.select(
+            cheese_hit_mouse,
+            level.cheese_pos,
+            new_cheese_pos,
+        )
+
+        new_wall_map = level.wall_map.at[
+            new_napkin_pos[0],
+            new_napkin_pos[1],
+        ].set(False)
+
+        new_wall_map = new_wall_map.at[
+            new_cheese_pos[0],
+            new_cheese_pos[1],
+        ].set(False)
+
+        final_spawn = []
+
+        for i in range(6-self.split_elements):
+            pos = new_napkin_pos
+            final_spawn.append(pos)
+
+        for i in range(self.split_elements):
+            pos = new_cheese_pos
+            final_spawn.append(pos)
+        
+        final_spawn.reverse()
+
+        return Level(
+            wall_map=new_wall_map,
+            initial_mouse_pos=level.initial_mouse_pos,
+            cheese_pos=new_cheese_pos,
+            dish_pos=final_spawn[0],
+            fork_pos = final_spawn[1],
+            spoon_pos = final_spawn[2],
+            glass_pos = final_spawn[3],
+            mug_pos = final_spawn[4],
+            napkin_pos = final_spawn[5],
+        )
 
 @struct.dataclass
 class CheeseonPileLevelMutator(base.LevelMutator):

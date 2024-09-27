@@ -30,6 +30,7 @@ def corner(
     env_layout: str = 'blocks',
     env_corner_size: int = 1,
     env_terminate_after_corner: bool = False,
+    restricted_shift: int = 15,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -124,6 +125,12 @@ def corner(
         maze_generator=maze_generator,
         corner_size=env_corner_size,
     )
+    restricted_shift_level_generator = cheese_in_the_corner.LevelGenerator(
+        height=env_size,
+        width=env_size,
+        maze_generator=maze_generator,
+        corner_size=restricted_shift,
+    )
     shift_level_generator = cheese_in_the_corner.LevelGenerator(
         height=env_size,
         width=env_size,
@@ -142,7 +149,8 @@ def corner(
         print("  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
-            level_generator2=shift_level_generator,
+            #level_generator2=shift_level_generator,
+            level_generator2=restricted_shift_level_generator,
             prob_level1=1.0-prob_shift,
         )
     else:
@@ -167,7 +175,10 @@ def corner(
                     corner_size=env_corner_size,
                 ),
                 # teleport cheese to a random position
-                cheese_in_the_corner.ScatterCheeseLevelMutator(),
+                cheese_in_the_corner.CornerCheeseLevelMutator(
+                    corner_size=restricted_shift,
+                ),
+                #cheese_in_the_corner.ScatterCheeseLevelMutator(),
             ),
             mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
         )
@@ -491,7 +502,7 @@ def dish(
     env_layout: str = 'blocks',
     env_terminate_after_dish: bool = False,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 10,
+    max_cheese_radius_shift: int = 100,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -508,7 +519,7 @@ def dish(
     plr_buffer_size: int = 4096,
     plr_temperature: float = 0.1,
     plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
+    plr_prob_replay: float = 0.33,
     plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # for accel
@@ -519,6 +530,7 @@ def dish(
     plr_proxy_shaping: bool = False,
     proxy_name: str = "proxy_dish",
     plr_proxy_shaping_coeff: float = 0.5,
+    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -532,7 +544,7 @@ def dish(
     num_minibatches_per_epoch: int = 4,
     num_epochs_per_cycle: int = 5,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
+    num_total_env_steps: int = 750_000_000,
     num_env_steps_per_cycle: int = 128,
     num_parallel_envs: int = 256,
     # logging and evals config
@@ -889,6 +901,7 @@ def dish(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
+        clipping=clipping,
         train_proxy_critic=train_proxy_critic,
         plr_proxy_shaping=plr_proxy_shaping,
         proxy_name=proxy_name,
@@ -935,8 +948,10 @@ def pile(
     # with both in the same position
     split_elements_train:int = 0,
     split_elements_shift:int = 0,
+    min_cheese_radius: int = 0,
     max_cheese_radius: int = 0,
-    max_cheese_radius_shift: int = 10,
+    min_cheese_radius_shift: int = 10,
+    max_cheese_radius_shift: int = 100,
     # these two are not relevant and can be ignored for now (they may come
     # useful in next implementations)
     max_dish_radius: int = 0,
@@ -1037,6 +1052,7 @@ def pile(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
+        min_cheese_radius = min_cheese_radius,
         max_cheese_radius=max_cheese_radius,
         max_dish_radius=max_dish_radius,
         split_elements=split_elements_train,
@@ -1045,6 +1061,7 @@ def pile(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
+        min_cheese_radius=min_cheese_radius_shift,
         max_cheese_radius=max_cheese_radius_shift,
         max_dish_radius=max_dish_radius_shift,
         split_elements=split_elements_shift,
@@ -1087,13 +1104,15 @@ def pile(
         biased_cheese_on_pile_mutator = MixtureLevelMutator(
             mutators=(
                 # teleport cheese on pile
-                cheese_on_a_pile.CheeseonPileLevelMutator(
+                cheese_on_a_pile.CheeseonPileLevelMutatorUP(
                     max_cheese_radius=max_cheese_radius,
+                    min_cheese_radius=min_cheese_radius,
                     split_elements=split_elements_shift, # split elements shift and train should always be the same -> Will fix that
                 ),
                 # teleport cheese and pile to a random different position, apart by max_cheese_radius
-                cheese_on_a_pile.CheeseonPileLevelMutator(
+                cheese_on_a_pile.CheeseonPileLevelMutatorUP(
                     max_cheese_radius=max_cheese_radius_shift,
+                    min_cheese_radius=min_cheese_radius_shift,
                     split_elements=split_elements_shift,
                 ),
             ),

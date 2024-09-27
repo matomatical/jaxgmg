@@ -202,6 +202,7 @@ def pile(
     layout: str                         = 'tree',
     level_of_detail: int                = 8,
     max_cheese_radius: int              = 0,
+    min_cheese_radius_shift: int        = 5,
     max_cheese_radius_shift: int        = 5,
     split_elements: int                 = 0,
     num_mutate_steps: int               = 1,
@@ -234,12 +235,14 @@ def pile(
     biased_cheese_on_pile_mutator = MixtureLevelMutator(
         mutators=(
             # teleport cheese on pile
-            cheese_on_a_pile.CheeseonPileLevelMutator(
+            cheese_on_a_pile.CheeseonPileLevelMutatorUP(
+                min_cheese_radius=min_cheese_radius_shift,
                 max_cheese_radius=max_cheese_radius,
                 split_elements=split_elements,
             ),
             # teleport cheese and pile to a random different position, apart by max_cheese_radius
-            cheese_on_a_pile.CheeseonPileLevelMutator(
+            cheese_on_a_pile.CheeseonPileLevelMutatorUP(
+                min_cheese_radius=min_cheese_radius_shift,
                 max_cheese_radius=max_cheese_radius_shift,
                 split_elements=split_elements,
             ),

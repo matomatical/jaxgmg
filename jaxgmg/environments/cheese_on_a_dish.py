@@ -223,7 +223,7 @@ class Env(base.Env):
         proxy_dish_first = proxy_reward_dish * got_dish_before_cheese
         
         if self.terminate_after_cheese_and_dish:
-            done = state.got_cheese & state.got_dish
+            done = state.got_cheese 
         else:
             #done = got_cheese
             done = state.got_cheese | state.got_dish
@@ -501,7 +501,7 @@ class LevelGenerator(base.LevelGenerator):
             dish_pos[1],
         ]
 
-        near_dish = (distance_to_dish == self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
+        near_dish = (distance_to_dish <= self.max_cheese_radius).flatten()  # we create a mask of valid cheese spawn positions, i.e. ones just at the right distance
         #remove the walls from the near_dish mask
 
         rng_spawn_cheese, rng = jax.random.split(rng)
