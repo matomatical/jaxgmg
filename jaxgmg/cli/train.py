@@ -496,8 +496,8 @@ def dish(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # level generator config
-    cheese_on_dish: bool = False,
-    cheese_on_dish_shift: bool = True,
+    cheese_on_dish: bool = True,
+    cheese_on_dish_shift: bool = False,
     # policy config
     net_cnn_type: str = "large",
     net_rnn_type: str = "ff",
