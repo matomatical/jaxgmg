@@ -30,7 +30,7 @@ flags=(
 );
 seed_array=(0 1);
 plr_proxy_shaping_coeff_array=(0.3 0.8);
-eta_schedule_time_array=(0.4, 0.8);
+eta_schedule_time_array=(0.4 0.8);
 
 source jaxgmg.venv/bin/activate
 for i in {0..1}; do
