@@ -552,7 +552,7 @@ def dish(
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
+    log_gifs: bool = False,
     log_imgs: bool = True,
     log_hists: bool = False,
     num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
