@@ -23,7 +23,13 @@ from jaxgmg.environments import minigrid_maze
 
 @functools.partial(
     jax.jit,
-    static_argnames=["scoring_method", "proxy_shaping", "proxy_name", "clipping"],
+    static_argnames=[
+        "scoring_method",
+        "proxy_shaping",
+        "proxy_name",
+        "clipping",
+        "proxy_shaping_coeff", # HACK: because it's a schedule
+    ],
 )
 def plr_compute_scores(
     # which scoring method?
@@ -43,6 +49,7 @@ def plr_compute_scores(
     # data for computing oracle scores (HACK)
     levels: Level,                          # Level[num_levels]
     clipping: bool,          # whether to clip the score
+    step: int,
 ) -> Array:                                 # float[num_levels]
     """
     Compute prioritisation 'scores' for a batch of levels using a named
@@ -112,6 +119,7 @@ def plr_compute_scores(
             0 if proxy_shaping and proxy_advantages is not None else None,
             0,      # levels
             None,   # clipping (static, don't vmap)
+            None,   # step (static, don't vmap)
         ),
     )(
         scoring_method,         # str (static)
@@ -126,6 +134,7 @@ def plr_compute_scores(
         proxy_advantages,       # float[vmap(num_levels), num_steps]
         levels,                 # Level[vmap(num_levels)]
         clipping,               # bool (static)
+        step,                   # int
     )
 
 
@@ -135,7 +144,13 @@ def plr_compute_scores(
 
 @functools.partial(
     jax.jit,
-    static_argnames=["scoring_method", "proxy_shaping", "proxy_name", "clipping"],
+    static_argnames=[
+        "scoring_method",
+        "proxy_shaping",
+        "proxy_name",
+        "clipping",
+        "proxy_shaping_coeff", # HACK: it's secretly a schedule function
+    ],
 )
 def plr_compute_score(
     scoring_method: str,
@@ -150,6 +165,7 @@ def plr_compute_score(
     proxy_advantages: Array | None, # float[num_steps] (optional)
     level: Level,                   # Level
     clipping: bool,
+    step: int,
 ) -> float:
     # compute the score on the original reward data
     match scoring_method.lower():
@@ -259,10 +275,11 @@ def plr_compute_score(
         case _:
             raise ValueError(f"Unknown proxy scoring method {scoring_method!r}")
 
+    coeff_at_this_step = proxy_shaping_coeff(step) # secretly a schedule, sorry
+    shaped_score = original_score - coeff_at_this_step * proxy_score
     if clipping:
-        return jnp.maximum(original_score - proxy_shaping_coeff * proxy_score, 0)
-    else:
-        return original_score - proxy_shaping_coeff * proxy_score
+        shaped_score = jnp.maximum(shaped_score, 0)
+    return shaped_score
 
 
 # # # 
@@ -337,7 +354,7 @@ def regret_maxmc_critic(
     """
     Estimate regret for a level from a single episode as
         
-        Return_{max ever} - 1/T sum_{t=0}^T \gamma^t Value(s_t).
+        Return_{max ever} - 1/T sum_{t=0}^T \\gamma^t Value(s_t).
     
     Note:
 
@@ -368,7 +385,7 @@ def regret_maxmc_critic_balanced(
     """
     Estimate regret for a level from a single episode as
         
-        Return_{max ever} - 1/T sum_{t=0}^T \gamma^t Value(s_t).
+        Return_{max ever} - 1/T sum_{t=0}^T \\gamma^t Value(s_t).
 
     Estimate the regret for a multi-episode rollout as the average of the
     per-episode averages.
@@ -419,7 +436,7 @@ def regret_maxmc_actor(
     """
     Estimate regret for a level from a single episode as
 
-        Return_{max ever} - sum_{t=0}^T \gamma^t r_t.
+        Return_{max ever} - sum_{t=0}^T \\gamma^t r_t.
 
     That is, the empirical average return achieved by the policy is used for
     the return of the policy, and the empirical max ever return on this level
@@ -446,7 +463,7 @@ def regret_oracle_actor(
     current policy's return with an analytically-computed known optimal
     return.
 
-        Return_{max oracle} - sum_{t=0}^T \gamma^t r_t.
+        Return_{max oracle} - sum_{t=0}^T \\gamma^t r_t.
 
     Notes:
 

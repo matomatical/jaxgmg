@@ -65,6 +65,8 @@ def run(
     proxy_name: str,
     plr_proxy_shaping_coeff: float,
     clipping: bool,
+    eta_schedule: bool,
+    eta_schedule_time: float,
     # ued config
     ued: str,
     prob_shift: float,
@@ -127,6 +129,19 @@ def run(
         print("WARNING: (proxy_value terms will be untrained)")
         print("WARNING: (this invalidates most estimators)")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
+    if eta_schedule:
+        eta_pretraining_duration = eta_schedule_time * num_total_cycles
+        eta_rampup_duration = 0.05 * num_total_cycles
+        plr_proxy_shaping_coeff = optax.linear_schedule(
+            init_value=0.0,
+            end_value=plr_proxy_shaping_coeff,
+            transition_begin=eta_pretraining_duration,
+            transition_steps=eta_rampup_duration,
+        )
+    else:
+        plr_proxy_shaping_coeff = optax.constant_schedule(
+            value=plr_proxy_shaping_coeff,
+        )
     if ued == "dr":
         gen = dr_infinite.CurriculumGenerator(
             level_generator=train_level_generator,
@@ -481,10 +496,14 @@ def run(
             # shortcut: we did gae already
             advantages=advantages,
             proxy_advantages=proxy_advantages,
+            step=t,
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
             metrics['ued'].update(ued_metrics)
+            metrics['ued'].update({
+                'eta': plr_proxy_shaping_coeff(t),
+            })
 
 
         # ppo update network on this data (if curriculum says so, else skip)

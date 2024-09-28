@@ -240,6 +240,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         rollouts: Rollout,              # Rollout[num_levels] (num_steps)
         advantages: Array,              # float[num_levels, num_steps]
         proxy_advantages: Array | None, # float[num_levels, num_steps]
+        step: int,
     ) -> GeneratorState:
         # perform all possible kinds of update
         generate_next_state = self._generate_update(
@@ -248,6 +249,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
         replay_next_state = self._replay_update(
             state=state,
@@ -255,6 +257,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
         mutate_next_state = self._mutate_update(
             state=state,
@@ -262,6 +265,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
 
         # keep the result corresponding to the previous batch's type
@@ -281,6 +285,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,
         proxy_advantages: Array,
         levels: Level, # Level[num_levels]
+        step: int,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a generate batch, update the
@@ -295,6 +300,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
         return state
 
@@ -306,6 +312,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,
         proxy_advantages: Array,
         levels: Level, # Level[num_levels]
+        step: int,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a replay batch, update the
@@ -357,7 +364,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
             max_ever_proxy_returns=max_proxy_max_returns,
             proxy_advantages=proxy_advantages,
             levels=levels,
-            clipping = self.clipping,
+            clipping=self.clipping,
+            step=step,
         )
 
         # replace the scores of the replayed level ids with the new scores
@@ -390,6 +398,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,
         proxy_advantages: Array,
         levels: Level, # Level[num_levels]
+        step: int,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a mutate batch, update the
@@ -404,6 +413,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
         return state
 
@@ -415,6 +425,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,      # float[num_levels, num_steps]
         proxy_advantages: Array,# float[num_levels, num_steps]
         levels: Level,          # Level[num_levels]
+        step: int,
     ) -> GeneratorState:
         # initialise the max returns
         max_returns = jax.vmap(
@@ -448,7 +459,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
             max_ever_proxy_returns=proxy_max_returns,
             proxy_advantages=proxy_advantages,
             levels=levels,
-            clipping = self.clipping,
+            clipping=self.clipping,
+            step=step,
         )
 
         # on to updating the buffer ...

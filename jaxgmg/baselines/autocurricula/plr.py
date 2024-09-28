@@ -184,6 +184,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         rollouts: Rollout,              # Rollout[num_levels] (num_steps)
         advantages: Array,              # float[num_levels, num_steps]
         proxy_advantages: Array | None, # float[num_levels, num_steps]
+        step: int, # for eta schedule
     ) -> GeneratorState:
         # perform both a replay-type update and a new-type update
         replay_next_state = self._replay_update(
@@ -192,6 +193,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
         new_next_state = self._new_update(
             state,
@@ -199,6 +201,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             levels=levels,
+            step=step,
         )
         # and keep the result corresponding to the previous batch's type
         next_state = jax.tree.map(
@@ -216,6 +219,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,
         proxy_advantages: Array,
         levels: Level,  # Level[num_levels]
+        step: int,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a replay batch, update the
@@ -266,7 +270,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
             max_ever_proxy_returns=max_proxy_max_returns,
             proxy_advantages=proxy_advantages,
             levels=levels,
-            clipping = self.clipping,
+            clipping=self.clipping,
+            step=step,
         )
         # replace the scores of the replayed level ids with the new scores
         # and mark those levels as just visited
@@ -296,6 +301,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,
         proxy_advantages: Array,
         levels: Level,  # Level[num_levels]
+        step: int,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a new batch (not a replay
@@ -333,7 +339,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
             max_ever_proxy_returns=proxy_max_returns,
             proxy_advantages=proxy_advantages,
             levels=levels,
-            clipping = self.clipping,
+            clipping=self.clipping,
+            step=step,
         )
 
         # on to updating the buffer...
