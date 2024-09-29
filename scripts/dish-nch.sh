@@ -1,18 +1,18 @@
 #!/bin/bash
 #SBATCH --job-name=dish-nch
 #SBATCH --partition=high_priority
-#SBATCH --time=4:00:00
+#SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --chdir=/data/matthew_farrugia_roberts
 #SBATCH --output=out/%A_%a-dish-nch.stdout
 #SBATCH --error=out/%A_%a-dish-nch.stderr
-#SBATCH --array 0-209%50
+#SBATCH --array 0-74%25
 
 flags=(
     --no-console-log
     --wandb-log
     --wandb-entity matthew-farrugia-roberts
-    --wandb-project dish-nch
+    --wandb-project paper-dish-nch
     --env-size 15
     --no-env-terminate-after-dish
     --num-channels-cheese 1
@@ -21,110 +21,59 @@ flags=(
     --net-width 256
     --plr-regret-estimator "maxmc-actor"
     --plr-robust
-    --clipping
     --num-mutate-steps 12
+    --prob-shift 3e-4
+    --prob-mutate-shift 3e-4
+    --num-total-env-steps 1_500_000_000
 );
-plr_proxy_shaping_coeff=0.3;
-seed_array=(0 1);
-prob_mutate_shift_array=(3e-3 1e-4 1e-1);
+seed_array=(10 11 12);
 num_channels_dish_array=(1 3 6 12 24);
 
 source jaxgmg.venv/bin/activate
-for i in {0..1}; do
+for i in {0..2}; do
     seed=${seed_array[$i]}
-    for j in {0..2}; do
-        prob_mutate_shift=${prob_mutate_shift_array[$j]}
-        for k in {0..4}; do
-            num_channels_dish=${num_channels_dish_array[$k]}
-            x=$((i * 3 * 5 * 7 + j * 5 * 7 + k * 7))
-            if [ $SLURM_ARRAY_TASK_ID -eq $((x + 0)) ]; then
-                echo "pass"
-                # jaxgmg train dish "${flags[@]}" \
-                #     --wandb-name ch:$num_channels_dish-algo:dr-alpha:$prob_mutate_shift-seed:$seed \
-                #     --seed $seed \
-                #     --prob-shift $prob_mutate_shift \
-                #     --prob-mutate-shift $prob_mutate_shift \
-                #     --num-channels-dish $num_channels_dish \
-                #     --ued dr \
-                #     --num-total-env-steps 250_000_000;
-            elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 1)) ]; then
-                echo "pass"
-                # jaxgmg train dish "${flags[@]}" \
-                #     --wandb-name ch:$num_channels_dish-algo:plr:orig-alpha:$prob_mutate_shift-seed:$seed \
-                #     --seed $seed \
-                #     --prob-shift $prob_mutate_shift \
-                #     --prob-mutate-shift $prob_mutate_shift \
-                #     --num-channels-dish $num_channels_dish \
-                #     --ued plr \
-                #     --no-plr-proxy-shaping \
-                #     --plr-prob-replay 0.33 \
-                #     --num-total-env-steps 750_000_000;
-            elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 2)) ]; then
-                jaxgmg train dish "${flags[@]}" \
-                    --wandb-name ch:$num_channels_dish-algo:plr:prox-clip-alpha:$prob_mutate_shift-seed:$seed \
-                    --seed $seed \
-                    --prob-shift $prob_mutate_shift \
-                    --prob-mutate-shift $prob_mutate_shift \
-                    --num-channels-dish $num_channels_dish \
-                    --ued plr \
-                    --plr-proxy-shaping \
-                    --plr-proxy-shaping-coeff $plr_proxy_shaping_coeff \
-                    --plr-prob-replay 0.33 \
-                    --num-total-env-steps 750_000_000;
-            elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 3)) ]; then
-                echo "pass"
-                # jaxgmg train dish "${flags[@]}" \
-                #     --wandb-name ch:$num_channels_dish-algo:accel:origc-alpha:$prob_mutate_shift-seed:$seed \
-                #     --seed $seed \
-                #     --prob-shift $prob_mutate_shift \
-                #     --prob-mutate-shift $prob_mutate_shift \
-                #     --num-channels-dish $num_channels_dish \
-                #     --ued accel \
-                #     --no-plr-proxy-shaping \
-                #     --plr-prob-replay 0.5 \
-                #     --num-total-env-steps 750_000_000 \
-                #     --chain-mutate --mutate-cheese-on-dish;
-            elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 4)) ]; then
-                jaxgmg train dish "${flags[@]}" \
-                    --wandb-name ch:$num_channels_dish-algo:accel:proxc-clip-alpha:$prob_mutate_shift-seed:$seed \
-                    --seed $seed \
-                    --prob-shift $prob_mutate_shift \
-                    --prob-mutate-shift $prob_mutate_shift \
-                    --num-channels-dish $num_channels_dish \
-                    --ued accel \
-                    --plr-proxy-shaping \
-                    --plr-proxy-shaping-coeff $plr_proxy_shaping_coeff \
-                    --plr-prob-replay 0.5 \
-                    --num-total-env-steps 750_000_000 \
+    for j in {0..4}; do
+        num_channels_dish=${num_channels_dish_array[$j]}
+        x=$((i * 5 * 5 + j * 5))
+        if [ $SLURM_ARRAY_TASK_ID -eq $((x + 0)) ]; then
+            # DR
+            jaxgmg train dish "${flags[@]}" \
+                --wandb-name ch:$num_channels_dish-algo:dr-seed:$seed \
+                --seed $seed \
+                --num-channels-dish $num_channels_dish \
+                --ued dr;
+        elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 1)) ]; then
+            # PLR (robust)
+            jaxgmg train dish "${flags[@]}" \
+                --wandb-name ch:$num_channels_dish-algo:plr-seed:$seed \
+                --seed $seed \
+                --num-channels-dish $num_channels_dish \
+                --ued plr --no-plr-proxy-shaping --plr-prob-replay 0.33;
+        elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 2)) ]; then
+            # ACCEL (const)
+            jaxgmg train dish "${flags[@]}" \
+                --wandb-name ch:$num_channels_dish-algo:accel_c-seed:$seed \
+                --seed $seed \
+                --num-channels-dish $num_channels_dish \
+                --ued accel --no-plr-proxy-shaping --plr-prob-replay 0.5 \
                     --chain-mutate --mutate-cheese-on-dish;
-            elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 5)) ]; then
-                echo "pass"
-                # jaxgmg train dish "${flags[@]}" \
-                #     --wandb-name ch:$num_channels_dish-algo:accel:origb-alpha:$prob_mutate_shift-seed:$seed \
-                #     --seed $seed \
-                #     --prob-shift $prob_mutate_shift \
-                #     --prob-mutate-shift $prob_mutate_shift \
-                #     --num-channels-dish $num_channels_dish \
-                #     --ued accel \
-                #     --no-plr-proxy-shaping \
-                #     --plr-prob-replay 0.5 \
-                #     --num-total-env-steps 750_000_000 \
-                #     --no-chain-mutate --mutate-cheese-on-dish;
-            elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 6)) ]; then
-                jaxgmg train dish "${flags[@]}" \
-                    --wandb-name ch:$num_channels_dish-algo:accel:proxb-clip-alpha:$prob_mutate_shift-seed:$seed \
-                    --seed $seed \
-                    --prob-shift $prob_mutate_shift \
-                    --prob-mutate-shift $prob_mutate_shift \
-                    --num-channels-dish $num_channels_dish \
-                    --ued accel \
-                    --plr-proxy-shaping \
-                    --plr-proxy-shaping-coeff $plr_proxy_shaping_coeff \
-                    --plr-prob-replay 0.5 \
-                    --num-total-env-steps 750_000_000 \
+        elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 3)) ]; then
+            # ACCEL (binom)
+            jaxgmg train dish "${flags[@]}" \
+                --wandb-name ch:$num_channels_dish-algo:accel_b-seed:$seed \
+                --seed $seed \
+                --num-channels-dish $num_channels_dish \
+                --ued accel --no-plr-proxy-shaping --plr-prob-replay 0.5 \
                     --no-chain-mutate --mutate-cheese-on-dish;
-            fi
-        done
+        elif [ $SLURM_ARRAY_TASK_ID -eq $((x + 4)) ]; then
+            # ACCEL (id)
+            jaxgmg train dish "${flags[@]}" \
+                --wandb-name ch:$num_channels_dish-algo:accel_d-seed:$seed \
+                --seed $seed \
+                --num-channels-dish $num_channels_dish \
+                --ued accel --no-plr-proxy-shaping --plr-prob-replay 0.5 \
+                    --chain-mutate --no-mutate-cheese-on-dish;
+        fi
     done
 done
 deactivate
