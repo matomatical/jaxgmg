@@ -16,7 +16,7 @@ flags=(
     --env-size 15
     --no-env-terminate-after-dish
     --num-channels-cheese 1
-    --num_channels_dish 6
+    --num-channels-dish 6
     --net-cnn-type large
     --net-rnn-type ff
     --net-width 256
