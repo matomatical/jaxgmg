@@ -550,6 +550,35 @@ def regret_oracle_actor(
             ]
         # TODO: this doesn't take into account the action space
         oracle_max_return = discount_rate ** goal_dist
+    elif isinstance(level, keys_and_chests.Level):
+        if not proxy_oracle:
+            # solve the maze
+            dists = maze_solving.maze_distances(level.wall_map)
+            # count reachable keys
+            keys_dists = dists[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.keys_pos[:, 0],
+                level.keys_pos[:, 1],
+            ]
+            reachable_keys = ~jnp.isinf(keys_dists)
+            num_reachable_keys = jnp.sum(reachable_keys & ~level.hidden_keys)
+            # count reachable chests
+            chests_dists = dists[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.chests_pos[:, 0],
+                level.chests_pos[:, 1],
+            ]
+            reachable_chests = ~jnp.isinf(chests_dists)
+            num_reachable_chests = jnp.sum(reachable_chests & ~level.hidden_chests)
+            # max available reward (TODO: this assumes no discounting)
+            oracle_max_return = jnp.minimum(
+                num_reachable_keys,
+                num_reachable_chests,
+            )
+        else:
+            assert False
     else:
         raise ValueError(f"Unsupported level type for oracle regret.")
 
