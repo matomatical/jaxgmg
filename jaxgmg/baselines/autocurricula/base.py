@@ -71,7 +71,7 @@ class CurriculumGenerator:
         raise NotImplementedError
 
 
-    def should_train(self, batch_type: int) -> bool:
+    def should_train(self, cycle: int, batch_type: int) -> bool:
         """
         You got a batch of this type from the `get_batch` method . This bool
         tells you if you should do PPO updates (True) or not (False).

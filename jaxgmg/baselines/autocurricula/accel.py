@@ -225,7 +225,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 raise ValueError(f"Invalid batch type {batch_type!r}")
 
 
-    def should_train(self, batch_type: int) -> bool:
+    def should_train(self, cycle: int, batch_type: int) -> bool:
         if not self.robust:
             return True
         else:

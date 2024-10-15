@@ -65,7 +65,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         return "generate"
 
 
-    def should_train(self, batch_type: int) -> bool:
+    def should_train(self, cycle: int, batch_type: int) -> bool:
         return True
 
 

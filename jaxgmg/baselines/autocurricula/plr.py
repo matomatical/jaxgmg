@@ -60,6 +60,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
     proxy_name: str | None
     proxy_shaping_coeff: float | None
     clipping: bool
+    debug_stop_gradient: bool
+    debug_stop_gradient_cycle: int
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -169,7 +171,12 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 raise ValueError(f"Invalid batch type {batch_type!r}")
 
 
-    def should_train(self, batch_type: int) -> bool:
+    def should_train(self, cycle: int, batch_type: int) -> bool:
+        # debug stop gradient
+        if self.debug_stop_gradient:
+            # if we have passed the designated cycle, always stop training
+            if cycle >= self.debug_stop_gradient_cycle:
+                return False
         if not self.robust:
             return True
         else:

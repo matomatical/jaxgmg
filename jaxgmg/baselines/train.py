@@ -67,6 +67,8 @@ def run(
     clipping: bool,
     eta_schedule: bool,
     eta_schedule_time: float,
+    debug_stop_gradient: bool,
+    debug_stop_gradient_after: float,
     # ued config
     ued: str,
     prob_shift: float,
@@ -174,6 +176,9 @@ def run(
             proxy_name=proxy_name,
             proxy_shaping_coeff=plr_proxy_shaping_coeff,
             clipping=clipping,
+            # debugging
+            debug_stop_gradient=debug_stop_gradient,
+            debug_stop_gradient_cycle=debug_stop_gradient_after * num_total_cycles,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -508,7 +513,8 @@ def run(
 
         # ppo update network on this data (if curriculum says so, else skip)
         rng_update, rng_t = jax.random.split(rng_t)
-        if gen.should_train(batch_type):
+        if gen.should_train(cycle=t, batch_type=batch_type):
+            progress.write("SHOULD TRAIN")
             if log_cycle:
                 ppo_start_time = time.perf_counter()
             train_state, ppo_metrics = ppo.update(
@@ -531,6 +537,8 @@ def run(
             step_counts['ppo-update'] += num_updates_per_cycle
             if log_cycle:
                 metrics['ppo'].update(ppo_metrics)
+        else:
+            progress.write("skip")
         
 
         # periodic evaluations
