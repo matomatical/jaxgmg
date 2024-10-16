@@ -392,7 +392,6 @@ class MixtureLevelGenerator(LevelGenerator):
     level_generator2: LevelGenerator
     prob_level1: float
 
-
     def sample(
         self,
         rng: chex.PRNGKey,
@@ -406,9 +405,13 @@ class MixtureLevelGenerator(LevelGenerator):
         level1 = self.level_generator1.sample(rng1)
         level2 = self.level_generator2.sample(rng2)
 
-        # choose the chosen level
+        # choose the chosen level with padding
         chosen_level = jax.tree.map(
-            lambda leaf1, leaf2: jax.lax.select(which, leaf1, leaf2),
+            lambda leaf1, leaf2: jax.lax.select(
+                which,
+                jax.numpy.pad(leaf1, [(0, max(0, leaf2.shape[i] - leaf1.shape[i])) for i in range(leaf1.ndim)]),
+                jax.numpy.pad(leaf2, [(0, max(0, leaf1.shape[i] - leaf2.shape[i])) for i in range(leaf2.ndim)])
+            ),
             level1,
             level2
         )
