@@ -225,7 +225,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 raise ValueError(f"Invalid batch type {batch_type!r}")
 
 
-    def should_train(self, cycle: int, batch_type: int) -> bool:
+    def should_train(self, batch_type: int) -> bool:
         if not self.robust:
             return True
         else:
@@ -241,6 +241,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,              # float[num_levels, num_steps]
         proxy_advantages: Array | None, # float[num_levels, num_steps]
         step: int,
+        scoring_method_override: str | None, # IGNORED
     ) -> GeneratorState:
         # perform all possible kinds of update
         generate_next_state = self._generate_update(

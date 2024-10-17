@@ -37,6 +37,7 @@ class AnnotatedLevel:
 class GeneratorState(base.GeneratorState):
     buffer: AnnotatedLevel              # AnnotatedLevel[buffer_size]
     num_replay_batches: int
+    num_generate_batches: int
     prev_P_replay: Array                # float[buffer_size]
     prev_batch_was_replay: bool
     prev_batch_level_ids: Array         # int[num_levels]
@@ -60,8 +61,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
     proxy_name: str | None
     proxy_shaping_coeff: float | None
     clipping: bool
-    debug_stop_gradient: bool
-    debug_stop_gradient_cycle: int
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -93,6 +92,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 max_ever_proxy_return=jnp.zeros(self.buffer_size),
             ),
             num_replay_batches=0,
+            num_generate_batches=0,
             prev_P_replay=jnp.zeros(self.buffer_size),
             prev_batch_was_replay=False,
             prev_batch_level_ids=jnp.arange(batch_size_hint),
@@ -171,19 +171,14 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 raise ValueError(f"Invalid batch type {batch_type!r}")
 
 
-    def should_train(self, cycle: int, batch_type: int) -> bool:
-        # debug stop gradient
-        if self.debug_stop_gradient:
-            # if we have passed the designated cycle, always stop training
-            if cycle >= self.debug_stop_gradient_cycle:
-                return False
+    def should_train(self, batch_type: int) -> bool:
         if not self.robust:
             return True
         else:
             return (batch_type == 1)
 
 
-    @functools.partial(jax.jit, static_argnames=['self'])
+    @functools.partial(jax.jit, static_argnames=['self', 'scoring_method_override'])
     def update(
         self,
         state: GeneratorState,
@@ -192,6 +187,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         advantages: Array,              # float[num_levels, num_steps]
         proxy_advantages: Array | None, # float[num_levels, num_steps]
         step: int, # for eta schedule
+        scoring_method_override: str | None, # used for debugging
     ) -> GeneratorState:
         # perform both a replay-type update and a new-type update
         replay_next_state = self._replay_update(
@@ -201,6 +197,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             proxy_advantages=proxy_advantages,
             levels=levels,
             step=step,
+            scoring_method_override=scoring_method_override,
         )
         new_next_state = self._new_update(
             state,
@@ -209,6 +206,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             proxy_advantages=proxy_advantages,
             levels=levels,
             step=step,
+            scoring_method_override=scoring_method_override,
         )
         # and keep the result corresponding to the previous batch's type
         next_state = jax.tree.map(
@@ -227,6 +225,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         proxy_advantages: Array,
         levels: Level,  # Level[num_levels]
         step: int,
+        scoring_method_override: str | None,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a replay batch, update the
@@ -266,7 +265,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
         )
         # compute the scores of these levels from the rollouts
         scores = plr_compute_scores(
-            scoring_method=self.scoring_method,
+            # scoring_method=self.scoring_method,
+            scoring_method=self.scoring_method if scoring_method_override is None else scoring_method_override,
             rollouts=rollouts,
             max_ever_returns=max_max_returns,
             advantages=advantages,
@@ -309,6 +309,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         proxy_advantages: Array,
         levels: Level,  # Level[num_levels]
         step: int,
+        scoring_method_override: str | None,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a new batch (not a replay
@@ -335,7 +336,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
 
         # compute the initial scores from these rollouts
         scores = plr_compute_scores(
-            scoring_method=self.scoring_method,
+            # scoring_method=self.scoring_method,
+            scoring_method=self.scoring_method if scoring_method_override is None else scoring_method_override,
             rollouts=rollouts,
             max_ever_returns=max_returns,
             advantages=advantages,
@@ -389,6 +391,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 state.buffer,
                 candidate_buffer,
             ),
+            num_generate_batches=state.num_generate_batches + 1,
         )
 
 

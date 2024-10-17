@@ -69,6 +69,7 @@ def run(
     eta_schedule_time: float,
     debug_stop_gradient: bool,
     debug_stop_gradient_after: float,
+    debug_stop_gradient_oracle: bool,
     # ued config
     ued: str,
     prob_shift: float,
@@ -176,9 +177,6 @@ def run(
             proxy_name=proxy_name,
             proxy_shaping_coeff=plr_proxy_shaping_coeff,
             clipping=clipping,
-            # debugging
-            debug_stop_gradient=debug_stop_gradient,
-            debug_stop_gradient_cycle=debug_stop_gradient_after * num_total_cycles,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -494,6 +492,11 @@ def run(
 
 
         # report experience and performance to level generator
+        scoring_method_override = None
+        if debug_stop_gradient:
+            if t >= debug_stop_gradient_after * num_total_cycles:
+                if debug_stop_gradient_oracle:
+                    scoring_method_override = 'oracle-actor'
         gen_state = gen.update(
             state=gen_state,
             levels=levels_t,
@@ -502,6 +505,7 @@ def run(
             advantages=advantages,
             proxy_advantages=proxy_advantages,
             step=t,
+            scoring_method_override=scoring_method_override
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
@@ -513,7 +517,12 @@ def run(
 
         # ppo update network on this data (if curriculum says so, else skip)
         rng_update, rng_t = jax.random.split(rng_t)
-        if gen.should_train(cycle=t, batch_type=batch_type):
+        should_train = gen.should_train(batch_type=batch_type)
+        if debug_stop_gradient:
+            if t >= debug_stop_gradient_after * num_total_cycles:
+                should_train = False
+        if should_train:
+            progress.write(f"{t:2d} update ({batch_type=:d}) (scoring_method_override=)")
             if log_cycle:
                 ppo_start_time = time.perf_counter()
             train_state, ppo_metrics = ppo.update(
@@ -536,6 +545,8 @@ def run(
             step_counts['ppo-update'] += num_updates_per_cycle
             if log_cycle:
                 metrics['ppo'].update(ppo_metrics)
+        else:
+            progress.write(f"{t:2d} skip   {batch_type=:d}) (scoring_method_override=)")
         
 
         # periodic evaluations
