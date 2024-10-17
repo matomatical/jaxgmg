@@ -409,8 +409,8 @@ class MixtureLevelGenerator(LevelGenerator):
         chosen_level = jax.tree.map(
             lambda leaf1, leaf2: jax.lax.select(
                 which,
-                jax.numpy.pad(leaf1, [(0, max(0, leaf2.shape[i] - leaf1.shape[i])) for i in range(leaf1.ndim)]),
-                jax.numpy.pad(leaf2, [(0, max(0, leaf1.shape[i] - leaf2.shape[i])) for i in range(leaf2.ndim)])
+                leaf1,
+                leaf2,
             ),
             level1,
             level2

@@ -1483,14 +1483,10 @@ def keys(
     # environment config
     env_size: int = 15,
     env_layout: str = 'blocks',
-    env_num_keys_min: int = 5,
-    env_num_keys_max: int = 5,
-    env_num_keys_min_shift: int = 15,
-    env_num_keys_max_shift: int = 15,
-    env_num_chests_min: int = 15,
-    env_num_chests_max: int = 15,
-    env_num_chests_min_shift: int = 5,
-    env_num_chests_max_shift: int = 5,
+    env_num_keys: int = 3,
+    env_num_keys_shift: int = 15,
+    env_num_chests: int = 15,
+    env_num_chests_shift: int = 5,
     obs_level_of_detail: int = 0,           # 0 = bool; 1, 3, 4, or 8 = rgb
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
@@ -1579,23 +1575,25 @@ def keys(
     maze_generator = maze_generation.get_generator_class_from_name(
         name=env_layout,
     )()
+    env_num_keys_max = max(env_num_keys, env_num_keys_shift)
+    env_num_chests_max = max(env_num_chests, env_num_chests_shift)
     orig_level_generator = keys_and_chests.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
-        num_keys_min=env_num_keys_min,
+        num_keys=env_num_keys,
         num_keys_max=env_num_keys_max,
-        num_chests_min=env_num_chests_min,
+        num_chests=env_num_chests,
         num_chests_max=env_num_chests_max,
     )
     shift_level_generator = keys_and_chests.LevelGenerator(
         height=env_size,
         width=env_size,
         maze_generator=maze_generator,
-        num_keys_min=env_num_keys_min_shift,
-        num_keys_max=env_num_keys_max_shift,
-        num_chests_min=env_num_chests_min_shift,
-        num_chests_max=env_num_chests_max_shift,
+        num_keys=env_num_keys_shift,
+        num_keys_max=env_num_keys_max,
+        num_chests=env_num_chests_shift,
+        num_chests_max=env_num_chests_max,
     )
     if prob_shift > 0.0:
         print("  mixing level generators with {prob_shift=}...")
@@ -1608,8 +1606,14 @@ def keys(
         train_level_generator = orig_level_generator
 
 
-    print("TODO: define level classifier")
-    classify_level_is_shift = None
+    print("configuring level classifier...")
+    def classify_level_is_shift(level: Level) -> bool:
+        num_visible_keys = jnp.sum(~level.hidden_keys)
+        num_visible_chests = jnp.sum(~level.hidden_chests)
+        return jnp.logical_and(
+            num_visible_keys == env_num_keys_shift,
+            num_visible_chests == env_num_chests_shift,
+        )
 
 
     print("configuring eval level generators...")
@@ -1629,7 +1633,11 @@ def keys(
     print("TODO: implement level solver...")
 
 
-    print("TODO: implement level metrics...")
+    print("configuring level metrics...")
+    level_metrics = keys_and_chests.LevelMetrics(
+        env=env,
+        discount_rate=ppo_gamma,
+    )
 
 
     print("TODO: implement level splayers for heatmap evals...")
@@ -1644,7 +1652,7 @@ def keys(
         train_level_generator=train_level_generator,
         level_solver=None,
         level_mutator=None,
-        level_metrics=None,
+        level_metrics=level_metrics,
         eval_level_generators=eval_level_generators,
         fixed_eval_levels={},
         heatmap_splayer_fn=None,

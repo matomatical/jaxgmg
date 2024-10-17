@@ -23,6 +23,8 @@ import enum
 import functools
 import itertools
 
+from typing import Any
+
 import jax
 import jax.numpy as jnp
 import einops
@@ -277,8 +279,6 @@ class Env(base.Env):
         chests_remaining = ((~state.got_chests) & ~state.level.hidden_chests).sum()
 
         # Calculate the excess keys collected beyond what is needed to open remaining chests
-
-
 
         return (
             state,
@@ -576,42 +576,32 @@ class LevelGenerator(base.LevelGenerator):
             Provides the maze generation method to use (see module
             `maze_generation` for details).
             The default is a tree maze generator using Kruskal's algorithm.
-    * num_keys_min : int (>= 0)
-            the smallest number of keys to randomly place in each generated
-            maze. the actual number will be uniformly random between this and
-            num_keys_max (inclusive).
-    * num_keys_max : int (>0, >= num_keys_min)
-            the largest number of keys to randomly place in each generated
-            maze. the actual number will be uniformly random between this and
-            num_keys_min (inclusive).
-            this one also determines the shape of the key-related arrays in
-            the level struct.
-    * num_chests_min : int (>= 0)
-            the smallest number of chests to randomly place in each generated
-            maze. the actual number will be uniformly random between this and
-            num_chests_max (inclusive).
-    * num_chests_max : int (>-, >= num_chests_min)
-            the largest number of chests to randomly place in each generated
-            maze. the actual number will be uniformly random between this and
-            num_chests_min (inclusive).
-            this one also determines the shape of the chest-related arrays in
-            the level struct.
+    * num_keys : int (>= 0)
+            the number of keys to randomly place in each generated maze.
+    * num_keys_max : int (>0, >= num_keys)
+            determines the shape of the key-related arrays in the level
+            struct.
+    * num_chests : int (>= 0)
+            the number of chests to randomly place in each generated maze.
+    * num_chests_max : int (>-, >= num_chests)
+            determines the shape of the chest-related arrays in the level
+            struct.
     """
     height: int = 13
     width: int = 13
     maze_generator : mg.MazeGenerator = mg.TreeMazeGenerator()
-    num_keys_min: int = 1
+    num_keys: int = 1
     num_keys_max: int = 4
-    num_chests_min: int = 4
+    num_chests: int = 4
     num_chests_max: int = 4
 
     def __post_init__(self):
-        assert self.num_keys_min >= 0
+        assert self.num_keys >= 0
         assert self.num_keys_max > 0
-        assert self.num_keys_max >= self.num_keys_min
-        assert self.num_chests_min >= 0
+        assert self.num_keys_max >= self.num_keys
+        assert self.num_chests >= 0
         assert self.num_chests_max > 0
-        assert self.num_chests_max >= self.num_chests_min
+        assert self.num_chests_max >= self.num_chests
         assert self.num_keys_max <= self.width, "need width for inventory"
         # TODO: somehow prevent or handle too many walls to spawn all items?
 
@@ -656,27 +646,11 @@ class LevelGenerator(base.LevelGenerator):
             replace=False,
         )
 
-        # decide randomly how many keys to use
-        rng_hidden_keys, rng = jax.random.split(rng)
-        num_keys = jax.random.randint(
-            key=rng_hidden_keys,
-            shape=(),
-            minval=self.num_keys_min,
-            maxval=self.num_keys_max+1, # exclusive
-        )
-        # hide keys after that many
-        hidden_keys = (jnp.arange(self.num_keys_max) >= num_keys)
+        # hide keys after the given number
+        hidden_keys = (jnp.arange(self.num_keys_max) >= self.num_keys)
         
-        # decide randomly how many chests to use
-        rng_hidden_chests, rng = jax.random.split(rng)
-        num_chests = jax.random.randint(
-            key=rng_hidden_chests,
-            shape=(),
-            minval=self.num_chests_min,
-            maxval=self.num_chests_max+1, # exclusive
-        )
-        # hide chests after that many
-        hidden_chests = (jnp.arange(self.num_chests_max) >= num_chests)
+        # hide chests after the given number
+        hidden_chests = (jnp.arange(self.num_chests_max) >= self.num_chests)
     
         return Level(
             wall_map=wall_map,
@@ -822,4 +796,90 @@ class LevelParser(base.LevelParser):
             hidden_chests=hidden_chests,
         )
 
+
+# # # 
+# Level complexity metrics
+
+
+@struct.dataclass
+class LevelMetrics(base.LevelMetrics):
+
+
+    @functools.partial(jax.jit, static_argnames=('self',))
+    def compute_metrics(
+        self,
+        levels: Level,          # Level[num_levels]
+        weights: chex.Array,    # float[num_levels]
+    ) -> dict[str, Any]:        # metrics
+        # basics
+        num_levels, h, w = levels.wall_map.shape
+        
+        def count_reachable_keys_and_chests(level):
+            # solve the maze
+            dists = maze_solving.maze_distances(level.wall_map)
+            # count reachable keys
+            keys_dists = dists[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.keys_pos[:, 0],
+                level.keys_pos[:, 1],
+            ]
+            reachable_keys = ~jnp.isinf(keys_dists)
+            num_reachable_keys = jnp.sum(reachable_keys & ~level.hidden_keys)
+            # count reachable chests
+            chests_dists = dists[
+                level.initial_mouse_pos[0],
+                level.initial_mouse_pos[1],
+                level.chests_pos[:, 0],
+                level.chests_pos[:, 1],
+            ]
+            reachable_chests = ~jnp.isinf(chests_dists)
+            num_reachable_chests = jnp.sum(reachable_chests & ~level.hidden_chests)
+            return num_reachable_keys, num_reachable_chests
+        num_reachable_keys, num_reachable_chests = jax.vmap(count_reachable_keys_and_chests)(levels)
+        
+        def count_visible_keys_and_chests(level):
+            num_visible_keys = jnp.sum(~level.hidden_keys)
+            num_visible_chests = jnp.sum(~level.hidden_chests)
+            return num_visible_keys, num_visible_chests
+        num_visible_keys, num_visible_chests = jax.vmap(count_visible_keys_and_chests)(levels)
+
+        # num walls (excluding border)
+        inner_wall_maps = levels.wall_map[:,1:-1,1:-1]
+        num_walls = jnp.sum(inner_wall_maps, axis=(1,2))
+
+        # rendered levels in a grid
+        def render_level(level):
+            state = self.env._reset(level)
+            rgb = self.env.render_state(state)
+            return rgb
+        _, top_64_level_ids = jax.lax.top_k(weights, k=64)
+        top_64_levels = jax.tree.map(
+            lambda leaf: leaf[top_64_level_ids],
+            levels,
+        )
+        rendered_levels = jax.vmap(render_level)(top_64_levels)
+        rendered_levels_pad = jnp.pad(
+            rendered_levels,
+            pad_width=((0, 0), (0, 1), (0, 1), (0, 0)),
+        )
+        rendered_levels_grid = einops.rearrange(
+            rendered_levels_pad,
+            '(level_h level_w) h w c -> (level_h h) (level_w w) c',
+            level_w=8,
+        )[:-1,:-1] # cut off last pixel of padding
+
+        return {
+            'layout': {
+                'levels64_img': rendered_levels_grid,
+                # number of walls
+                'num_walls_avg': num_walls.mean(),
+            },
+            'counts': {
+                'num_visible_keys_avg': num_visible_keys.mean(),
+                'num_visible_chests_avg': num_visible_chests.mean(),
+                'num_reachable_keys_avg': num_reachable_keys.mean(),
+                'num_reachable_chests_avg': num_reachable_chests.mean(),
+            },
+        }
 
