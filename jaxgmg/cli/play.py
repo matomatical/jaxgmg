@@ -85,7 +85,7 @@ def play_forever(
             controls,
             sep="\n",
         )
-        if record: frames.append(obs)
+        if record: frames.append(img)
     
         rng_steps, rng = jax.random.split(rng)
         while True:
@@ -111,7 +111,7 @@ def play_forever(
                 controls,
                 sep="\n",
             )
-            if record and not d: frames.append(obs)
+            if record and not d: frames.append(img)
             if d:
                 break
         if not debug:
