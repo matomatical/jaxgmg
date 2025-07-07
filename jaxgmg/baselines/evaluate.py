@@ -208,7 +208,7 @@ def run(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
-    param_count = sum(p.size for p in jax.tree_leaves(net_init_params))
+    param_count = sum(p.size for p in jax.tree.leaves(net_init_params))
     print("  number of parameters:", param_count)
 
 
@@ -225,9 +225,13 @@ def run(
     # load the checkpoint
     net_params = checkpoint_manager.restore(
         checkpoint_number,
-        args=ocp.args.PyTreeRestore(net_init_params),
+        args=ocp.args.PyTreeRestore(
+            net_init_params,
+            restore_args=ocp.checkpoint_utils.construct_restore_args(
+                net_init_params,
+            ),
+        )
     )
-    # print(net_params)
 
 
     # init train state
@@ -243,6 +247,7 @@ def run(
     print("doing the evaluations...")
     rng_evals, rng = jax.random.split(rng)
     for eval_name, eval_obj in evals_dict.items():
+        print("evaluation:", eval_name)
         rng_eval, rng_evals = jax.random.split(rng_evals)
         results = eval_obj.periodic_eval(
             rng=rng_eval,
@@ -250,19 +255,20 @@ def run(
             train_state=train_state,
             net_init_state=net_init_state,
         )
-        returns = results['returns']
+        print("* results:", list(results.keys()))
+        print("* TODO: save somehow")
         
-        
-        # saving the evaluation
-        path = os.path.join(
-            'evaluations',
-            f"{checkpoint_folder.replace('/','-')}-{checkpoint_number}",
-            f'{eval_name}.csv',
-        )
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
-            print("i,j,return", file=f)
-            for r, i, j in zip(returns, eval_obj.levels_pos[0], eval_obj.levels_pos[1]):
-                print(f"{i},{j},{r}", file=f)
+        # # saving returns from heatmap evaluations
+        # returns = results['returns']
+        # path = os.path.join(
+        #     'evaluations',
+        #     f"{checkpoint_folder.replace('/','-')}-{checkpoint_number}",
+        #     f'{eval_name}.csv',
+        # )
+        # os.makedirs(os.path.dirname(path), exist_ok=True)
+        # with open(path, 'w') as f:
+        #     print("i,j,return", file=f)
+        #     for r, i, j in zip(returns, eval_obj.levels_pos[0], eval_obj.levels_pos[1]):
+        #         print(f"{i},{j},{r}", file=f)
 
 
