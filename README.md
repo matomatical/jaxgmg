@@ -8,6 +8,9 @@ JAX-based environments and RL baselines for studying goal misgeneralisation.
 > everything is finished, tested, documented, or stable.
 > See also the [roadmap](#roadmap-towards-jaxgmg-10).
 
+> [!NOTE]
+> This README contains some nice graphics but is pretty out of date, sorry.
+
 Installation
 ------------
 
