@@ -8,6 +8,13 @@ JAX-based environments and RL baselines for studying goal misgeneralisation.
 > everything is finished, tested, documented, or stable.
 > See also the [roadmap](#roadmap-towards-jaxgmg-10).
 
+> [!NOTE]  
+> If you are looking for the code used for the paper
+>   [Mitigating Goal Misgeneralization via Minimax Regret](https://arxiv.org/abs/2507.03068),
+> you want to check out the
+>   [experiments branch](https://github.com/matomatical/jaxgmg/tree/experiments),
+> which is far ahead this branch (and also much messier).
+
 Installation
 ------------
 
