@@ -24,6 +24,14 @@ from jaxgmg.environments.base import ChainLevelMutator, IteratedLevelMutator
 from jaxgmg import util
 
 
+# Canonical defaults for the universal training hyperparameters. Every command
+# below sources its TrainConfig-field defaults from here (via `_DEFAULTS.x.y`)
+# so there is a single source of truth and no cross-command default drift. Only
+# environment-specific args (env_*, mutator/accel knobs, wandb routing) carry
+# their own per-command literals.
+_DEFAULTS = TrainConfig()
+
+
 @util.wandb_run
 def corner(
     # environment config
@@ -35,20 +43,20 @@ def corner(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "large",
-    net_rnn_type: str = "ff",
-    net_width: int = 256,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, accel
-    prob_shift: float = 0.0,
-    num_train_levels: int = 2048,
+    ued: str = _DEFAULTS.ued.method,                       # dr, dr-finite, plr, accel
+    prob_shift: float = _DEFAULTS.ued.prob_shift,
+    num_train_levels: int = _DEFAULTS.ued.num_train_levels,
     # for plr
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5, #default 0.5
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = False,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay, #default 0.5
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
@@ -56,45 +64,45 @@ def corner(
     mutate_cheese: bool = True,
     # for proxy augmented methods
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 128,
-    num_parallel_envs: int = 256,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "test",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = False,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
     # checkpointing
-    checkpointing: bool = True,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
@@ -277,21 +285,21 @@ def dish(
     cheese_on_dish: bool = True,
     cheese_on_dish_shift: bool = False,
     # policy config
-    net_cnn_type: str = "large",
-    net_rnn_type: str = "ff",
-    net_width: int = 256,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # ued config
-    ued: str = "plr",
-    prob_shift: float = 0.0,
+    ued: str = _DEFAULTS.ued.method,
+    prob_shift: float = _DEFAULTS.ued.prob_shift,
     # for domain randomisation
-    num_train_levels: int = 2048,
+    num_train_levels: int = _DEFAULTS.ued.num_train_levels,
     # for plr
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = True,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay,
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
@@ -299,44 +307,44 @@ def dish(
     mutate_cheese_on_dish: bool = True,
     # for proxy augmented methods
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 128,
-    num_parallel_envs: int = 256,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "test",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = False,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     # checkpointing
-    checkpointing: bool = True,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
@@ -516,20 +524,20 @@ def keys(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     #  policy config
-    net_cnn_type: str = "large",
-    net_rnn_type: str = "ff",
-    net_width: int = 256,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, accel
-    prob_shift: float = 0.0,
-    num_train_levels: int = 2048,
+    ued: str = _DEFAULTS.ued.method,                       # dr, dr-finite, plr, accel
+    prob_shift: float = _DEFAULTS.ued.prob_shift,
+    num_train_levels: int = _DEFAULTS.ued.num_train_levels,
     # for plr
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5, #default 0.5
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = False,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay, #default 0.5
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
@@ -537,44 +545,44 @@ def keys(
     mutate_keys_ratio: bool = True,
     # for proxy augmented methods
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 128,
-    num_parallel_envs: int = 256,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "keys_demo",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     # checkpointing
-    checkpointing: bool = True,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
@@ -787,64 +795,64 @@ def minimaze(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     # policy config
-    net_cnn_type: str = "large",
-    net_rnn_type: str = "ff",
-    net_width: int = 256,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # ued config
-    ued: str = "plr",                        # dr, dr-finite, plr, accel
-    prob_shift: float = 0.0,
+    ued: str = _DEFAULTS.ued.method,                        # dr, dr-finite, plr, accel
+    prob_shift: float = _DEFAULTS.ued.prob_shift,
     # for domain randomisation
-    num_train_levels: int = 2048,
+    num_train_levels: int = _DEFAULTS.ued.num_train_levels,
     # for plr
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = True,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay,
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.1,
     # for proxy augmented methods
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 128,
-    num_parallel_envs: int = 256,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "test",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     # checkpointing
-    checkpointing: bool = True,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
@@ -980,57 +988,57 @@ def memory_test(
     img_level_of_detail: int = 1,
     env_penalize_time: bool = True,
     # policy config
-    net_cnn_type: str = "mlp",
-    net_rnn_type: str = "ff",
-    net_width: int = 64,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # curriculum
-    ued: str = "dr",
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5,
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = True,
+    ued: str = _DEFAULTS.ued.method,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay,
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # proxy augmentation
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 1000_000,
-    num_env_steps_per_cycle: int = 64,
-    num_parallel_envs: int = 64,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "test",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     # checkpointing
-    checkpointing: bool = False,
-    keep_all_checkpoints: bool = False,
-    max_num_checkpoints: int = 1,
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
@@ -1076,20 +1084,20 @@ def follow(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     #  policy config
-    net_cnn_type: str = "large",
-    net_rnn_type: str = "ff",
-    net_width: int = 256,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, accel
-    prob_shift: float = 0.0,
-    num_train_levels: int = 2048,
+    ued: str = _DEFAULTS.ued.method,                       # dr, dr-finite, plr, accel
+    prob_shift: float = _DEFAULTS.ued.prob_shift,
+    num_train_levels: int = _DEFAULTS.ued.num_train_levels,
     # for plr
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5, #default 0.5
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = False,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay, #default 0.5
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
@@ -1097,44 +1105,44 @@ def follow(
     mutate_cheese: bool = True,
     # for proxy augmented methods
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 128,
-    num_parallel_envs: int = 256,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "followme_demo",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     # checkpointing
-    checkpointing: bool = True,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
@@ -1233,20 +1241,20 @@ def lava(
     img_level_of_detail: int = 1,           # obs_ is for train, img_ for gifs
     env_penalize_time: bool = False,
     #  policy config
-    net_cnn_type: str = "large",
-    net_rnn_type: str = "ff",
-    net_width: int = 256,
+    net_cnn_type: str = _DEFAULTS.net.cnn_type,
+    net_rnn_type: str = _DEFAULTS.net.rnn_type,
+    net_width: int = _DEFAULTS.net.width,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, accel
-    prob_shift: float = 0.0,
-    num_train_levels: int = 2048,
+    ued: str = _DEFAULTS.ued.method,                       # dr, dr-finite, plr, accel
+    prob_shift: float = _DEFAULTS.ued.prob_shift,
+    num_train_levels: int = _DEFAULTS.ued.num_train_levels,
     # for plr
-    plr_buffer_size: int = 4096,
-    plr_temperature: float = 0.1,
-    plr_staleness_coeff: float = 0.1,
-    plr_prob_replay: float = 0.5, #default 0.5
-    plr_regret_estimator: str = "maxmc-actor",
-    plr_robust: bool = False,
+    plr_buffer_size: int = _DEFAULTS.ued.buffer_size,
+    plr_temperature: float = _DEFAULTS.ued.temperature,
+    plr_staleness_coeff: float = _DEFAULTS.ued.staleness_coeff,
+    plr_prob_replay: float = _DEFAULTS.ued.prob_replay, #default 0.5
+    plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
+    plr_robust: bool = _DEFAULTS.ued.robust,
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.0,
@@ -1254,44 +1262,44 @@ def lava(
     mutate_cheese: bool = True,
     # for proxy augmented methods
     # PPO hyperparameters
-    ppo_lr: float = 0.00005,                # learning rate
-    ppo_gamma: float = 0.999,               # discount rate
-    ppo_clip_eps: float = 0.1,
-    ppo_gae_lambda: float = 0.95,
-    ppo_entropy_coeff: float = 0.001,
-    ppo_critic_coeff: float = 0.5,
-    ppo_max_grad_norm: float = 0.5,
-    ppo_lr_annealing: bool = False,
-    num_minibatches_per_epoch: int = 4,
-    num_epochs_per_cycle: int = 5,
+    ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
+    ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
+    ppo_clip_eps: float = _DEFAULTS.ppo.clip_eps,
+    ppo_gae_lambda: float = _DEFAULTS.ppo.gae_lambda,
+    ppo_entropy_coeff: float = _DEFAULTS.ppo.entropy_coeff,
+    ppo_critic_coeff: float = _DEFAULTS.ppo.critic_coeff,
+    ppo_max_grad_norm: float = _DEFAULTS.ppo.max_grad_norm,
+    ppo_lr_annealing: bool = _DEFAULTS.ppo.lr_annealing,
+    num_minibatches_per_epoch: int = _DEFAULTS.ppo.num_minibatches_per_epoch,
+    num_epochs_per_cycle: int = _DEFAULTS.ppo.num_epochs_per_cycle,
     # training dimensions
-    num_total_env_steps: int = 20_000_000,
-    num_env_steps_per_cycle: int = 128,
-    num_parallel_envs: int = 256,
+    num_total_env_steps: int = _DEFAULTS.collect.num_total_env_steps,
+    num_env_steps_per_cycle: int = _DEFAULTS.collect.num_env_steps_per_cycle,
+    num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
-    console_log: bool = True,
-    wandb_log: bool = True,
+    console_log: bool = _DEFAULTS.log.console,
+    wandb_log: bool = _DEFAULTS.log.wandb,
     wandb_project: str = "lavaland_demo",
     wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
     wandb_group: str = None,
     wandb_name: str = None,
-    log_gifs: bool = True,
-    log_imgs: bool = True,
-    log_hists: bool = False,
-    num_cycles_per_log: int = 32,           #   32 * 32k = roughly  1M steps
-    num_cycles_per_eval: int = 32,          #   32 * 32k = roughly  1M steps
-    num_cycles_per_gifs: int = 1024,        # 1024 * 32k = roughly 32M steps
-    num_cycles_per_big_eval: int = 1024,    # 1024 * 32k = roughly 32M steps
-    evals_num_env_steps: int = 512,
-    evals_num_levels: int = 256,
-    gif_grid_width: int = 16,
+    log_gifs: bool = _DEFAULTS.log.gifs,
+    log_imgs: bool = _DEFAULTS.log.imgs,
+    log_hists: bool = _DEFAULTS.log.hists,
+    num_cycles_per_log: int = _DEFAULTS.log.num_cycles_per_log,           #   32 * 32k = roughly  1M steps
+    num_cycles_per_eval: int = _DEFAULTS.eval.num_cycles_per_eval,          #   32 * 32k = roughly  1M steps
+    num_cycles_per_gifs: int = _DEFAULTS.log.num_cycles_per_gifs,        # 1024 * 32k = roughly 32M steps
+    num_cycles_per_big_eval: int = _DEFAULTS.eval.num_cycles_per_big_eval,    # 1024 * 32k = roughly 32M steps
+    evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
+    evals_num_levels: int = _DEFAULTS.eval.num_levels,
+    gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     # checkpointing
-    checkpointing: bool = True,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = False,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = 1,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = 512,
+    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
+    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
+    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
+    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
-    seed: int = 42,
+    seed: int = _DEFAULTS.seed,
 ):
     config = locals()
     util.print_config(config)
