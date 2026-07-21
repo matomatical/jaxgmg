@@ -18,6 +18,7 @@ import tqdm
 import wandb
 
 from jaxgmg import util
+from jaxgmg.baselines.config import TrainConfig
 from jaxgmg.baselines import networks
 from jaxgmg.baselines import experience
 from jaxgmg.baselines import evals
@@ -44,8 +45,8 @@ from jaxgmg.baselines.autocurricula.base import GeneratorState
 
 
 def run(
-    seed: int,
-    # environment-specific stuff
+    config: TrainConfig,
+    # environment-specific objects (built per-command by the CLI)
     env: Env,
     train_level_generator: LevelGenerator,
     level_mutator: LevelMutator | None,
@@ -55,54 +56,51 @@ def run(
     fixed_eval_levels: dict[str, Level],
     heatmap_splayer_fn: Callable | None,
     classify_level_is_shift: Callable[[Level], bool] | None,
-    # actor critic policy config
-    net_cnn_type: str,
-    net_rnn_type: str,
-    net_width: int,
-    # ued config
-    ued: str,
-    prob_shift: float,
-    num_train_levels: int,
-    plr_buffer_size: int,
-    plr_temperature: float,
-    plr_staleness_coeff: float,
-    plr_prob_replay: float,
-    plr_regret_estimator: str,
-    plr_robust: bool,
-    # PPO config
-    ppo_lr: float,
-    ppo_gamma: float,
-    ppo_clip_eps: float,
-    ppo_gae_lambda: float,
-    ppo_entropy_coeff: float,
-    ppo_critic_coeff: float,
-    ppo_max_grad_norm: float,
-    ppo_lr_annealing: bool,
-    # training run dimensions
-    num_minibatches_per_epoch: int,
-    num_epochs_per_cycle: int,
-    num_total_env_steps: int,
-    num_env_steps_per_cycle: int,
-    num_parallel_envs: int,
-    # logging and evals config
-    console_log: bool,
-    wandb_log: bool,
-    log_gifs: bool,
-    log_imgs: bool,
-    log_hists: bool,
-    num_cycles_per_log: int,
-    num_cycles_per_gifs: int,
-    num_cycles_per_eval: int,
-    num_cycles_per_big_eval: int,
-    evals_num_env_steps: int,
-    evals_num_levels: int,
-    gif_grid_width: int,
-    # checkpointing config
-    checkpointing: bool,
-    keep_all_checkpoints: bool,
-    max_num_checkpoints: int,
-    num_cycles_per_checkpoint: int,
 ):
+    # unpack the config into the local names used throughout the loop below
+    seed = config.seed
+    net_cnn_type = config.net.cnn_type
+    net_rnn_type = config.net.rnn_type
+    net_width = config.net.width
+    ued = config.ued.method
+    prob_shift = config.ued.prob_shift
+    num_train_levels = config.ued.num_train_levels
+    plr_buffer_size = config.ued.buffer_size
+    plr_temperature = config.ued.temperature
+    plr_staleness_coeff = config.ued.staleness_coeff
+    plr_prob_replay = config.ued.prob_replay
+    plr_regret_estimator = config.ued.regret_estimator
+    plr_robust = config.ued.robust
+    ppo_lr = config.ppo.lr
+    ppo_gamma = config.ppo.gamma
+    ppo_clip_eps = config.ppo.clip_eps
+    ppo_gae_lambda = config.ppo.gae_lambda
+    ppo_entropy_coeff = config.ppo.entropy_coeff
+    ppo_critic_coeff = config.ppo.critic_coeff
+    ppo_max_grad_norm = config.ppo.max_grad_norm
+    ppo_lr_annealing = config.ppo.lr_annealing
+    num_minibatches_per_epoch = config.ppo.num_minibatches_per_epoch
+    num_epochs_per_cycle = config.ppo.num_epochs_per_cycle
+    num_total_env_steps = config.collect.num_total_env_steps
+    num_env_steps_per_cycle = config.collect.num_env_steps_per_cycle
+    num_parallel_envs = config.collect.num_parallel_envs
+    console_log = config.log.console
+    wandb_log = config.log.wandb
+    log_gifs = config.log.gifs
+    log_imgs = config.log.imgs
+    log_hists = config.log.hists
+    num_cycles_per_log = config.log.num_cycles_per_log
+    num_cycles_per_gifs = config.log.num_cycles_per_gifs
+    num_cycles_per_eval = config.eval.num_cycles_per_eval
+    num_cycles_per_big_eval = config.eval.num_cycles_per_big_eval
+    evals_num_env_steps = config.eval.num_env_steps
+    evals_num_levels = config.eval.num_levels
+    gif_grid_width = config.log.gif_grid_width
+    checkpointing = config.ckpt.enabled
+    keep_all_checkpoints = config.ckpt.keep_all
+    max_num_checkpoints = config.ckpt.max_num
+    num_cycles_per_checkpoint = config.ckpt.num_cycles_per
+
     # deriving some additional config variables
     num_total_env_steps_per_cycle = num_env_steps_per_cycle * num_parallel_envs
     num_total_cycles = num_total_env_steps // num_total_env_steps_per_cycle
