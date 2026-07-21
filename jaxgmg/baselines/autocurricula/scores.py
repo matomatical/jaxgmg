@@ -14,7 +14,6 @@ from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import cheese_on_a_dish
 from jaxgmg.environments import cheese_on_a_pile
-from jaxgmg.environments import minigrid_maze
 
 
 # # # 
@@ -478,9 +477,9 @@ def regret_oracle_actor(
       It will therefore give wrong results for other environment
       configurations.
     * The oracle assumes the action space is to move in a cardinal direction.
-      For environments like minigrid_maze it will give an incorrect result
-      because it does not account for the need to take left/right turn
-      actions.
+      Turn-action environments like minigrid_maze are not supported: they are
+      no longer dispatched here and fall through to a ValueError, rather than
+      silently returning a wrong result that ignores the turn actions.
 
     Implementation notes:
 
@@ -551,23 +550,6 @@ def regret_oracle_actor(
                 level.napkin_pos[0],
                 level.napkin_pos[1],
             ]
-        oracle_max_return = discount_rate ** goal_dist
-    elif isinstance(level, minigrid_maze.Level):
-        if not proxy_oracle:
-            goal_dist = maze_solving.maze_distances(level.wall_map)[
-                level.initial_hero_pos[0],
-                level.initial_hero_pos[1],
-                level.goal_pos[0],
-                level.goal_pos[1],
-            ]
-        else:
-            goal_dist = maze_solving.maze_distances(level.wall_map)[
-                level.initial_hero_pos[0],
-                level.initial_hero_pos[1],
-                level.goal_pos[0],
-                level.goal_pos[1],
-            ]
-        # TODO: this doesn't take into account the action space
         oracle_max_return = discount_rate ** goal_dist
     elif isinstance(level, keys_and_chests.Level):
         if not proxy_oracle:
