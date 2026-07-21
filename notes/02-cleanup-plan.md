@@ -78,6 +78,19 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
   notebook/script grep; fix or retire `jobs/plr.jobs`.
 *Effort: S. Each deletion verified by import grep + green tests.*
 
+> **Status (2026-07-21).** Done (reviewed w/ Matthew, suite green): deleted
+> `scattered.py`, `plr_compute_scores_old`, keys legacy valuation block,
+> `plr_parallel.py`, `wrappers/jaxued_wrappers.py` (~4.05k lines); fixed the stale
+> `plr-parallel` CLI comments and a stale commented-out `optimal_value` ref in
+> `cli/solve.py`. `plr_parallel` + `jaxued_wrappers` were non-functional/unused;
+> **intent registered in `notes/mfr-wishlist.md`** (parallel-robust PLR baseline;
+> JaxUED interop wrapper) and code is git-recoverable — also lets us drop the
+> `jaxued` dep. **Deferred to Phase 2:** the dish proxy-solver salvage (it's a
+> *fix*, and unblocks the dish-oracle test — do it with the other Phase-2 fixes;
+> keep `cheese_on_a_dish_original.py` until then). **Still ready (verified 0-use,
+> no notebooks):** delete the four util helpers from `util.py`. `jobs/plr.jobs`
+> folded into the Phase-6 `scripts/`+`jobs/` deletion.
+
 ### Phase 2 — Fix outright bugs (low risk)
 - **Reachable/correctness** (issue #2): restore dish proxy solver; fix `minigrid_maze`
   solver field refs (`state.goal_pos`→`Level`, `got_corner`→`got_proxy`) or explicitly mark
@@ -122,8 +135,10 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
   naming and the `scoring_method_override` semantics; reconcile `splay_*` APIs (issue #14).
 - Decide the demo surface: keep 10 demo groups, fold under `jaxgmg demo …`, or move to an
   optional extra. Generalize `eval`/`heatmaps` beyond corner, or document the limitation.
-- Restore `__init__.py` files / confirm namespace-package intent; refresh README/roadmap;
-  archive the ~27 bespoke SLURM scripts (`scripts/`, `jobs/`) into `scripts/archive/`.
+- Restore `__init__.py` files / confirm namespace-package intent; refresh README/roadmap.
+- **Delete `scripts/` and `jobs/` outright** (Matthew, 2026-07-21): the ~27 bespoke SLURM
+  scripts are incomplete and of historical interest only — no need to archive in-tree
+  (git history preserves them).
 
 ## Test strategy (the "tricky parts")
 

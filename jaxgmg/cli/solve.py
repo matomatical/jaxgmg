@@ -228,10 +228,5 @@ def keys(
         fps=fps,
         debug=debug,
     )
-    # value = keys_and_chests.optimal_value(
-    #     level=level,
-    #     discount_rate=discount_rate,
-    #     env=env,
-    # )
 
 

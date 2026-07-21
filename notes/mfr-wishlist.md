@@ -26,3 +26,21 @@ Some musings on some things I want to eventually do with the rewrite.
     environment distributions.
   * An expensive integration test of the whole port is to replicate the main
     plot(s) of the paper.
+* Baselines & interop to (re)build (deleted during the cleanup because the
+  existing code was non-functional/unused, but the *intent* is worth keeping;
+  the old code is recoverable from git history — e.g. `git show
+  895d537:jaxgmg/baselines/autocurricula/plr_parallel.py`):
+  * **Parallel + robust PLR baseline** (my implementation of the variant
+    proposed in the minimax paper, `~/agents/papers/Jiang+2023-minimax`).
+    Rebuild cleanly rather than porting — the old version duplicated most of
+    `plr.py`. The distinctive behaviour to preserve: `get_batch` returns
+    `2 * num_levels` levels (a `replay` batch *and* a `new` batch), rollouts +
+    UED buffer updates run on **all** of them, but PPO trains on **only** the
+    first `num_levels` (the replay ones). i.e. collect experience in parallel
+    from both batches, but keep the "robust" property of training on replay
+    only. (The old module carried this as a decommissioned `NotImplementedError`
+    stub with a training-loop integration snippet in its docstring.)
+  * **JaxUED-conformant environment wrapper** for interop with external UED
+    baselines (wraps our `Env`/`Level` in jaxued's `UnderspecifiedEnv` API).
+    Will need a comprehensive rewrite; deleting the old wrapper also lets us
+    drop the external `jaxued` dependency until the feature is rebuilt.

@@ -38,7 +38,7 @@ def corner(
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                       # dr, dr-finite, plr, accel
     prob_shift: float = 0.0,
     num_train_levels: int = 2048,
     # for plr
@@ -1009,7 +1009,7 @@ def pile(
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                        # dr, dr-finite, plr, accel
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -1501,7 +1501,7 @@ def keys(
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                       # dr, dr-finite, plr, accel
     prob_shift: float = 0.0,
     num_train_levels: int = 2048,
     # for plr
@@ -1833,7 +1833,7 @@ def minimaze(
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                        # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                        # dr, dr-finite, plr, accel
     prob_shift: float = 0.0,
     # for domain randomisation
     num_train_levels: int = 2048,
@@ -2479,7 +2479,7 @@ def follow(
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                       # dr, dr-finite, plr, accel
     prob_shift: float = 0.0,
     num_train_levels: int = 2048,
     # for plr
@@ -2694,7 +2694,7 @@ def lava(
     net_rnn_type: str = "ff",
     net_width: int = 256,
     # ued config
-    ued: str = "plr",                       # dr, dr-finite, plr, plr-parallel
+    ued: str = "plr",                       # dr, dr-finite, plr, accel
     prob_shift: float = 0.0,
     num_train_levels: int = 2048,
     # for plr
