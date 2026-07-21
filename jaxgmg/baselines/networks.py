@@ -233,9 +233,10 @@ class Impala(ActorCriticNetwork):
         state: ActorCriticState,
         prev_action: int,
     ) -> tuple[
-        distrax.Categorical,
-        Array,                  # float[num_values]
-        ActorCriticState,
+        distrax.Categorical,    # action distribution (pi)
+        Array,                  # float (value v)
+        Array,                  # float (proxy value vp)
+        ActorCriticState,       # next recurrent state
     ]:
         # embed the image part of the observation
         match self.cnn_type:

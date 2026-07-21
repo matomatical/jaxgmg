@@ -65,7 +65,7 @@ def corner(
     rng = jax.random.PRNGKey(seed=seed)
     level = level_generator.sample(rng=rng)
     image = env.render_level(level)
-    print(util.img2str(obs))
+    print(util.img2str(image))
 
     print("splaying the level...")
     level_set = splayer(level)

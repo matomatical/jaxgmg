@@ -323,7 +323,7 @@ class ActorCriticHeatmapVisualisationEval(Eval):
         return {
             'action_probs_img': action_diamond_plot,
             'value_img': value_heatmap,
-            'proxy_value_img': value_heatmap,
+            'proxy_value_img': proxy_value_heatmap,
         }
     
 

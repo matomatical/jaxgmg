@@ -225,8 +225,6 @@ def mazegen_tree(
     """
     Speedtest for tree maze generator.
     """
-    if level_of_detail not in {0,1,3,4,8}:
-        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -253,8 +251,6 @@ def mazegen_edges(
     """
     Speedtest for edge maze generator.
     """
-    if level_of_detail not in {0,1,3,4,8}:
-        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -281,8 +277,6 @@ def mazegen_blocks(
     """
     Speedtest for tree maze generator.
     """
-    if level_of_detail not in {0,1,3,4,8}:
-        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
@@ -311,8 +305,6 @@ def mazegen_noise(
     """
     Speedtest for noise maze generator.
     """
-    if level_of_detail not in {0,1,3,4,8}:
-        raise ValueError(f"invalid level of detail {level_of_detail}")
     util.print_config(locals())
     speedtest_mazegen(
         rng=jax.random.PRNGKey(seed=seed),
