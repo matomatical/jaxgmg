@@ -85,11 +85,12 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
 > `cli/solve.py`. `plr_parallel` + `jaxued_wrappers` were non-functional/unused;
 > **intent registered in `notes/mfr-wishlist.md`** (parallel-robust PLR baseline;
 > JaxUED interop wrapper) and code is git-recoverable — also lets us drop the
-> `jaxued` dep. **Deferred to Phase 2:** the dish proxy-solver salvage (it's a
-> *fix*, and unblocks the dish-oracle test — do it with the other Phase-2 fixes;
-> keep `cheese_on_a_dish_original.py` until then). **Still ready (verified 0-use,
-> no notebooks):** delete the four util helpers from `util.py`. `jobs/plr.jobs`
-> folded into the Phase-6 `scripts/`+`jobs/` deletion.
+> `jaxued` dep. Also deleted the four dead `util.py` helpers
+> (`pico8`, `print_img`, `print_histogram`, `save_json`; verified 0-use).
+> **Deferred to Phase 2:** the dish proxy-solver salvage (it's a *fix*, and
+> unblocks the dish-oracle test — do it with the other Phase-2 fixes; keep
+> `cheese_on_a_dish_original.py` until then). `jobs/plr.jobs` folded into the
+> Phase-6 `scripts/`+`jobs/` deletion. **Phase 1 otherwise complete.**
 
 ### Phase 2 — Fix outright bugs (low risk)
 - **Reachable/correctness** (issue #2): restore dish proxy solver; fix `minigrid_maze`

@@ -68,17 +68,6 @@ def print_config(config: dict):
         print(f"  {key:30s}: {value}")
 
 
-def print_histogram(data, bins=10, range=None, width=40):
-    """
-    Bin and count a sequence of values and print them to stdout as an ASCII
-    histogram.
-    """
-    hist, bin_edges = jnp.histogram(data, bins=bins, range=range)
-    norm_counts = hist / hist.max()
-    for count, lo, hi in zip(norm_counts, bin_edges, bin_edges[1:]):
-        print(f"  {lo:.2f} to {hi:.2f} | {int(count * width + 1) * '*'}")
-
-
 def print_legend(legend, colormap=None):
     """
     Render a mapping from colors to values to stdout.
@@ -86,14 +75,6 @@ def print_legend(legend, colormap=None):
     print("legend:")
     for value, name in legend.items():
         print(img2str(jnp.full((2,2), value), colormap=colormap,), name)
-
-
-def print_img(im, colormap=None):
-    """
-    Render a small image to stdout using unicode half-block characters to
-    represent pairs of pixels.
-    """
-    print(img2str(im, colormap=colormap))
 
 
 def filter_and_render_metrics(
@@ -254,12 +235,7 @@ def save_gif(
     )
 
 
-def save_json(dct, path):
-    with open(path, 'w') as outfile:
-        json.dump(dct, outfile, indent=True)
-
-
-# # # 
+# # #
 # wandb wrappers and formatting functions
 
 
@@ -531,19 +507,5 @@ def sweetie16(x):
         [.160,.211,.435],[.231,.364,.788],[.254,.650,.964],[.450,.937,.968],
         [.956,.956,.956],[.580,.690,.760],[.337,.423,.525],[.2  ,.235,.341],
     ])[x]
-
-
-def pico8(x):
-    """
-    PICO-8 colour palette.
-
-    Details: https://pico-8.fandom.com/wiki/Palette
-    """
-    return (jnp.array([
-        [  0,   0,   0], [ 29,  43,  83], [126,  37,  83], [  0, 135,  81],
-        [171,  82,  54], [ 95,  87,  79], [194, 195, 199], [255, 241, 232],
-        [255,   0,  77], [255, 163,   0], [255, 236,  39], [  0, 228,  54],
-        [ 41, 173, 255], [131, 118, 156], [255, 119, 168], [255, 204, 170],
-    ]) / 255)[x]
 
 
