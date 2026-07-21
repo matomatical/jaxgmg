@@ -329,7 +329,7 @@ def run(
         rng=rng_model_init,
         obs_type=env.obs_type(level=example_level),
     )
-    param_count = sum(p.size for p in jax.tree_leaves(net_init_params))
+    param_count = sum(p.size for p in jax.tree.leaves(net_init_params))
     print("  number of parameters:", param_count)
 
 
@@ -629,5 +629,9 @@ def run(
         # they would be automatically saved since I put them in the run dir,
         # and the docs say this, but it doesn't seem to be the case...)
         wandb.save(checkpoint_path + "/**", base_path=wandb.run.dir)
+
+    # return the trained parameters (fire-and-forget for the CLI, but lets the
+    # integration smoke test inspect the result).
+    return train_state
 
 
