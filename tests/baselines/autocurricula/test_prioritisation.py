@@ -8,7 +8,7 @@ properties PLR relies on (higher score ⇒ more replay; staler ⇒ more replay).
 
 Reference: given ordinal ranks (rank 1 = highest score),
     tempered_hvals = (1/rank) ** (1/temperature)
-    staleness      = 1 + current_time - last_visit_time
+    staleness      = current_time - last_visit_time   # 0 for a just-visited level
     P = (1-c) * tempered/Σtempered  +  c * staleness/Σstaleness
 """
 
@@ -47,32 +47,25 @@ def test_rank_based_golden_temperature_one():
 
 def test_pure_staleness_golden():
     # staleness_coeff=1 -> P = staleness / sum(staleness).
-    # last_visit [0,1,2,3], current 3 -> staleness [4,3,2,1] -> [.4,.3,.2,.1]
+    # last_visit [0,1,2,3], current 3 -> staleness [3,2,1,0] (sum 6)
+    #   -> [3/6, 2/6, 1/6, 0]. The just-visited level (last_visit == current) gets 0.
     p = probs([0, 0, 0, 0], staleness_coeff=1.0, last_visit=[0, 1, 2, 3], current_time=3)
-    np.testing.assert_allclose(p, [0.4, 0.3, 0.2, 0.1], rtol=1e-6)
+    np.testing.assert_allclose(p, [0.5, 1/3, 1/6, 0.0], rtol=1e-6)
     # the least-recently-visited level (smallest last_visit) is most probable
     assert np.argmax(p) == 0
 
 
-def test_staleness_offset_is_one_not_zero():
-    # Characterizes the `1 + current - last_visit` offset (there's a TODO in the
-    # source questioning it): a just-visited level (last_visit == current) still
-    # has staleness 1, not 0, so it keeps nonzero staleness weight.
-    p = probs([0, 0], staleness_coeff=1.0, last_visit=[5, 5], current_time=5)
-    np.testing.assert_allclose(p, [0.5, 0.5], rtol=1e-6)   # both staleness 1
+def test_all_equally_recent_falls_back_to_uniform_staleness():
+    # Degenerate case: every level was visited at the current time, so all
+    # staleness values are 0 and their sum is 0. The mixture guards this 0/0
+    # with a uniform staleness distribution (rather than producing NaN). This
+    # is also the buffer's state at init (every last_visit == current == 0).
+    p = probs([0, 0, 0], staleness_coeff=1.0, last_visit=[5, 5, 5], current_time=5)
+    np.testing.assert_allclose(p, [1/3, 1/3, 1/3], rtol=1e-6)
+    assert not np.any(np.isnan(p))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG-3 (notes/03-bug-log.md): both PLR papers define staleness as "
-        "c - C_i (P_C = (c-C_i)/sum), and both reference impls reset a "
-        "just-visited level's staleness to 0. jaxgmg's `1 + current - last_visit` "
-        "gives it staleness 1, so a just-visited level keeps nonzero staleness "
-        "weight instead of 0. When the `1 +` is dropped, drop this xfail."
-    ),
-)
-def test_just_visited_level_has_zero_staleness_weight_ref():
+def test_just_visited_level_has_zero_staleness_weight():
     # level 1 was just visited (last_visit == current_time); level 0 is stale.
     # Reference staleness = [c-0, c-c] = [5, 0] -> P_C = [1, 0].
     p = probs([0, 0], staleness_coeff=1.0, last_visit=[0, 5], current_time=5)

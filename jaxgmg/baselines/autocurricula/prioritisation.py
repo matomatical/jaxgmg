@@ -29,13 +29,25 @@ def plr_replay_probs(
     )
     tempered_hvals = jnp.pow(1 / ranks, 1 / temperature)
     
-    # staleness-aware prioritisation
-    staleness = 1 + current_time - last_visit_times # TODO: is 1+ correct?
+    # staleness-aware prioritisation. Both PLR papers (Jiang+2020, Jiang+2021)
+    # and both reference implementations define staleness as (c - C_i), so a
+    # just-visited level (C_i == current_time) has staleness 0. See BUG-3 in
+    # notes/03-bug-log.md.
+    staleness = current_time - last_visit_times
+    staleness_sum = staleness.sum()
+    # Guard the degenerate all-equally-recent case (e.g. at init, before any
+    # level has been revisited, every C_i == current_time so the sum is 0):
+    # fall back to a uniform staleness distribution rather than dividing 0/0.
+    staleness_probs = jnp.where(
+        staleness_sum > 0,
+        staleness / jnp.where(staleness_sum > 0, staleness_sum, 1),
+        1 / buffer_size,
+    )
 
     # probability of replaying each level is a mixture of these
     P_replay = (
         (1-staleness_coeff) * tempered_hvals / tempered_hvals.sum()
-        + staleness_coeff * staleness / staleness.sum()
+        + staleness_coeff * staleness_probs
     )
     return P_replay
 
