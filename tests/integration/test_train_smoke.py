@@ -5,10 +5,12 @@ PPO cycles on a tiny Cheese-in-the-Corner env + tiny net, for each curriculum
 (DR and PLR), and assert the whole pipeline executes and produces finite,
 correctly-structured parameters.
 
-This is the safety net for the Phase-3 config refactor: it exercises
-collect_rollouts -> GAE -> ppo.update -> curriculum get_batch/update across the
-real `baselines.train.run` entry point. `run` is invoked with wandb and
-checkpointing OFF (both are wandb-coupled) and logging off (so it stays fast).
+This is the safety net for the Phase-3 config refactor. Everything is kept tiny
+so we can leave eval / metrics / logging turned ON (exercising the eval, level
+metrics, classifier and console-render paths that the refactor's eval.*/log.*
+config groups feed) while still running in seconds. wandb is OFF (console_log
+drives the logging path without it); checkpointing is OFF (the backend is slated
+for replacement, so it's not worth testing here).
 
 As Phase 3 drops dead flags and then wraps the ~62 args in a TrainConfig, the
 `run(...)` invocation here changes with it, but the assertions stay put — that
@@ -27,7 +29,7 @@ from jaxgmg.procgen import maze_generation
 
 
 def _tiny_corner_builders():
-    """A minimal set of the ~9 builder objects run() needs, tiny + fast."""
+    """The ~9 builder objects run() needs, tiny + fast, with evals wired up."""
     env = corner.Env(
         penalize_time=False,
         terminate_after_cheese_and_corner=False,
@@ -42,19 +44,19 @@ def _tiny_corner_builders():
         env=env,
         train_level_generator=gen,
         level_mutator=None,           # DR/PLR don't need one
-        level_solver=None,            # skip solving (evals are off anyway)
-        level_metrics=None,
-        eval_level_generators={},     # no eval batches -> fast
+        level_solver=corner.LevelSolver(env=env, discount_rate=0.99),
+        level_metrics=corner.LevelMetrics(env=env, discount_rate=0.99),
+        eval_level_generators={'eval': gen},                 # one small eval batch
         fixed_eval_levels={},
-        heatmap_splayer_fn=None,
-        classify_level_is_shift=None,
+        heatmap_splayer_fn=None,                             # skip heatmap media
+        classify_level_is_shift=lambda level: (level.cheese_pos[0] == 1),
     )
 
 
 def _tiny_run_kwargs():
     """The ~48 universal scalars + the soon-to-be-dropped flags, tiny values.
 
-    4 cycles of 8x8 = 256 env steps total. wandb/checkpoint/logging all off.
+    3 cycles of 8x8 = 192 env steps total. Logging/eval ON, wandb/checkpoint OFF.
     """
     return dict(
         seed=0,
@@ -99,23 +101,23 @@ def _tiny_run_kwargs():
         # dimensions (tiny)
         num_minibatches_per_epoch=2,
         num_epochs_per_cycle=1,
-        num_total_env_steps=256,      # // (8*8) = 4 cycles
+        num_total_env_steps=192,      # // (8*8) = 3 cycles
         num_env_steps_per_cycle=8,
         num_parallel_envs=8,
-        # logging + evals: OFF (keeps log_cycle False -> fast, no wandb)
-        console_log=False,
+        # logging + evals: ON (no wandb); media off to stay fast/robust
+        console_log=True,
         wandb_log=False,
         log_gifs=False,
         log_imgs=False,
         log_hists=False,
-        num_cycles_per_log=1,
+        num_cycles_per_log=1,         # log every cycle -> exercise metrics/render
         num_cycles_per_gifs=1000,
-        num_cycles_per_eval=1,
+        num_cycles_per_eval=1,        # eval every cycle
         num_cycles_per_big_eval=1000,
         evals_num_env_steps=8,
         evals_num_levels=4,
         gif_grid_width=2,
-        # checkpointing: OFF (wandb-coupled)
+        # checkpointing: OFF (backend slated for replacement; not tested here)
         checkpointing=False,
         keep_all_checkpoints=False,
         max_num_checkpoints=1,
