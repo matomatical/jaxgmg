@@ -53,7 +53,6 @@ def corner(
     chain_mutate: bool = True,
     mutate_cheese: bool = True,
     # for proxy augmented methods
-    clipping: bool = False,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -440,7 +439,6 @@ def corner(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
@@ -512,7 +510,6 @@ def dish(
     chain_mutate: bool = True,
     mutate_cheese_on_dish: bool = True,
     # for proxy augmented methods
-    clipping: bool = False,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -921,7 +918,6 @@ def dish(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
@@ -995,7 +991,6 @@ def keys(
     chain_mutate: bool = True,
     mutate_keys_ratio: bool = True,
     # for proxy augmented methods
-    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1244,7 +1239,6 @@ def keys(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=debug_stop_gradient,
         debug_stop_gradient_after=debug_stop_gradient_after,
         debug_stop_gradient_oracle=debug_stop_gradient_oracle,
@@ -1311,7 +1305,6 @@ def minimaze(
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.1,
     # for proxy augmented methods
-    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1726,7 +1719,6 @@ def minimaze(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
@@ -1784,7 +1776,6 @@ def memory_test(
     plr_regret_estimator: str = "maxmc-actor",
     plr_robust: bool = True,
     # proxy augmentation
-    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -1866,7 +1857,6 @@ def memory_test(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
@@ -1934,7 +1924,6 @@ def follow(
     chain_mutate: bool = True,
     mutate_cheese: bool = True,
     # for proxy augmented methods
-    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -2069,7 +2058,6 @@ def follow(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
@@ -2137,7 +2125,6 @@ def lava(
     chain_mutate: bool = True,
     mutate_cheese: bool = True,
     # for proxy augmented methods
-    clipping: bool = True,
     # PPO hyperparameters
     ppo_lr: float = 0.00005,                # learning rate
     ppo_gamma: float = 0.999,               # discount rate
@@ -2270,7 +2257,6 @@ def lava(
         plr_prob_replay=plr_prob_replay,
         plr_regret_estimator=plr_regret_estimator,
         plr_robust=plr_robust,
-        clipping=clipping,
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,

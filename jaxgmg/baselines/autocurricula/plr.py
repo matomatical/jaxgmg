@@ -57,7 +57,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
     # scoring
     scoring_method: str
     discount_rate: float
-    clipping: bool
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -244,7 +243,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             discount_rate=self.discount_rate,
             levels=levels,
-            clipping=self.clipping,
         )
         # replace the scores of the replayed level ids with the new scores
         # and mark those levels as just visited
@@ -293,7 +291,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             discount_rate=self.discount_rate,
             levels=levels,
-            clipping=self.clipping,
         )
 
         # on to updating the buffer...

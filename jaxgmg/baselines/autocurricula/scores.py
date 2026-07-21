@@ -23,7 +23,6 @@ from jaxgmg.environments import cheese_on_a_dish
     jax.jit,
     static_argnames=[
         "scoring_method",
-        "clipping",
     ],
 )
 def plr_compute_scores(
@@ -36,7 +35,6 @@ def plr_compute_scores(
     discount_rate: float,
     # data for computing oracle scores (HACK)
     levels: Level,                          # Level[num_levels]
-    clipping: bool,          # whether to clip the score
 ) -> Array:                                 # float[num_levels]
     """
     Compute prioritisation 'scores' for a batch of levels using a named
@@ -100,7 +98,6 @@ def plr_compute_scores(
             0,      # advantages
             None,   # discount rate (don't vmap)
             0,      # levels
-            None,   # clipping (static, don't vmap)
         ),
     )(
         scoring_method,         # str (static)
@@ -109,7 +106,6 @@ def plr_compute_scores(
         advantages,             # float[vmap(num_levels), num_steps]
         discount_rate,          # float
         levels,                 # Level[vmap(num_levels)]
-        clipping,               # bool (static)
     )
 
 
@@ -121,7 +117,6 @@ def plr_compute_scores(
     jax.jit,
     static_argnames=[
         "scoring_method",
-        "clipping",
     ],
 )
 def plr_compute_score(
@@ -131,7 +126,6 @@ def plr_compute_score(
     advantages: Array,              # float[num_steps]
     discount_rate: float,
     level: Level,                   # Level
-    clipping: bool,
 ) -> float:
     # compute the score on the original reward data
     match scoring_method.lower():
@@ -192,10 +186,6 @@ def plr_compute_score(
         case _:
             raise ValueError(f"Unknown scoring method {scoring_method!r}")
 
-    # NOTE: `clipping` historically only clipped the (now-removed) proxy-shaped
-    # score, so it is currently inert for the true-reward score. It is kept in
-    # the config pending a decision on whether to clip the regret score here
-    # (see notes/04-phase3-design.md).
     return original_score
 
 

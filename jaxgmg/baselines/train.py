@@ -59,7 +59,6 @@ def run(
     net_cnn_type: str,
     net_rnn_type: str,
     net_width: int,
-    clipping: bool,
     debug_stop_gradient: bool,
     debug_stop_gradient_after: float,
     debug_stop_gradient_oracle: bool,
@@ -148,7 +147,6 @@ def run(
             # scoring
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
-            clipping=clipping,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -170,7 +168,6 @@ def run(
             # scoring
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
-            clipping=clipping,
         )
         gen_state = gen.init(
             rng=rng_train_levels,

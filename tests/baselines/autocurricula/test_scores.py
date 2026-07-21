@@ -213,7 +213,6 @@ def test_dispatcher_returns_primitive(method):
         advantages=advantages,
         discount_rate=GAMMA,
         level=None,
-        clipping=False,
     ))
 
     if method == "maxmc-actor":

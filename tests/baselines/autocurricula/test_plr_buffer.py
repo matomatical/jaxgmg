@@ -30,7 +30,7 @@ def make_gen(scoring_method, buffer_size):
     return plr.CurriculumGenerator(
         level_generator=None, level_metrics=None, buffer_size=buffer_size,
         temperature=1.0, staleness_coeff=0.0, robust=False, prob_replay=0.5,
-        scoring_method=scoring_method, discount_rate=GAMMA, clipping=False,
+        scoring_method=scoring_method, discount_rate=GAMMA,
     )
 
 

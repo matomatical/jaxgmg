@@ -68,8 +68,6 @@ def _tiny_run_kwargs():
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
-        # ppo value clipping
-        clipping=False,
         # ued (overridden per-test)
         ued='dr',
         prob_shift=0.0,
