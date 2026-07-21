@@ -62,6 +62,23 @@ def test_staleness_offset_is_one_not_zero():
     np.testing.assert_allclose(p, [0.5, 0.5], rtol=1e-6)   # both staleness 1
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BUG-3 (notes/03-bug-log.md): both PLR papers define staleness as "
+        "c - C_i (P_C = (c-C_i)/sum), and both reference impls reset a "
+        "just-visited level's staleness to 0. jaxgmg's `1 + current - last_visit` "
+        "gives it staleness 1, so a just-visited level keeps nonzero staleness "
+        "weight instead of 0. When the `1 +` is dropped, drop this xfail."
+    ),
+)
+def test_just_visited_level_has_zero_staleness_weight_ref():
+    # level 1 was just visited (last_visit == current_time); level 0 is stale.
+    # Reference staleness = [c-0, c-c] = [5, 0] -> P_C = [1, 0].
+    p = probs([0, 0], staleness_coeff=1.0, last_visit=[0, 5], current_time=5)
+    assert p[1] == pytest.approx(0.0)
+
+
 # --- normalisation --------------------------------------------------------- #
 
 @pytest.mark.parametrize("c", [0.0, 0.1, 0.5, 1.0])

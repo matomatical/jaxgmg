@@ -118,3 +118,65 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
     keys-small level but returns the wrong branch. Flips to xpass when fixed.
   - `test_filtered_solver_currently_picks_wrong_branch` — characterizes the current
     (buggy) 0-value behaviour so the bug is documented even before the fix.
+
+---
+
+## BUG-3 — staleness has an extra `+1` vs the reference PLR algorithm  `[ ]`
+
+> Not a crash or a clearly-wrong result — an **unintended deviation from the
+> published algorithm**, documented here (per Matthew) so we can later test
+> whether it had a meaningful effect. Verified 2026-07-21 against both papers'
+> equations and both reference implementations (see citations).
+
+- **Where:** `jaxgmg/baselines/autocurricula/prioritisation.py:33`
+  ```python
+  staleness = 1 + current_time - last_visit_times   # TODO: is 1+ correct?
+  ```
+- **Reference algorithm.** Both PLR papers define the staleness distribution as
+  `P_C(l_i) = (c − C_i) / Σ_j (c − C_j)`, where `c` is the current episode/step
+  count and `C_i` is the timestamp at which level `i` was last sampled — so a
+  **just-visited level has staleness 0**:
+  - *Prioritized Level Replay* (Jiang, Grefenstette, Rocktäschel; arXiv
+    2010.03934), Eq. (staleness): `~/agents/papers/Jiang+2020-plr/core/3_methods.tex:148`.
+  - *Replay-Guided Adversarial Environment Design* / Robust PLR (arXiv
+    2110.02439), "PLR level-buffer update rule" algorithm: `P_C = (c−C_i)/Σ(c−C_j)`
+    at `~/agents/papers/Jiang+2021-dcd/main.tex:~515`.
+  - Reference code, `_update_staleness` = `seed_staleness += 1;
+    seed_staleness[selected] = 0` (just-visited → 0):
+    - `facebookresearch/level-replay` @ ccecf45, `level_replay/level_sampler.py:202-205`
+    - `facebookresearch/dcd` @ cefd881, `level_replay/level_sampler.py:627-630`
+- **The deviation.** jaxgmg computes `1 + current − last_visit`, i.e.
+  `staleness_jaxgmg = staleness_reference + 1`, uniformly (verified by simulating
+  both update rules over an identical replay sequence: the difference is exactly
+  `[1,1,…]` at every step). Consequences:
+  1. A **just-replayed level gets nonzero staleness weight** (should be 0), so it
+     is not fully de-prioritised on the staleness axis the way the paper intends.
+  2. Adding 1 to every entry before normalising **compresses the staleness
+     distribution toward uniform**, weakening staleness prioritisation overall
+     (e.g. reference `[0,5]→[0,1]`; jaxgmg `[1,6]→[1/7,6/7]`).
+- **Reachability / blast radius.** Affects every run with `staleness_coeff > 0`.
+  jaxgmg default is `0.1`; the Robust-PLR paper used `0.3`/`0.7`. So this touches
+  the main PLR/ACCEL results, though the effect is likely small (it only *softens*
+  a secondary mixture term). Magnitude to be measured, not assumed.
+- **Fix:** `staleness = current_time - last_visit_times` (drop the `1 +`), and
+  double-check the clock alignment: last-visit is stamped `num_replay_batches + 1`
+  in `plr._replay_update`, and `current_time = num_replay_batches`, so with the
+  `+1` removed a just-visited level reads staleness `-1` — the stamp should then
+  be `num_replay_batches` (no `+1`) so it reads 0. Fix both together.
+- **Pinned by:** `tests/baselines/autocurricula/test_prioritisation.py`
+  - `test_just_visited_level_has_zero_staleness_weight_ref` — `xfail(strict)`;
+    asserts the reference behaviour (just-visited ⇒ 0 staleness weight). Flips to
+    xpass when fixed.
+  - `test_staleness_offset_is_one_not_zero` — characterizes current behaviour.
+
+### Checked and NOT a bug: rank tie-breaking
+
+The rank prioritisation breaks ties between equal scores by index (via `argsort`)
+rather than averaging — but this **matches the reference** exactly: both
+`level-replay` (`level_sampler.py:295-299`) and `dcd` (`:791-795`) use
+`temp = np.flip(scores.argsort()); ranks[temp] = arange+1`, ordinal ranks with an
+index tie-break, identical in form to jaxgmg's `prioritisation.py:25-28`. (Only a
+cosmetic difference in *which* tied index wins — `np.flip(argsort)` favours the
+higher index, jaxgmg's `argsort(descending=True)` the lower — immaterial given
+random buffer order.) Documented via `test_equal_scores_broken_by_index_not_uniform`;
+no change needed.

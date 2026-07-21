@@ -57,6 +57,17 @@ published keys oracle-latest results. Pinned by
 `test_keys_oracle.py::test_filtered_solver_matches_full_solver_on_train_format`.
 Fix: `(~level.hidden_keys).sum()`.
 
+**BUG-3 — staleness `+1` vs reference PLR.** `plr_replay_probs` uses
+`1 + current − last_visit`, but both PLR papers and both reference
+implementations use `c − C_i` (a just-visited level has staleness 0). The extra
+`+1` gives just-visited levels nonzero staleness weight and flattens the
+staleness distribution; affects every run with `staleness_coeff > 0` (default
+0.1). Verified against papers + reference code (citations in the bug log).
+Pinned by
+`test_prioritisation.py::test_just_visited_level_has_zero_staleness_weight_ref`.
+(The rank tie-break quirk was checked too and *matches* the reference — not a
+bug.)
+
 ## Natural next steps (not yet covered)
 
 - **Dish oracle**: blocked on the broken/commented-out dish proxy solver
