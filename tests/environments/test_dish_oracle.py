@@ -135,26 +135,19 @@ def test_realised_return_is_gamma_pow_d_minus_1(env, case):
     assert realised == pytest.approx(GAMMA ** (d - 1), rel=1e-6)
 
 
-# --- the oracle currently reports gamma^d (characterization) -------------- #
+# --- the oracle equals the realised optimal return (BUG-1 fixed) ---------- #
 
 @pytest.mark.parametrize("case", REACHABLE, ids=[c[0] for c in REACHABLE])
-def test_oracle_level_value_is_gamma_pow_d(solver, case):
+def test_oracle_level_value_is_gamma_pow_d_minus_1(solver, case):
+    # The oracle discounts the cheese reward by gamma^(d-1), matching the
+    # arrival-step index (BUG-1 fixed, was gamma^d). Same as corner/keys.
     _name, level, d = case
     soln = solver.solve(level)
     value = float(solver.level_value(soln, level))
-    assert value == pytest.approx(GAMMA ** d, rel=1e-6)
+    assert value == pytest.approx(GAMMA ** (d - 1), rel=1e-6)
 
 
 @pytest.mark.parametrize("case", REACHABLE, ids=[c[0] for c in REACHABLE])
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG-1 (notes/03-bug-log.md): LevelSolver.state_value discounts the "
-        "cheese reward by gamma^d, but an optimal agent's realised return is "
-        "gamma^(d-1) (the reward lands on the arrival step). Same off-by-one as "
-        "corner/keys. When BUG-1 is fixed across all envs, drop this xfail."
-    ),
-)
 def test_oracle_value_should_equal_realised_return(env, solver, case):
     _name, level, _d = case
     rewards, dones = optimal_rollout(env, level)

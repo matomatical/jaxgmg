@@ -931,8 +931,17 @@ class LevelSolver(base.LevelSolver):
         episode_still_valid = time_of_reward < self.env.max_steps_in_episode
         valid_reward = penalized_reward * episode_still_valid
 
-        # discount the reward
-        discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
+        # discount the reward. The cheese reward lands on the *arrival* step,
+        # which an optimal agent reaches after `optimal_dist` transitions, i.e.
+        # at trajectory index `optimal_dist - 1` -- so the realised discounted
+        # return is gamma^(optimal_dist - 1), not gamma^optimal_dist (BUG-1).
+        # The max(., 0) clamps the degenerate mouse-on-cheese case (d=0) to a
+        # value of 1 rather than gamma^-1 (see notes/03-bug-log.md); the env
+        # currently never generates such a level. Unreachable cheese has
+        # optimal_dist = inf, so gamma^inf = 0 is preserved.
+        discounted_reward = (
+            self.discount_rate ** jnp.maximum(optimal_dist - 1, 0)
+        ) * valid_reward
 
         return discounted_reward
 

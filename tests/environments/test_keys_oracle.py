@@ -129,8 +129,8 @@ def rollout_return(env, level, actions, gamma):
 
 # name, level_str, (height, width), num_keys, num_chests,
 #   optimal MOVE_RIGHT count,
-#   oracle value (gamma^cumulative-dist per chest),
-#   realised value (gamma^(dist-1) per chest)
+#   oracle value == realised value (gamma^(cumulative-dist - 1) per chest;
+#   the reward lands on the arrival step, so BUG-1 fixed subtracts one factor)
 GOLDEN = [
     (
         # 1 key, 1 chest: @ -> k(d1) -> c(d2). chest reward at cumulative dist 2.
@@ -141,8 +141,7 @@ GOLDEN = [
         # # # # #
         """,
         (3, 5), 1, 1, 2,
-        GAMMA ** 2,                       # oracle: gamma^2
-        GAMMA ** 1,                       # realised: chest opens on step index 1
+        GAMMA ** 1,                       # chest opens on step index 1
     ),
     (
         # 2 keys, 2 chests: @ -> k -> k -> c(d3) -> c(d4).
@@ -153,13 +152,12 @@ GOLDEN = [
         # # # # # # #
         """,
         (3, 7), 2, 2, 4,
-        GAMMA ** 3 + GAMMA ** 4,          # oracle
-        GAMMA ** 2 + GAMMA ** 3,          # realised (opens at t=2, t=3)
+        GAMMA ** 2 + GAMMA ** 3,          # opens at t=2, t=3
     ),
     (
         # 1 key, 2 chests: must pick which chest to open. Right chest is closer
         # after grabbing the key (@ -> k(d1) -> c_right(d2)) than the left one
-        # (@ -> k(d1) -> back to c_left, d4). Oracle must argmax to gamma^2.
+        # (@ -> k(d1) -> back to c_left, d4). Oracle must argmax to gamma^1.
         "one_key_two_chests_pick_nearer",
         """
         # # # # # # #
@@ -167,8 +165,7 @@ GOLDEN = [
         # # # # # # #
         """,
         (3, 7), 1, 2, 2,
-        GAMMA ** 2,                       # oracle picks the reachable-sooner chest
-        GAMMA ** 1,                       # realised
+        GAMMA ** 1,                       # reachable-sooner chest, arrival index 1
     ),
 ]
 
@@ -185,7 +182,7 @@ def solver(env):
 
 @pytest.mark.parametrize("case", GOLDEN, ids=[c[0] for c in GOLDEN])
 def test_golden_optimal_rollout_collects_expected_return(env, case):
-    _name, s, (h, w), nk, nc, n_right, _oracle, realised_expected = case
+    _name, s, (h, w), nk, nc, n_right, realised_expected = case
     level = parse_level(s, h, w, nk, nc)
     actions = [RIGHT] * n_right
     realised, rewards, dones = rollout_return(env, level, actions, GAMMA)
@@ -196,30 +193,20 @@ def test_golden_optimal_rollout_collects_expected_return(env, case):
 
 
 @pytest.mark.parametrize("case", GOLDEN, ids=[c[0] for c in GOLDEN])
-def test_oracle_level_value_matches_gamma_pow_cumulative_distance(solver, case):
-    # Pin the CURRENT oracle behaviour: it enumerates plans and returns the max
-    # sum of gamma^(cumulative distance) over opened chests. (See off-by-one.)
-    _name, s, (h, w), nk, nc, _n_right, oracle_expected, _realised = case
+def test_oracle_level_value_matches_realised_golden(solver, case):
+    # The oracle enumerates plans and returns the max sum of
+    # gamma^(cumulative distance - 1) over opened chests, matching the
+    # hand-computed realised return (BUG-1 fixed; was gamma^cumulative).
+    _name, s, (h, w), nk, nc, _n_right, realised_expected = case
     level = parse_level(s, h, w, nk, nc)
     soln = solver.solve(level)
     value = float(solver.level_value(soln, level))
-    assert value == pytest.approx(oracle_expected, rel=1e-6)
+    assert value == pytest.approx(realised_expected, rel=1e-6)
 
 
 @pytest.mark.parametrize("case", GOLDEN, ids=[c[0] for c in GOLDEN])
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG-1 (notes/03-bug-log.md) recurs in the keys oracle: "
-        "FullLevelSolver discounts each chest reward by gamma^(cumulative "
-        "distance to the chest), but the realised return discounts by "
-        "gamma^(distance-1) since the reward lands on the arrival step. So the "
-        "oracle over-discounts by one factor of gamma per chest. When BUG-1 is "
-        "fixed across all envs, drop this xfail."
-    ),
-)
 def test_oracle_value_should_equal_realised_return(env, solver, case):
-    _name, s, (h, w), nk, nc, n_right, _oracle, _realised = case
+    _name, s, (h, w), nk, nc, n_right, _realised = case
     level = parse_level(s, h, w, nk, nc)
     realised, _rewards, _dones = rollout_return(env, level, [RIGHT] * n_right, GAMMA)
     soln = solver.solve(level)

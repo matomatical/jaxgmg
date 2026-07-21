@@ -110,30 +110,18 @@ def test_realised_return_is_gamma_pow_d_minus_1(env):
         assert realised == pytest.approx(GAMMA ** (d - 1), rel=1e-6)
 
 
-# --- the oracle currently reports gamma^d (characterization) -------------- #
+# --- the oracle equals the realised optimal return (BUG-1 fixed) ---------- #
 
-def test_oracle_level_value_is_gamma_pow_d(env, solver):
-    # Pin the CURRENT oracle behaviour: state_value discounts by gamma^d, where
-    # d is the mouse->cheese distance. (See the off-by-one test below.)
+def test_oracle_level_value_is_gamma_pow_d_minus_1(env, solver):
+    # The oracle discounts the cheese reward by gamma^(d-1), matching the
+    # arrival-step index (d-1) of the reward (BUG-1 fixed, was gamma^d).
     for level in sample_levels(count=8):
         d = int(mouse_cheese_distance(level))
         soln = solver.solve(level)
         value = float(solver.level_value(soln, level))
-        assert value == pytest.approx(GAMMA ** d, rel=1e-6)
+        assert value == pytest.approx(GAMMA ** (d - 1), rel=1e-6)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Off-by-one in the oracle discount: LevelSolver.state_value returns "
-        "gamma^d but an optimal agent's realised discounted return is "
-        "gamma^(d-1) (the cheese reward lands on the arrival step, index d-1). "
-        "The oracle applies one extra discount factor, so an optimal agent "
-        "shows slightly NEGATIVE oracle-regret. Tiny at gamma=0.999 but a real "
-        "bias in the oracle-latest regret estimator. Flagged for Matthew; when "
-        "fixed, drop this xfail."
-    ),
-)
 def test_oracle_value_should_equal_realised_return(env, solver):
     for level in sample_levels(count=8):
         rewards, dones = optimal_rollout(env, level)

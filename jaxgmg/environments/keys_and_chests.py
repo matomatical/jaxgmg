@@ -1198,11 +1198,16 @@ def _evaluate_visitation_sequence(
 
         # compute reward delivered at this step
         raw_reward = open_chest.astype(float)
-        # discount reward since it comes in the future
+        # discount reward since it comes in the future. Each chest reward lands
+        # on the *arrival* step, reached after `new_cumulative_distance`
+        # transitions, i.e. at trajectory index new_cumulative_distance - 1 --
+        # so the realised discounted return is gamma^(cum_dist - 1), not
+        # gamma^cum_dist (BUG-1). The max(., 0) clamp is defensive (any real
+        # chest reward requires a key first, so cum_dist >= 1 here).
         discount_factor = jnp.where(
             jnp.isinf(new_cumulative_distance),
             0.0, # even if discount rate is 1.0, no reward from inf dist
-            discount_rate ** new_cumulative_distance,
+            discount_rate ** jnp.maximum(new_cumulative_distance - 1, 0),
         )
         discounted_reward = raw_reward * discount_factor
         # modify reward based on environment configuration
@@ -1403,8 +1408,14 @@ class FullLevelSolver(base.LevelSolver):
 
             # compute reward delivered at this step
             raw_reward = open_chest.astype(float)
-            # discount reward since it comes in the future
-            discount_factor = self.discount_rate ** new_cumulative_distance
+            # discount reward since it comes in the future. Chest reward lands
+            # on the arrival step (index new_cumulative_distance - 1), so the
+            # realised return is gamma^(cum_dist - 1), not gamma^cum_dist
+            # (BUG-1). max(., 0) is defensive; unreachable -> inf -> gamma^inf=0.
+            discount_factor = (
+                self.discount_rate
+                ** jnp.maximum(new_cumulative_distance - 1, 0)
+            )
             discounted_reward = raw_reward * discount_factor
             # modify reward based on environment configuration
             virtual_time = state.steps + new_cumulative_distance
