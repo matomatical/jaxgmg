@@ -16,14 +16,15 @@ the `cleanup2` effort, mostly via the test suite. **Policy (per Matthew):**
 
 Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
 
-**Progress (as of Phase 2, 2026-07-21):** BUG-2 and BUG-3 are resolved (their
-xfails flipped to xpass and were dropped). BUG-1 (the oracle discount
-off-by-one) remains open — deferred to Phase 4, where the `regret_oracle_actor`
-refactor (issue #11) touches the estimator half of the fix.
+**Progress (as of Phase 4, 2026-07-21):** ALL THREE BUGS RESOLVED. BUG-2 and
+BUG-3 were fixed in Phase 2; BUG-1 (the oracle discount off-by-one) was fixed in
+Phase 4 across all live solver value paths and the `oracle-actor` estimator (via
+the issue #11 refactor). All BUG-1 xfails flipped to xpass and were dropped.
+**This log is now fully resolved.**
 
 ---
 
-## BUG-1 — Oracle discount off-by-one (γ^d vs γ^(d-1))  `[ ]`
+## BUG-1 — Oracle discount off-by-one (γ^d vs γ^(d-1))  `[x]`
 
 - **Found:** 2026-06-25, cross-checking the oracle against an optimal rollout.
 - **Where:** `jaxgmg/environments/cheese_in_the_corner.py:997`
@@ -78,6 +79,23 @@ refactor (issue #11) touches the estimator half of the fix.
   γ^(d-1) off-by-one in `cheese_on_a_dish.LevelSolver.state_value`. Pinned by
   `tests/environments/test_dish_oracle.py::test_oracle_value_should_equal_realised_return`
   (2 cases, `xfail(strict)`).
+- **Resolved (2026-07-21, Phase 4).** Swept `γ^d → γ^max(d-1, 0)` in the
+  **value paths only** — `cheese_in_the_corner`/`cheese_on_a_dish`
+  `state_value`, and the keys `LevelSolverFiltered`/`FullLevelSolver` simulate
+  loops (per-chest `γ^max(cumulative_dist-1, 0)`). The `d=0`
+  (mouse-on-goal, never generated) clamps to 1.0 per Matthew's chosen
+  convention; `d=∞` stays 0. The `state_action_values` / action paths were
+  **deliberately left alone**: `Q(s,a)` already discounts by `γ^action_dist`,
+  which is correct, so after fixing `V` we have `V(s) = max_a Q(s,a)` (pinned by
+  the new `test_state_value_equals_max_action_value`). The `oracle-actor`
+  estimator's own inline `γ^goal_dist` was removed entirely by the issue #11
+  refactor (it now delegates to the fixed solver via `buffer.oracle_returns`),
+  so the fix reaches the estimator too. All BUG-1 xfails (corner ×1, dish ×2,
+  keys ×3, scores oracle-actor ×1 = 7) flipped to xpass and were dropped; the
+  characterization tests that pinned the old `γ^d`/`γ^cumulative` values were
+  updated to the corrected values. **NB (Tier-4):** this changes the oracle-latest
+  regret benchmark by ~(1-γ) per goal (≈0.1% at γ=0.999) — re-check the paper's
+  oracle-latest figures if/when GPU repro is run.
 
 ---
 

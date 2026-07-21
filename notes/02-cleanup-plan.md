@@ -205,6 +205,39 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
 - Replace the `proxy_shaping_coeff`-as-static-schedule hack with a per-step float (issue #12).
 *Effort: M-L. Gate strictly behind Phase-0 tests; this is the paper's reproducibility core.*
 
+> **Status (2026-07-21).** Phase 4 **done** (suite green throughout; ends at
+> **137 passed, 0 xfailed** — every BUG-1 xfail resolved). Five commits.
+> - **BUG-1 fixed** (commit `411b85a` + the V=maxQ test): swept
+>   `γ^d → γ^max(d-1,0)` in the corner/dish/keys solver *value* paths (not the
+>   action paths — `Q` was already correct, so `V = max_a Q` now holds and is
+>   tested). `d=0` clamps to 1.0 (Matthew's convention); `d=∞` stays 0. See
+>   `03-bug-log.md` (now fully resolved).
+> - **Issue #7 — shared buffer library** (`autocurricula/buffer.py`): factored
+>   the ~90% plr↔accel duplication (max-ever-return tracking, staleness
+>   sampling, score computation, the top-k tournament) into reusable ops that
+>   are generic over the buffer pytree. PLR uses `AnnotatedLevel` directly;
+>   ACCEL subclasses it (mutation/replay counts). The differing control flow
+>   stays put (PLR's 2-way coin flip / cached `prev_P_replay` eviction vs
+>   ACCEL's 3-way FSM / recomputed eviction). Behaviour-preserving (train
+>   determinism smoke unchanged). New `test_buffer.py` (library primitives, incl.
+>   the subclass-field-preservation property) + `test_accel_buffer.py` (closes
+>   the accel coverage gap #7 flagged).
+> - **Issue #11 — oracle-actor refactor** (commit `e472cf9`): `regret_oracle_actor`
+>   is now pure arithmetic; the oracle return is computed once per batch by
+>   `buffer.oracle_returns` using the **CLI-configured** `level_solver` (threaded
+>   through train.run into plr/accel). Deleted the isinstance dispatch, the HACK
+>   env, the magic `min_keys=3`/`min_chests=3`/`128`, and the whole
+>   `scores.py → environments` import coupling. Dropped the CLI's
+>   "assumed as part of hack" asserts, keeping (relabelled) the genuine
+>   oracle-validity guards (`penalize_time=False`; dish non-terminating).
+> - **Issue #12** was already **moot** (proxy machinery + `proxy_shaping_coeff`
+>   schedule removed in the Phase-3 follow-up).
+> - **NB (Tier-4):** BUG-1 shifts the oracle-latest benchmark by ~(1-γ), and the
+>   keys oracle now uses real `min_keys`/`min_chests` (not 3/3) — so keys
+>   oracle-latest training-distribution numbers differ from the paper's. Re-check
+>   under GPU repro. **Still open after Phase 4:** Phases 5 (optional gridworld
+>   base) & 6 (API polish + `scripts/`+`jobs/` deletion).
+
 ### Phase 5 — Consolidate: shared gridworld base (optional, highest risk)
 - Extract a `gridworld` mixin/base for the cheese family: common `_step` movement + the
   `steps` literal (duplicated >20×), the bool→RGB `argmax(priority)→spritemap` render, the
