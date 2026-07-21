@@ -1155,9 +1155,22 @@ class LevelSolver(base.LevelSolver):
         return action
 
 
-# # # 
+# # #
 # Splay functions
 # Note that these functions are not jittable.
+
+
+def splayer_from_name(name: str):
+    """Map a `level_splayer` name to its splay function (used by the CLI)."""
+    match name:
+        case 'mouse':
+            return splay_mouse
+        case 'cheese':
+            return splay_cheese
+        case 'cheese-and-mouse':
+            return splay_cheese_and_mouse
+        case _:
+            raise ValueError(f"unknown level splayer {name!r}")
 
 
 def splay_mouse(level: Level):
