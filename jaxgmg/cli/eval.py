@@ -141,15 +141,7 @@ def corner(
 
 
     print("configuring heatmap splayer...")
-    match level_splayer:
-        case 'mouse':
-            splayer_fn = cheese_in_the_corner.splay_mouse
-        case 'cheese':
-            splayer_fn = cheese_in_the_corner.splay_cheese
-        case 'cheese-and-mouse':
-            splayer_fn = cheese_in_the_corner.splay_cheese_and_mouse 
-        case _:
-            raise ValueError(f'unknown level splayer {level_splayer!r}')
+    splayer_fn = cheese_in_the_corner.splayer_from_name(level_splayer)
 
 
     evaluate.run(

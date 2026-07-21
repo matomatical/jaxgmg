@@ -152,15 +152,7 @@ def corner(
     """
     Test heatmap generation on the Cheese in the Corner environment.
     """
-    match splayer:
-        case 'cheese':
-            splayer = cheese_in_the_corner.splay_cheese
-        case 'mouse':
-            splayer = cheese_in_the_corner.splay_mouse
-        case 'cheese-and-mouse':
-            splayer = cheese_in_the_corner.splay_cheese_and_mouse
-        case _:
-            raise ValueError(f"unknown splayer {splayer!r}")
+    splayer = cheese_in_the_corner.splayer_from_name(splayer)
     util.print_config(locals())
 
     print("preparing environment...")

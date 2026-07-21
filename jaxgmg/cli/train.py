@@ -62,7 +62,6 @@ def corner(
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
     mutate_cheese: bool = True,
-    # for proxy augmented methods
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
@@ -305,7 +304,6 @@ def dish(
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
     mutate_cheese_on_dish: bool = True,
-    # for proxy augmented methods
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
@@ -543,7 +541,6 @@ def keys(
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
     mutate_keys_ratio: bool = True,
-    # for proxy augmented methods
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
@@ -813,7 +810,6 @@ def minimaze(
     # for accel
     num_mutate_steps: int = 12,
     prob_mutate_shift: float = 0.1,
-    # for proxy augmented methods
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
@@ -999,7 +995,6 @@ def memory_test(
     plr_prob_replay: float = _DEFAULTS.ued.prob_replay,
     plr_regret_estimator: str = _DEFAULTS.ued.regret_estimator,
     plr_robust: bool = _DEFAULTS.ued.robust,
-    # proxy augmentation
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
@@ -1103,7 +1098,6 @@ def follow(
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
     mutate_cheese: bool = True,
-    # for proxy augmented methods
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate
@@ -1260,7 +1254,6 @@ def lava(
     prob_mutate_shift: float = 0.0,
     chain_mutate: bool = True,
     mutate_cheese: bool = True,
-    # for proxy augmented methods
     # PPO hyperparameters
     ppo_lr: float = _DEFAULTS.ppo.lr,                # learning rate
     ppo_gamma: float = _DEFAULTS.ppo.gamma,               # discount rate

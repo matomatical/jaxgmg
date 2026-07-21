@@ -56,28 +56,6 @@ def plr_compute_scores(
             for score methods that use them, provide them here.
     * discount_rate: float
             Used in several regret estimation methods.
-    * proxy_shaping : bool
-            Whether to compute a proxy score and shape the score with this.
-    * proxy_name : str
-            The key to use for accessing the proxy reward in the rollout.
-    * proxy_shaping_coeff : optional float in [0, 1]
-            The coefficient to use for shaping. If proxy shaping, the score
-            is computed on both true reward data and proxy reward data, and
-            the returned score is:
-            
-                original_score - proxy_shaping_coeff * proxy_score
-
-            This is equivalent to linearly interpolating between
-            original_score and (orginal_score - proxy_score) with
-            proxy_shaping_coeff as the interpolation proportion.
-    * max_ever_proxy_returns : optional float[num_levels]
-            Used as an estimate of the optimal proxy return achievable for a
-            level for maxMC regret estimators. (Only used if proxy_shaping.)
-    * proxy_advantages : optional float[num_levels, num_steps] or None
-            When training with PPO, we probably have already computed the
-            GAEs of the proxy reward from the rollouts. In order to skip
-            computing them again for score methods that use them, provide
-            them here. (Only used if proxy_shaping.)
     * levels : Level[num_levels]
             The levels probably shouldn't be needed for computing the scores,
             as they are meant to be based on the rollouts. However, for
@@ -174,7 +152,6 @@ def plr_compute_score(
                 rewards=rollout.transitions.reward,
                 dones=rollout.transitions.done,
                 discount_rate=discount_rate,
-                proxy_oracle=False,
             )
         case "dro-actor":
             original_score = dro_actor(
@@ -357,13 +334,12 @@ def regret_maxmc_actor(
     return max_ever_return - average_return
 
 
-@functools.partial(jax.jit, static_argnames=["proxy_oracle"])
+@jax.jit
 def regret_oracle_actor(
     level: Level,
     rewards: Array,             # float[num_steps]
     dones: Array,               # float[num_steps]
     discount_rate: float,
-    proxy_oracle: bool,         # static
 ) -> float:
     """
     Estimate regret for a level by combining an empirical average of the
@@ -393,64 +369,39 @@ def regret_oracle_actor(
       returns here (instead of the level, like maxmc).
     """
     if isinstance(level, cheese_in_the_corner.Level):
-        if not proxy_oracle:
-            goal_dist = maze_solving.maze_distances(level.wall_map)[
-                level.initial_mouse_pos[0],
-                level.initial_mouse_pos[1],
-                level.cheese_pos[0],
-                level.cheese_pos[1],
-            ]
-        else:
-            goal_dist = maze_solving.maze_distances(level.wall_map)[
-                level.initial_mouse_pos[0],
-                level.initial_mouse_pos[1],
-                1,
-                1,
-            ]
+        goal_dist = maze_solving.maze_distances(level.wall_map)[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+        ]
         oracle_max_return = discount_rate ** goal_dist
     elif isinstance(level, cheese_on_a_dish.Level):
-        if not proxy_oracle:
-            wall_map = level.wall_map.at[
-                level.dish_pos[0],
-                level.dish_pos[1],
-            ].set(
-                (level.dish_pos != level.cheese_pos).any()
-            )
-            goal_dist = maze_solving.maze_distances(wall_map)[
-                level.initial_mouse_pos[0],
-                level.initial_mouse_pos[1],
-                level.cheese_pos[0],
-                level.cheese_pos[1],
-            ]
-        else:
-            wall_map = level.wall_map.at[
-                level.cheese_pos[0],
-                level.cheese_pos[1],
-            ].set(
-                (level.dish_pos != level.cheese_pos).any()
-            )
-            goal_dist = maze_solving.maze_distances(wall_map)[
-                level.initial_mouse_pos[0],
-                level.initial_mouse_pos[1],
-                level.dish_pos[0],
-                level.dish_pos[1],
-            ]
+        wall_map = level.wall_map.at[
+            level.dish_pos[0],
+            level.dish_pos[1],
+        ].set(
+            (level.dish_pos != level.cheese_pos).any()
+        )
+        goal_dist = maze_solving.maze_distances(wall_map)[
+            level.initial_mouse_pos[0],
+            level.initial_mouse_pos[1],
+            level.cheese_pos[0],
+            level.cheese_pos[1],
+        ]
         oracle_max_return = discount_rate ** goal_dist
     elif isinstance(level, keys_and_chests.Level):
-        if not proxy_oracle:
-            level_solver = keys_and_chests.LevelSolverFiltered(
-                env=keys_and_chests.Env( # HACK
-                    penalize_time=False,
-                    max_steps_in_episode=128,
-                ),
-                discount_rate=discount_rate,
-                min_keys=3, # HACK
-                min_chests=3, # HACK
-            )
-            soln = level_solver.solve(level)
-            oracle_max_return = level_solver.level_value(soln, level)
-        else:
-            assert False
+        level_solver = keys_and_chests.LevelSolverFiltered(
+            env=keys_and_chests.Env( # HACK
+                penalize_time=False,
+                max_steps_in_episode=128,
+            ),
+            discount_rate=discount_rate,
+            min_keys=3, # HACK
+            min_chests=3, # HACK
+        )
+        soln = level_solver.solve(level)
+        oracle_max_return = level_solver.level_value(soln, level)
     else:
         raise ValueError(f"Unsupported level type for oracle regret.")
 

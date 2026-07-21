@@ -13,7 +13,7 @@ Strategy: the two dispatchers (``plr_compute_scores`` / ``plr_compute_score``)
 eat big vmapped rollout PyTrees, but every regret *definition* is a small pure
 function over 1-D arrays. So we test the primitives directly against
 hand-computed golden values, and cover the ``match`` dispatch with one light
-smoke test (``proxy_shaping=False`` returns the primitive's value verbatim).
+smoke test (the dispatcher returns each primitive's value verbatim).
 
 The oracle-latest estimator (``regret_oracle_actor``) carries the same
 **BUG-1** discount off-by-one as the ``LevelSolver`` oracles
@@ -155,7 +155,7 @@ def test_oracle_actor_oracle_term_is_gamma_pow_d():
         dones = jnp.asarray([False, False, False, True])
         regret = float(scores.regret_oracle_actor(
             level=level, rewards=rewards, dones=dones,
-            discount_rate=GAMMA, proxy_oracle=False,
+            discount_rate=GAMMA,
         ))
         assert regret == pytest.approx(GAMMA ** d)
 
@@ -178,7 +178,7 @@ def test_oracle_actor_optimal_agent_has_zero_regret():
     dones = jnp.asarray([False, True])
     regret = float(scores.regret_oracle_actor(
         level=level, rewards=rewards, dones=dones,
-        discount_rate=GAMMA, proxy_oracle=False,
+        discount_rate=GAMMA,
     ))
     assert regret == pytest.approx(0.0)
 
