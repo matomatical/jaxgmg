@@ -135,6 +135,33 @@ def test_oracle_value_should_equal_realised_return(env, solver):
         assert value == pytest.approx(realised, rel=1e-6)
 
 
+# --- consistency: V(s) == max_a Q(s,a) ------------------------------------ #
+
+def test_state_value_equals_max_action_value(env, solver):
+    # This is the Bellman-optimality consistency that justified the BUG-1 fix
+    # touching state_value (V) but NOT state_action_values (Q): Q already
+    # discounts by gamma^(action_dist), which is correct, and after fixing V to
+    # gamma^(d-1) we have V(s) == max_a Q(s,a). (Subtracting one from Q too
+    # would have re-broken this.) Checked at every state along an optimal
+    # rollout, so it exercises a range of mouse->cheese distances.
+    for level in sample_levels(count=8):
+        soln = solver.solve(level)
+        actions = np.asarray(maze_solving.maze_optimal_directions(level.wall_map))
+        cheese = np.asarray(level.cheese_pos)
+        _obs, state = env.reset_to_level(level)
+        rng = jax.random.PRNGKey(0)
+        for _ in range(env.max_steps_in_episode):
+            v = float(solver.state_value(soln, state))
+            q = np.asarray(solver.state_action_values(soln, state))
+            assert v == pytest.approx(float(q.max()), rel=1e-6, abs=1e-9)
+            mr, mc = int(state.mouse_pos[0]), int(state.mouse_pos[1])
+            a = int(actions[mr, mc, cheese[0], cheese[1]])
+            rng, rng_step = jax.random.split(rng)
+            _obs, state, _reward, done, _info = env.step(rng_step, state, a)
+            if done:
+                break
+
+
 # --- edge case: unreachable cheese ---------------------------------------- #
 
 def build_isolated_cheese_level():
