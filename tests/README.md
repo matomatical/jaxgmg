@@ -43,9 +43,17 @@ realised optimal return is `γ^(d-1)` (reward lands on the arrival step), and
 keys-and-chests over-discounts each chest reward the same way. So an optimal
 agent shows slightly *negative* oracle-regret. Tiny at γ=0.999 but a real bias
 in the oracle-latest estimator. Pinned by
-`test_corner_oracle.py::test_oracle_value_should_equal_realised_return` and
-`test_keys_oracle.py::test_oracle_value_should_equal_realised_return`. To be
-fixed (across all envs) during the refactor.
+`test_corner_oracle.py`, `test_keys_oracle.py`, and `test_scores.py`
+(`..._should_equal_realised_return` / `..._optimal_agent_has_zero_regret`). To
+be fixed (across all envs *and* the estimator) during the refactor.
+
+**BUG-2 — `LevelSolverFiltered` branch selection.** The keys `oracle-actor`
+solver picks its truncated-solve branch on `hidden_keys.sum()` (hidden count)
+instead of the real-key count, so on the paper's training distribution it
+returns the wrong branch and undervalues the optimum. Confirmed to affect
+published keys oracle-latest results. Pinned by
+`test_keys_oracle.py::test_filtered_solver_matches_full_solver_on_train_format`.
+Fix: `(~level.hidden_keys).sum()`.
 
 ## Natural next steps (not yet covered)
 
@@ -53,6 +61,3 @@ fixed (across all envs) during the refactor.
   (cleanup-plan issue #2 / Phase 2); add once that path is restored.
 - **PLR/ACCEL buffer** mechanics (`prioritisation.plr_replay_probs` rank +
   staleness; buffer update/insert) — Tier-2 characterization, the next layer up.
-- **`LevelSolverFiltered` / BUG-2**: the keys `oracle-actor` solver's
-  hidden-vs-real-key selection (see `notes/03-bug-log.md`) is unpinned pending
-  the level-format invariant.

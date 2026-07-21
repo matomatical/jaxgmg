@@ -68,7 +68,15 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
 
 ---
 
-## BUG-2 (candidate, UNCONFIRMED) — `LevelSolverFiltered` selects on hidden-key count  `[ ]`
+## BUG-2 — `LevelSolverFiltered` selects on hidden-key count (affects paper results)  `[ ]`
+
+> **CONFIRMED (2026-07-21).** Matthew confirmed the oracle-latest (`oracle-actor`)
+> keys-and-chests experiments are in the **main paper**, and the appendix
+> corroborates `num_keys_max=10`, `min_keys=3`. Since `num_keys_max=10 ≠ 6`, the
+> buggy and correct selectors do NOT coincide, so this **did affect the published
+> keys oracle-latest numbers** on the training distribution. Not just a latent
+> landmine — a real bug in reported results.
+
 
 - **Found:** 2026-07-21, reading the `oracle-actor` keys path.
 - **Where:** `jaxgmg/environments/keys_and_chests.py:1015-1020`
@@ -87,14 +95,26 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
   the key-filtered solve when keys are the small dimension (`num_keys == min_keys`)
   the test should be `(~level.hidden_keys).sum() == self.min_keys`. As written it
   only coincidentally selects correctly when `num_keys_max == 2*min_keys`.
+- **Effect with the paper's config** (`num_keys=3, num_keys_shift=10, num_chests=10,
+  num_chests_shift=3` ⟹ `num_keys_max=num_chests_max=10`, `min_keys=min_chests=3`):
+  - **Train / original levels** (3 real keys, 10 real chests): correct branch is
+    `value_filtered_keys`; buggy `hidden_keys.sum()=7 ≠ 3` selects
+    `value_filtered_chests`, which truncates to the first 3 of 10 chests and thus
+    **undervalues the optimum** (oracle regret too low / negative). WRONG.
+  - **Shift / eval levels** (10 real keys, 3 real chests): both selectors land on
+    `value_filtered_chests`, which is correct here. OK by luck.
 - **Reachability:** `LevelSolverFiltered` is used only by `scores.regret_oracle_actor`
-  for keys-and-chests, instantiated with hardcoded `min_keys=3, min_chests=3` (itself
-  issue #11 in the cleanup plan). So this only bites keys experiments run with the
-  `oracle-actor` estimator (default is `maxmc-actor`).
-- **NOT YET CONFIRMED — needs Matthew:** what `num_keys_max` did the oracle-actor
-  keys runs use? If always 6, the selection happens to be correct and this is "only"
-  a misnamed-variable landmine for the refactor. Otherwise it's a live correctness
-  bug in those runs. Also the class carries the loud docstring warning "THIS WILL
-  SILENTLY BREAK IF YOU PASS IT A LEVEL THAT DOES NOT HAVE THE EXPECTED FORMAT".
-- **Not pinned by a test yet** (would need the level-format invariant nailed down
-  first). Revisit when cleaning up `regret_oracle_actor` / issue #11 in Phase 4.
+  for keys-and-chests, hardcoded `min_keys=3, min_chests=3` (issue #11). Reached via
+  `--plr-regret-estimator oracle-actor`, or the `--debug-stop-gradient
+  --debug-stop-gradient-oracle` path (`baselines/train.py:499`; honored in `plr.py`,
+  IGNORED in `accel.py`/`base.py`). No *committed* script enables it, but the runs
+  exist off-repo (see above).
+- **Fix:** one line — `num_real_keys = (~level.hidden_keys).sum()`. (Also fold
+  `LevelSolverFiltered` into a cleaner oracle when addressing issue #11 in Phase 4;
+  consider re-checking whether the paper's keys oracle-latest numbers shift.)
+- **Pinned by:** `tests/environments/test_keys_oracle.py`
+  - `test_filtered_solver_matches_full_solver_on_train_format` — `xfail(strict)`;
+    `LevelSolverFiltered` should equal the trusted `FullLevelSolver` optimum on a
+    keys-small level but returns the wrong branch. Flips to xpass when fixed.
+  - `test_filtered_solver_currently_picks_wrong_branch` — characterizes the current
+    (buggy) 0-value behaviour so the bug is documented even before the fix.

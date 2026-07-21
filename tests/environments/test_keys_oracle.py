@@ -225,3 +225,76 @@ def test_oracle_value_should_equal_realised_return(env, solver, case):
     soln = solver.solve(level)
     value = float(solver.level_value(soln, level))
     assert value == pytest.approx(realised, rel=1e-6)
+
+
+# --- BUG-2: LevelSolverFiltered branch selection -------------------------- #
+#
+# `LevelSolverFiltered` (the compute-saving oracle used by
+# `scores.regret_oracle_actor` for keys) computes both a key-truncated and a
+# chest-truncated solve and picks the valid one. The selector (keys_and_chests.py
+# ~L1015) tests `level.hidden_keys.sum() == min_keys`, but `hidden_keys.sum()` is
+# the *hidden* key count, not the real one. On the paper's training distribution
+# (3 real keys, 10 real chests, num_keys_max=10) this selects the CHEST-truncated
+# solve, which drops most chests and undervalues the optimum. See BUG-2 in
+# notes/03-bug-log.md. Confirmed (with Matthew) to affect published keys
+# oracle-latest results.
+#
+# We reproduce on a small "keys-small" level where FullLevelSolver (already
+# trusted above) is tractable and serves as ground truth: 3 real keys + 1 hidden
+# key, and 4 real chests of which only chest index 3 is reachable (chests 0-2 sit
+# on the border wall). The correct oracle opens chest 3 (value gamma^3); the
+# buggy filtered solver picks the chest-truncated branch (first 3 chests, all
+# unreachable) and returns 0. BUG-1's discount off-by-one is identical in both
+# solvers, so it cancels in this Filtered-vs-Full comparison, isolating BUG-2.
+
+
+def _keys_small_train_format_level():
+    # 5x7 grid, open interior (rows 1-3, cols 1-5).
+    h, w = 5, 7
+    wall = np.ones((h, w), dtype=bool)
+    wall[1:4, 1:6] = False
+    return kc.Level(
+        wall_map=jnp.asarray(wall),
+        # keys 0,1,2 real and near the mouse; key 3 hidden (position irrelevant).
+        keys_pos=jnp.asarray([[1, 2], [1, 3], [1, 4], [3, 5]]),
+        hidden_keys=jnp.asarray([False, False, False, True]),
+        # chests 0,1,2 parked on the top wall row -> unreachable; chest 3 reachable.
+        chests_pos=jnp.asarray([[0, 0], [0, 1], [0, 2], [2, 1]]),
+        hidden_chests=jnp.asarray([False, False, False, False]),
+        initial_mouse_pos=jnp.asarray([1, 1]),
+        inventory_map=jnp.arange(4),
+    )
+
+
+def test_filtered_solver_currently_picks_wrong_branch(env):
+    # Characterization: the buggy selector returns the chest-truncated solve
+    # (value 0 here) while the true optimum is gamma^3.
+    level = _keys_small_train_format_level()
+    full = kc.FullLevelSolver(env=env, discount_rate=GAMMA)
+    true_value = float(full.level_value(full.solve(level), level))
+    assert true_value == pytest.approx(GAMMA ** 3)          # optimum opens chest 3
+
+    filt = kc.LevelSolverFiltered(
+        env=env, discount_rate=GAMMA, min_keys=3, min_chests=3)
+    buggy_value = float(filt.solve(level).value)
+    assert buggy_value == pytest.approx(0.0)                # wrong branch -> 0
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BUG-2 (notes/03-bug-log.md): LevelSolverFiltered selects its branch on "
+        "level.hidden_keys.sum() (hidden count) instead of (~hidden_keys).sum() "
+        "(real count), so on a keys-small (train-format) level it returns the "
+        "chest-truncated solve and undervalues the optimum. Should equal the "
+        "trusted FullLevelSolver value. Fix: (~level.hidden_keys).sum()."
+    ),
+)
+def test_filtered_solver_matches_full_solver_on_train_format(env):
+    level = _keys_small_train_format_level()
+    full = kc.FullLevelSolver(env=env, discount_rate=GAMMA)
+    true_value = float(full.level_value(full.solve(level), level))
+    filt = kc.LevelSolverFiltered(
+        env=env, discount_rate=GAMMA, min_keys=3, min_chests=3)
+    filtered_value = float(filt.solve(level).value)
+    assert filtered_value == pytest.approx(true_value, rel=1e-6)
