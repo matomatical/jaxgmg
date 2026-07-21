@@ -185,6 +185,15 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
 >   `cheese_in_the_corner.splayer_from_name` — which also **fixed `jaxgmg splay
 >   corner`** (it referenced a nonexistent `LevelSplayer` class and crashed).
 >   Issue #12 was already moot.
+> - **(c) `memory_test` relocated CLI → test (Matthew's call).** Unifying its
+>   defaults in (a) was wrong: it's a lightweight check of the recurrent training
+>   *algorithm*, not an experiment. So the command was removed (from `cli/train.py`
+>   + `app.py`) and replaced with `tests/integration/test_train_recurrent_smoke.py`
+>   — a Tier-3 wiring check running the minigrid Memory-Test task with **lstm and
+>   gru** cells. This also closes a real coverage gap: the corner smoke test only
+>   exercised the `ff` path, leaving `evaluate_sequence_recurrent` / the BPTT
+>   branch / RNN state carry-reset untested. Suite now 111 passed, 7 xfailed. (The
+>   *learning* counterpart is the deferred Tier-4 recurrent test noted below.)
 
 ### Phase 4 — Consolidate: the science core
 - Extract a shared **PLR buffer module** used by `plr.py` and `accel.py` (max-ever-return
@@ -276,6 +285,13 @@ checkpoints — only the paper's published numbers. So the refactor safety net i
   below ~α=1e‑1; dish robust from α=1e‑2; ACCEL+oracle robust for all positive α). Document the
   exact config; run only when GPU is available. A downscaled **mini-repro** (smaller maze/steps)
   is a cheaper qualitative stand-in. **Not a blocker for the cleanup.**
+- **Tier 4 — recurrent *learning* tests (DEFERRED, needs more compute):** the Tier-3 recurrent
+  smoke test (`tests/integration/test_train_recurrent_smoke.py`) only checks that the LSTM/GRU
+  training path *runs*. We still owe *learning* tests that the recurrent policies actually **learn
+  to solve** memory-requiring environments — e.g. the minigrid Memory-Test level (goal spawns on
+  one of two sides behind a partial-observation window, so solving it requires remembering which
+  side). This is the recurrent analogue of the paper-repro tier and should gate any future
+  memory / partial-observability research. **Not a blocker for the cleanup.**
 
 Suggested layout: `tests/procgen/`, `tests/environments/`, `tests/baselines/`,
 `tests/integration/`, with a shared `conftest.py` of small-maze fixtures and a
