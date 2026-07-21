@@ -16,6 +16,11 @@ the `cleanup2` effort, mostly via the test suite. **Policy (per Matthew):**
 
 Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
 
+**Progress (as of Phase 2, 2026-07-21):** BUG-2 and BUG-3 are resolved (their
+xfails flipped to xpass and were dropped). BUG-1 (the oracle discount
+off-by-one) remains open — deferred to Phase 4, where the `regret_oracle_actor`
+refactor (issue #11) touches the estimator half of the fix.
+
 ---
 
 ## BUG-1 — Oracle discount off-by-one (γ^d vs γ^(d-1))  `[ ]`
@@ -25,10 +30,14 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
   ```python
   discounted_reward = (self.discount_rate**optimal_dist) * valid_reward
   ```
-  and the analogous `state_value` in the other environments' `LevelSolver`s
-  (`cheese_on_a_pile.py`, `cheese_on_a_dish.py`, `keys_and_chests.py`,
-  `minigrid_maze.py`, `base.py:599`) — **the fix must sweep all of them**, not
-  just corner.
+  and the analogous `state_value` in the other environments' `LevelSolver`s.
+  **The fix must sweep all live oracle paths**, not just corner. As of Phase 2
+  the live set is: `cheese_in_the_corner.py`, `cheese_on_a_dish.py`,
+  `keys_and_chests.py` (`FullLevelSolver` + `LevelSolverFiltered`), the
+  `oracle-actor` estimator `scores.regret_oracle_actor`, and `base.py:599`.
+  NOTE (Phase 2): `cheese_on_a_pile.py` was deleted (no longer in scope), and
+  `minigrid_maze.py` still has the off-by-one but was dropped from the oracle
+  dispatch, so it is no longer reachable (fix if/when minigrid is revived).
 - **Bug:** `state_value` discounts the terminal reward by `γ^d`, where `d` is
   the mouse→cheese shortest-path distance. But the reward for reaching the
   cheese lands on the **arrival step** (trajectory index `d-1`, since the first
@@ -65,10 +74,14 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
   must touch the estimator too, not just the solvers. Pinned by
   `tests/baselines/autocurricula/test_scores.py::test_oracle_actor_optimal_agent_has_zero_regret`
   (`xfail(strict)`).
+- **Also pinned in cheese-on-a-dish** (2026-07-21, Phase 2): same γ^d vs
+  γ^(d-1) off-by-one in `cheese_on_a_dish.LevelSolver.state_value`. Pinned by
+  `tests/environments/test_dish_oracle.py::test_oracle_value_should_equal_realised_return`
+  (2 cases, `xfail(strict)`).
 
 ---
 
-## BUG-2 — `LevelSolverFiltered` selects on hidden-key count (affects paper results)  `[ ]`
+## BUG-2 — `LevelSolverFiltered` selects on hidden-key count (affects paper results)  `[x]`
 
 > **CONFIRMED (2026-07-21).** Matthew confirmed the oracle-latest (`oracle-actor`)
 > keys-and-chests experiments are in the **main paper**, and the appendix
@@ -112,16 +125,18 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
 - **Fix:** one line — `num_real_keys = (~level.hidden_keys).sum()`. (Also fold
   `LevelSolverFiltered` into a cleaner oracle when addressing issue #11 in Phase 4;
   consider re-checking whether the paper's keys oracle-latest numbers shift.)
-- **Pinned by:** `tests/environments/test_keys_oracle.py`
-  - `test_filtered_solver_matches_full_solver_on_train_format` — `xfail(strict)`;
-    `LevelSolverFiltered` should equal the trusted `FullLevelSolver` optimum on a
-    keys-small level but returns the wrong branch. Flips to xpass when fixed.
-  - `test_filtered_solver_currently_picks_wrong_branch` — characterizes the current
-    (buggy) 0-value behaviour so the bug is documented even before the fix.
+- **Resolved (2026-07-21, Phase 2).** One-line fix:
+  `num_real_keys = (~level.hidden_keys).sum()` in `keys_and_chests.py:1015`.
+  Verified against the trusted `FullLevelSolver`. NB the fix changes the
+  published keys oracle-latest training-distribution numbers — re-check the
+  paper's keys figures if/when GPU repro is run (Tier 4).
+- **Pinned by:** `tests/environments/test_keys_oracle.py::test_filtered_solver_matches_full_solver_on_train_format`
+  (now xpass — xfail dropped; the obsolete `..._currently_picks_wrong_branch`
+  characterization test was removed).
 
 ---
 
-## BUG-3 — staleness has an extra `+1` vs the reference PLR algorithm  `[ ]`
+## BUG-3 — staleness has an extra `+1` vs the reference PLR algorithm  `[x]`
 
 > Not a crash or a clearly-wrong result — an **unintended deviation from the
 > published algorithm**, documented here (per Matthew) so we can later test
@@ -163,11 +178,21 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
   in `plr._replay_update`, and `current_time = num_replay_batches`, so with the
   `+1` removed a just-visited level reads staleness `-1` — the stamp should then
   be `num_replay_batches` (no `+1`) so it reads 0. Fix both together.
-- **Pinned by:** `tests/baselines/autocurricula/test_prioritisation.py`
-  - `test_just_visited_level_has_zero_staleness_weight_ref` — `xfail(strict)`;
-    asserts the reference behaviour (just-visited ⇒ 0 staleness weight). Flips to
-    xpass when fixed.
-  - `test_staleness_offset_is_one_not_zero` — characterizes current behaviour.
+- **Resolved (2026-07-21, Phase 2).** Dropped the `1 +` in
+  `prioritisation.plr_replay_probs` (`staleness = current_time - last_visit`).
+  **Correction to the fix sketch above:** the last-visit stamp must NOT change.
+  `plr._replay_update` stamps `num_replay_batches + 1` and then advances
+  `num_replay_batches` to that same value, so at the next `get_batch`
+  (`current_time == num_replay_batches`) a just-visited level already reads
+  staleness 0 once the `+1` is gone; changing the stamp would re-introduce the
+  offset. Dropping the `+1` did expose a 0/0 at buffer init (all
+  `last_visit == current == 0`, which the old `+1` had masked) — guarded with a
+  uniform-staleness fallback so the mixture stays a valid distribution. The
+  function is shared by `accel.py`, so both curricula are fixed together.
+- **Pinned by:** `tests/baselines/autocurricula/test_prioritisation.py::test_just_visited_level_has_zero_staleness_weight`
+  (now xpass — xfail dropped). Added
+  `test_all_equally_recent_falls_back_to_uniform_staleness` for the init guard;
+  removed the obsolete `test_staleness_offset_is_one_not_zero` characterization.
 
 ### Checked and NOT a bug: rank tie-breaking
 

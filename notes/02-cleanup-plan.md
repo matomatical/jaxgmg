@@ -102,6 +102,31 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
   `value_heatmap`→`proxy_value_heatmap`; fix `networks.py` return annotation.
 *Effort: M (mostly the solver fixes). Add a regression test per fix where feasible.*
 
+> **Status (2026-07-21).** Phase 2 done (reviewed w/ Matthew; suite green: 106
+> passed, 7 xfailed — the 7 are all BUG-1, deferred to Phase 4). Changes:
+> - **BUG-2** (keys `LevelSolverFiltered` branch selector) and **BUG-3** (PLR
+>   staleness `+1`) fixed; their xfails flipped to xpass and were dropped (see
+>   `03-bug-log.md`). Both touched published-number code paths.
+> - **Cosmetic/crashers** (#8, #9): evals proxy-heatmap key, `splay` `obs`→`image`,
+>   4 bogus `speedtest` `level_of_detail` guards (NameError crashers), `networks`
+>   `__call__` return annotation (3- vs 4-tuple). The 7× `{prob_shift=}` missing-`f`
+>   prints (#9) are **deferred to Phase 3**, which rewrites the 8-way-duplicated
+>   `cli/train.py` where they all live.
+> - **minigrid** dropped from the `regret_oracle_actor` dispatch (scope #3) so it
+>   can't silently mis-score turn-action levels; the file is otherwise untouched.
+> - **`cheese_on_a_pile` deleted** entirely (scope #2): file + `scores.py` branch
+>   + the `pile` train & mutate CLI commands + their `app.py` registrations. Chose
+>   deletion over fixing the mutators, since pile is slated for removal anyway.
+> - **dish (option 1a):** the audit's premise that the dish regret regime "can't
+>   run" was **wrong** — the main `LevelSolver` is live and `regret_oracle_actor`
+>   computes dish oracle returns directly from `maze_distances` (no proxy solver
+>   involved; nothing live ever called `solve_proxy`). So we deleted the dead
+>   `cheese_on_a_dish_original.py` + the commented-out proxy-solver blocks rather
+>   than resurrecting them, and added `test_dish_oracle.py` (oracle↔rollout
+>   cross-check + the distinctive dish-as-barrier case + unreachable-cheese).
+> **Remaining:** BUG-1 (oracle discount off-by-one) → Phase 4 with the
+> `regret_oracle_actor` refactor (issue #11); the `{prob_shift=}` f-strings → Phase 3.
+
 ### Phase 3 — Consolidate: config dataclass + single train runner (biggest readability win)
 - Introduce a `TrainConfig` dataclass (grouped: `net_*`, `ppo_*`, `ued/plr_*`, `proxy_*`,
   `eval_*`, logging) holding the ~50 universal params + their defaults **once**.
