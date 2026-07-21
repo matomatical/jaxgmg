@@ -153,12 +153,38 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
 >   commands call `run(TrainConfig.from_cli(locals()), …)`.
 > - **Eval levels** moved to `cli/eval_levels.py`; added `splayer_from_name`.
 >   `cli/train.py` 2891 → 1384 lines. Fixed the 6 `{prob_shift=}` f-strings (#9).
-> **Deferred follow-ups:** (a) point each command's typer defaults at the
-> `TrainConfig` canonical to *kill* (not just expose) the remaining default drift;
-> (b) the proxy struct-strip (`Rollout.proxy_value` / buffer
-> `max_ever_proxy_return` / networks `vp` head / env `proxy_rewards`) + reconcile
-> `splay_*` vs `LevelSplayer.*` (issue #14). Issue #12 (proxy_shaping_coeff
-> schedule) is now **moot** — the proxy machinery is gone.
+
+> **Phase-3 follow-ups — both DONE (2026-07-21, 3 commits).** Suite 109 passed,
+> 7 xfailed throughout.
+> - **(a) Default unification.** Every TrainConfig-field CLI default now
+>   references a single module-level `_DEFAULTS = TrainConfig()`
+>   (`_DEFAULTS.<group>.<field>`), so config.py is the sole source of truth and
+>   cross-command drift is structurally impossible. Env-specific args (env_*,
+>   mutator/accel knobs, wandb routing, level_splayer) keep per-command literals.
+>   Per Matthew, historical per-command defaults are NOT preserved (the paper +
+>   git log document the experiment hyperparams), so the previously-drifted
+>   defaults were unified to canonical — changing some commands' *default*
+>   behaviour (flags still override): dish/minimaze/memory_test `plr_robust`
+>   True→False; keys/minimaze/memory_test/follow/lava `log_gifs` True→False; and
+>   **memory_test** (a reduced-scale demo) now inherits canonical scale/net/
+>   curriculum (net mlp/64→large/256, ued dr→plr, 1M→20M env steps, 64→128
+>   steps/cycle, 64→256 parallel envs, checkpointing off→on). `from_cli` is
+>   unchanged; its per-key fallback still covers params a command omits.
+> - **(b) Proxy struct-strip + splay reconcile (issue #14).** Removed the inert
+>   proxy plumbing Phase 3 left in place: the networks `vp` head (Dense(2)→
+>   Dense(1) — **NB** this changes value-head init RNG, so a fresh run's exact
+>   per-seed trajectory differs from the old 2-head net; outcome *distribution*
+>   unchanged and no checkpoints existed), `Rollout.proxy_value`/
+>   `final_proxy_value`, buffer `max_ever_proxy_return`, env `proxy_rewards`
+>   emission + base penalty-scaling + the proxy metric blocks + always-None
+>   `benchmark_proxies` plumbing, and the proxy *solver* machinery
+>   (`LevelSolutionProxies`/`solve_proxy`/`state_value_proxies`/
+>   `level_value_proxy`). Also dropped `scores.regret_oracle_actor`'s dead
+>   `proxy_oracle` arg (the isinstance/magic-number re-solve refactor stays Phase
+>   4 / issue #11). Reconciled all splayer call sites on
+>   `cheese_in_the_corner.splayer_from_name` — which also **fixed `jaxgmg splay
+>   corner`** (it referenced a nonexistent `LevelSplayer` class and crashed).
+>   Issue #12 was already moot.
 
 ### Phase 4 — Consolidate: the science core
 - Extract a shared **PLR buffer module** used by `plr.py` and `accel.py` (max-ever-return

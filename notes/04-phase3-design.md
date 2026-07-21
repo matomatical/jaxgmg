@@ -110,3 +110,18 @@ Deviations/notes:
 - `clipping` was found to be dead (proxy-only) and removed (Matthew's call).
 - The proxy **struct** strip (Rollout/buffer/vp head/env `proxy_rewards`) remains
   deferred to its own step, as agreed.
+
+## Follow-ups: DONE (2026-07-21)
+
+Both deferred follow-ups are now complete (3 commits after the Phase-3 wrap-up).
+See the "Phase-3 follow-ups" block in `02-cleanup-plan.md` for the full detail:
+- **(a)** default drift *killed* (not just exposed): all TrainConfig-field CLI
+  defaults now source from one `_DEFAULTS = TrainConfig()`. Historical
+  per-command defaults intentionally not preserved (Matthew's call) — notable
+  behavioural change: `memory_test` now inherits canonical scale/net/curriculum.
+- **(b)** proxy struct strip (vp head, Rollout/buffer proxy fields, env
+  `proxy_rewards`, proxy metrics, proxy solver machinery, `proxy_oracle`) +
+  splayer reconcile on `splayer_from_name` (issue #14; fixed the crashing
+  `splay corner`). NB the `vp` head removal (Dense(2)→Dense(1)) changes
+  value-head init RNG — fresh runs differ per-seed from the old net (no
+  checkpoints existed; outcome distribution unchanged).
