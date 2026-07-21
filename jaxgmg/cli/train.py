@@ -134,7 +134,7 @@ def corner(
         corner_size=env_corner_size,
     )
     if prob_shift > 0.0:
-        print("  mixing level generators with {prob_shift=}...")
+        print(f"  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
             level_generator2=shift_level_generator,
@@ -372,7 +372,7 @@ def dish(
         cheese_on_dish=cheese_on_dish_shift,  
     )
     if prob_shift > 0.0:
-        print("  mixing level generators with {prob_shift=}...")
+        print(f"  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
             level_generator2=shift_level_generator,
@@ -619,7 +619,7 @@ def keys(
         num_chests_max=env_num_chests_max,
     )
     if prob_shift > 0.0:
-        print("  mixing level generators with {prob_shift=}...")
+        print(f"  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
             level_generator2=shift_level_generator,
@@ -877,7 +877,7 @@ def minimaze(
         corner_size=env_size-2,
     )
     if prob_shift > 0.0:
-        print("  mixing level generators with {prob_shift=}...")
+        print(f"  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
             level_generator2=shift_level_generator,
@@ -1167,7 +1167,7 @@ def follow(
         trustworthy_leader=trustworthy_leader_shift,
     )
     if prob_shift > 0.0:
-        print("  mixing level generators with {prob_shift=}...")
+        print(f"  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
             level_generator2=shift_level_generator,
@@ -1322,7 +1322,7 @@ def lava(
         lava_threshold=lava_treshold_shift,
     )
     if prob_shift > 0.0:
-        print("  mixing level generators with {prob_shift=}...")
+        print(f"  mixing level generators with {prob_shift=}...")
         train_level_generator = MixtureLevelGenerator(
             level_generator1=orig_level_generator,
             level_generator2=shift_level_generator,

@@ -94,3 +94,19 @@ TrainConfig
   `PLRConfig`, `ACCELConfig`, each holding only its own params — rather than one
   flat `ued` group where DR carries unused plr fields. Deferred to keep Phase 3
   focused; the flat `ued` group is a clean stepping stone. See [[jaxgmg-cleanup]].
+
+## Status: DONE (2026-07-21)
+
+Implemented as designed. Suite green throughout (109 passed, 7 xfailed). See the
+Phase-3 status block in `02-cleanup-plan.md` for the commit-by-commit summary.
+Deviations/notes:
+- `run()`'s body keeps the flat local names (config unpacked at the top) rather
+  than referencing `config.x.y` throughout — lowest-risk, body byte-identical.
+- CLI commands keep all their typer flags (full sweep-ability) and build the
+  config via `TrainConfig.from_cli(locals())`. Their per-command default values
+  are unchanged, so the historical **default drift is now visible in each
+  command's constructed config but not yet unified** — killing it (pointing
+  matching defaults at the canonical) is a deferred follow-up.
+- `clipping` was found to be dead (proxy-only) and removed (Matthew's call).
+- The proxy **struct** strip (Rollout/buffer/vp head/env `proxy_rewards`) remains
+  deferred to its own step, as agreed.

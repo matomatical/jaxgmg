@@ -137,6 +137,29 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
   replace the 4 duplicated `match level_splayer` blocks with one helper.
 *Effort: L. Highest payoff for day-to-day research ergonomics; eliminates default drift.*
 
+> **Status (2026-07-21).** Phase 3 **done** (suite green throughout: 109 passed,
+> 7 xfailed — the 7 are the BUG-1 pins). See `04-phase3-design.md` for the design.
+> - **Tier-3 training smoke test** stood up first (`tests/integration/
+>   test_train_smoke.py`; corner DR+PLR, evals/logging on, wandb/checkpoint off).
+>   It immediately caught a latent JAX-compat break (`jax.tree_leaves`, removed in
+>   JAX 0.10 — the CLI training path was broken on the nook's 0.10.2); fixed.
+> - **Subtracted dead flags** (behaviour-preserving for all real runs): proxy
+>   machinery + η schedule, the dead `clipping` flag (only ever clipped the
+>   removed proxy score), and `debug_stop_gradient*` + `scoring_method_override`.
+>   `run()` went 62 → 51 args (42 scalars + 9 builders).
+> - **`TrainConfig`** (`baselines/config.py`): nested frozen dataclasses
+>   (net/ppo/ued/collect/eval/log/ckpt), defaults verified 42/42 against corner.
+>   `run(config, *env_objects)` unpacks it (loop body byte-identical); the 7 CLI
+>   commands call `run(TrainConfig.from_cli(locals()), …)`.
+> - **Eval levels** moved to `cli/eval_levels.py`; added `splayer_from_name`.
+>   `cli/train.py` 2891 → 1384 lines. Fixed the 6 `{prob_shift=}` f-strings (#9).
+> **Deferred follow-ups:** (a) point each command's typer defaults at the
+> `TrainConfig` canonical to *kill* (not just expose) the remaining default drift;
+> (b) the proxy struct-strip (`Rollout.proxy_value` / buffer
+> `max_ever_proxy_return` / networks `vp` head / env `proxy_rewards`) + reconcile
+> `splay_*` vs `LevelSplayer.*` (issue #14). Issue #12 (proxy_shaping_coeff
+> schedule) is now **moot** — the proxy machinery is gone.
+
 ### Phase 4 — Consolidate: the science core
 - Extract a shared **PLR buffer module** used by `plr.py` and `accel.py` (max-ever-return
   computation, score computation, top-k insertion) — removes the 4×/2× duplication so the
