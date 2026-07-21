@@ -1011,8 +1011,10 @@ class LevelSolverFiltered(LevelSolverInit):
             penalize_time=self.env.penalize_time,
             max_steps_in_episode=self.env.max_steps_in_episode,
         )
-        # which one was right?
-        num_real_keys = level.hidden_keys.sum()
+        # which one was right? hidden_keys[i] marks slot i as HIDDEN, so the
+        # number of *real* keys is the count of non-hidden slots. (See BUG-2 in
+        # notes/03-bug-log.md.)
+        num_real_keys = (~level.hidden_keys).sum()
         value = jnp.where(
             num_real_keys == self.min_keys,
             value_filtered_keys,
