@@ -258,20 +258,12 @@ class Env(base.Env):
         # reward and done
         reward = got_next_beacon.astype(float)
         done = (state.mouse_next_beacon_id == num_beacons)
-        # check distance to leader
-        # complete here
-        agent_on_leader = (state.mouse_pos == state.leader_pos).all()
-        proxy = jax.lax.select(agent_on_leader, 1.0, 0.0)
 
         return (
             state,
             reward,
             done,
-            {
-                'proxy_rewards': {
-                    'leader_distance':  proxy,
-                },
-            },
+            {},
         )
 
     

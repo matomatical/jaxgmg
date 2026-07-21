@@ -35,7 +35,6 @@ class Transition:
     net_state: ActorCriticState
     prev_action: int
     value: float
-    proxy_value: float
     action: int
     log_prob: float
     reward: float
@@ -53,10 +52,7 @@ class Rollout:
     * final_value : float
             The network's output for the result of the final transition.
             Useful as a learning target. Used in computing GAE estimates.
-    * final_proxy_value : float
-            The network's output for the result of the final transition (from
-            the second head).
-    
+
     Note: Considered adding these fields, but decided to exclude them because
     they are currently unused so we don't need to compute them. They could be
     useful for recomputing the value target but we don't currently do that
@@ -78,7 +74,6 @@ class Rollout:
     # final_net_state: ActorCriticState
     # final_prev_action: int
     final_value: float
-    final_proxy_value: float
 
 
 # # # 
@@ -144,7 +139,6 @@ def collect_rollout(
         (
             action_distribution,
             value,
-            proxy_value,
             next_net_state,
         ) = net_apply(
             net_params,
@@ -184,7 +178,6 @@ def collect_rollout(
             net_state=net_state,
             prev_action=prev_action,
             value=value,
-            proxy_value=proxy_value,
             action=action,
             log_prob=log_prob,
             reward=reward,
@@ -200,7 +193,7 @@ def collect_rollout(
     )
     # compute final value
     (fin_env_state, fin_obs, fin_net_state, fin_prev_action) = final_carry
-    _fin_pi, fin_value, fin_proxy_value, _fin_next_net_state = net_apply(
+    _fin_pi, fin_value, _fin_next_net_state = net_apply(
         net_params,
         fin_obs,
         fin_net_state,
@@ -214,7 +207,6 @@ def collect_rollout(
         # final_net_state=fin_net_stat,
         # final_prev_action=fin_prev_action,
         final_value=fin_value,
-        final_proxy_value=fin_proxy_value,
     )
 
 
@@ -326,20 +318,6 @@ def compute_single_rollout_metrics(
             'benchmark_regret': benchmark_return - avg_return,
         })
     
-    # if there are any proxy rewards, add new metrics for each
-    proxy_dict = rollout.transitions.info.get("proxy_rewards", {})
-    for proxy_name, proxy_rewards in proxy_dict.items():
-        avg_proxy_return = compute_average_return(
-            rewards=proxy_rewards,
-            dones=rollout.transitions.done,
-            discount_rate=discount_rate,
-        )
-        proxy_reward_per_step = proxy_rewards.mean()
-        metrics["proxy_"+proxy_name] = {
-            'avg_return': avg_proxy_return,
-            'reward_per_step': proxy_reward_per_step,
-        }
-    
     return metrics
 
 
@@ -348,7 +326,6 @@ def compute_rollout_metrics(
     rollouts: Rollout,                  # Rollout[num_levels]
     discount_rate: float,
     benchmark_returns: Array | None,    # float[num_levels]
-    benchmark_proxies: dict[str, Array] | None,
 ) -> dict[str, Any]:
     """
     Parameters:
@@ -411,37 +388,7 @@ def compute_rollout_metrics(
             'lvl_benchmark_return_hist': benchmark_returns,
             'lvl_benchmark_regret_hist': benchmark_regret,
         })
-    
-    # if there are any proxy rewards, add new metrics for each
-    proxy_dict = rollouts.transitions.info.get("proxy_rewards", {})
-    for proxy_name, proxy_rewards in proxy_dict.items():
-        avg_proxy_returns = vmap_avg_return(
-            proxy_rewards,              # float[L (vmapped), S]
-            rollouts.transitions.done,  # bool[L (vmapped), S]
-            discount_rate,              # float
-        )                               # -> float[L (vmapped)]
-        proxy_reward_per_step = (
-            proxy_rewards.mean(axis=1)  # float[L, S] -> float[L]
-        )
-        metrics[proxy_name] = {
-            # average over all levels in the batch
-            'avg_avg_return': avg_proxy_returns.mean(),
-            'avg_reward_per_step': proxy_reward_per_step.mean(),
-            # histrograms of values for each level
-            'lvl_avg_return_hist': avg_proxy_returns,
-            'lvl_reward_per_step_hist': proxy_reward_per_step,
-        }
-        if benchmark_proxies is not None:
-            benchmark_proxy = benchmark_proxies[proxy_name]
-            benchmark_regret = benchmark_proxy - avg_proxy_returns
-            metrics[proxy_name].update({
-                # average over all levels in the batch
-                f"avg_benchmark_return_{proxy_name}": benchmark_proxy.mean(),
-                f"avg_benchmark_regret_{proxy_name}": benchmark_regret.mean(),
-                # histograms of values for each level
-                f"lvl_benchmark_return_hist_{proxy_name}": benchmark_proxy,
-                f"lvl_benchmark_regret_hist_{proxy_name}": benchmark_regret,
-            })
+
     return metrics
 
 

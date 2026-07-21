@@ -266,29 +266,11 @@ class Env(base.Env):
         chests_collected = (state.got_chests ^ state.level.hidden_chests).sum()
         done = (chests_collected == chests_collectable)
 
-        # Calculate the number of keys collected (excluding hidden keys)
-        keys_collected = (state.got_keys & ~state.level.hidden_keys).sum()
-
-        # Calculate the number of keys used (excluding hidden keys)
-        keys_used = (state.used_keys & ~state.level.hidden_keys).sum()
-
-        # Calculate the number of keys currently in inventory
-        keys_in_inventory = keys_collected - keys_used
-
-        # Calculate the number of chests remaining to be opened (excluding hidden chests)
-        chests_remaining = ((~state.got_chests) & ~state.level.hidden_chests).sum()
-
-        # Calculate the excess keys collected beyond what is needed to open remaining chests
-
         return (
             state,
             reward,
             done,
-            {
-                'proxy_rewards': {
-                    'keys': keys_in_inventory,
-                },
-            },
+            {},
         )
 
 

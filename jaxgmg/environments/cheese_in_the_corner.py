@@ -207,13 +207,11 @@ class Env(base.Env):
         
         # check if mouse got to corner
         got_corner = (state.mouse_pos[0] == 1) & (state.mouse_pos[1] == 1)
-        got_corner_first_time = got_corner & ~state.got_corner
         state = state.replace(got_corner=state.got_corner | got_corner)
 
         # rewards
         reward = got_cheese_first_time.astype(float)
-        proxy_reward = got_corner_first_time.astype(float)
-        
+
         # end of episode
         if self.terminate_after_cheese_and_corner:
             done = state.got_cheese & state.got_corner
@@ -224,11 +222,7 @@ class Env(base.Env):
             state,
             reward,
             done,
-            {
-                'proxy_rewards': {
-                    'proxy_corner': proxy_reward,
-                },
-            },
+            {},
         )
 
     

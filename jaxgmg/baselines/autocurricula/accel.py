@@ -46,7 +46,6 @@ class AnnotatedLevel:
     last_visit_time: int
     # information for maxmc methods
     max_ever_return: float
-    max_ever_proxy_return: float
     # additional annotations for metrics
     first_visit_time: int
     num_mutations: int
@@ -112,7 +111,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 num_replays=initial_counts,
                 num_mutations=initial_counts,
                 max_ever_return=jnp.zeros(self.buffer_size),
-                max_ever_proxy_return=jnp.zeros(self.buffer_size),
             ),
             prev_batch_type=BatchType.GENERATE, # white lie
             prev_batch_level_ids=jnp.arange(batch_size_hint),
@@ -424,7 +422,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
             last_score=scores,
             last_visit_time=time_now,
             max_ever_return=max_returns,
-            max_ever_proxy_return=jnp.zeros(num_levels),  # inert (proxy removed)
             first_visit_time=time_now,
             num_replays=count_zero,
             num_mutations=mutate_counts,

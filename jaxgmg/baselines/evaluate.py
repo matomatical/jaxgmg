@@ -86,7 +86,6 @@ def run(
                 discount_rate=ppo_gamma,
                 levels=levels,
                 benchmarks=benchmark_returns,
-                benchmark_proxies=None,
                 env=env,
                 period=1,
             )

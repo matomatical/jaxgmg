@@ -176,7 +176,7 @@ class ProximalPolicyOptimisation:
         # run latest network to get current value/action predictions
         if self.do_backprop_thru_time:
             # recompute hidden states to allow BPTT
-            action_distribution, value, _proxy_value = jax.vmap(
+            action_distribution, value = jax.vmap(
                 networks.evaluate_sequence_recurrent,
                 in_axes=(None, None, None, 0, 0, 0)
             )(
@@ -189,7 +189,7 @@ class ProximalPolicyOptimisation:
             )
         else:
             # use cached inputs, run forward pass in parallel (no BPTT)
-            action_distribution, value, _proxy_value = jax.vmap(
+            action_distribution, value = jax.vmap(
                 networks.evaluate_sequence_parallel,
                 in_axes=(None, None, 0, 0, 0),
             )(

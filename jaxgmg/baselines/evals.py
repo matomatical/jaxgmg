@@ -156,7 +156,6 @@ class FixedLevelsEval(Eval):
             rollouts=rollouts,
             discount_rate=self.discount_rate,
             benchmark_returns=None,
-            benchmark_proxies=None,
         )
         return eval_metrics
 
@@ -169,7 +168,6 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
     env: Env
     levels: Level       # Level[num_levels]
     benchmarks: Array   # float[num_levels]
-    benchmark_proxies: dict[str, Array]
 
 
     def eval(
@@ -191,7 +189,6 @@ class FixedLevelsEvalWithBenchmarkReturns(Eval):
             rollouts=rollouts,
             discount_rate=self.discount_rate,
             benchmark_returns=self.benchmarks,
-            benchmark_proxies=self.benchmark_proxies,
         )
         return eval_metrics
 
@@ -291,7 +288,7 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             ),
             net_init_state,
         )
-        action_distr, values, proxy_values, _net_state = jax.vmap(
+        action_distr, values, _net_state = jax.vmap(
             train_state.apply_fn,
             in_axes=(None, 0, 0, 0),
         )(
@@ -313,17 +310,10 @@ class ActorCriticHeatmapVisualisationEval(Eval):
             data=values,
             pos=self.levels_pos,
         )
-        # model proxy value -> heatmap
-        proxy_value_heatmap = generate_heatmap(
-            shape=self.grid_shape,
-            data=proxy_values,
-            pos=self.levels_pos,
-        )
-    
+
         return {
             'action_probs_img': action_diamond_plot,
             'value_img': value_heatmap,
-            'proxy_value_img': proxy_value_heatmap,
         }
     
 

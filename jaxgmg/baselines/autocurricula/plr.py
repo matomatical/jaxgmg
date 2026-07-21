@@ -28,7 +28,6 @@ class AnnotatedLevel:
     last_visit_time: int
     # information for maxmc methods
     max_ever_return: float
-    max_ever_proxy_return: float    # proxy returns for maxmc
     # additional annotations for metrics
     first_visit_time: int
 
@@ -85,7 +84,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
                 last_visit_time=initial_time,
                 first_visit_time=initial_time,
                 max_ever_return=jnp.zeros(self.buffer_size),
-                max_ever_proxy_return=jnp.zeros(self.buffer_size),
             ),
             num_replay_batches=0,
             num_generate_batches=0,
@@ -305,7 +303,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
             last_visit_time=time_now,
             first_visit_time=time_now,
             max_ever_return=max_returns,
-            max_ever_proxy_return=jnp.zeros(num_levels),  # inert (proxy removed)
         )
 
         # concatenate the low-potential levels and the challenger levels

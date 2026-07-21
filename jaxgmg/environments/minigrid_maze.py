@@ -238,14 +238,12 @@ class Env(base.Env):
         #check if hero got to proxy goal
         proxy_pos = jnp.array([0, 0])
         got_proxy_corner = (state.hero_pos == proxy_pos).all()
-        got_proxy_first_time = got_proxy_corner & ~state.got_proxy
         state = state.replace(got_proxy=state.got_proxy | got_proxy_corner)
 
-        
+
         # rewards
         reward = got_goal_first_time.astype(float)
-        proxy_reward = got_proxy_first_time.astype(float)
-        
+
         # end of episode
         if self.terminate_after_goal:
             done = state.got_goal
@@ -256,11 +254,7 @@ class Env(base.Env):
             state,
             reward,
             done,
-            {
-                'proxy_rewards': {
-                    'proxy_corner': proxy_reward,
-                },
-            },
+            {},
         )
 
 

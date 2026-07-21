@@ -188,12 +188,12 @@ def test_oracle_actor_optimal_agent_has_zero_regret():
 def _make_rollout(rewards, dones, values):
     transitions = experience.Transition(
         env_state=None, obs=None, net_state=None, prev_action=None,
-        value=jnp.asarray(values), proxy_value=None, action=None,
+        value=jnp.asarray(values), action=None,
         log_prob=None, reward=jnp.asarray(rewards),
         done=jnp.asarray(dones, dtype=bool), info={},
     )
     return experience.Rollout(
-        transitions=transitions, final_value=None, final_proxy_value=None,
+        transitions=transitions, final_value=None,
     )
 
 

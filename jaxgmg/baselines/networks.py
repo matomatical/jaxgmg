@@ -26,7 +26,7 @@ ActorCriticParams = ArrayTree
 
 ActorCriticForwardPass = Callable[
     [ActorCriticParams, Observation, ActorCriticState, int],
-    tuple[distrax.Categorical, float, float, ActorCriticState],
+    tuple[distrax.Categorical, float, ActorCriticState],
 ]
 
 
@@ -43,7 +43,7 @@ class ActorCriticNetwork(nn.Module):
     `@compact`). The call function should follow this API:
     
     ```
-    pi, v, vp, next_state = net.apply(
+    pi, v, next_state = net.apply(
         params=params,
         obs=obs,
         state=state,
@@ -94,7 +94,6 @@ class ActorCriticNetwork(nn.Module):
     ) -> tuple[
         distrax.Categorical,    # distribution over range(num_actions)
         float,                  # real value
-        float,                  # proxy value
         ActorCriticState,
     ]:
         raise NotImplementedError
@@ -114,7 +113,6 @@ def evaluate_sequence_recurrent(
 ) -> tuple[
     distrax.Categorical,    # Categorical[num_steps] (action_distributions)
     Array,                  # float[num_steps] (values)
-    Array,                  # float[num_steps] (proxy values)
 ]:
     # scan through the trajectory
     default_prev_action = -1
@@ -131,7 +129,7 @@ def evaluate_sequence_recurrent(
         net_state, prev_action = carry
         obs, done, chosen_action = transition
         # apply network
-        action_distribution, value, proxy_value, next_net_state = net_apply(
+        action_distribution, value, next_net_state = net_apply(
             net_params,
             obs,
             net_state,
@@ -144,14 +142,14 @@ def evaluate_sequence_recurrent(
             (next_net_state, chosen_action),
         )
         carry = (next_net_state, next_prev_action)
-        output = (action_distribution, value, proxy_value)
+        output = (action_distribution, value)
         return carry, output
     _final_carry, outputs = jax.lax.scan(
         _net_step,
         initial_carry,
         transitions,
     )
-    return outputs # action_distributions, values, proxy_values
+    return outputs # action_distributions, values
 
 
 def evaluate_sequence_parallel(
@@ -163,19 +161,18 @@ def evaluate_sequence_parallel(
 ) -> tuple[
     Array, # distrax.Categorical[num_steps] (action_distributions)
     Array, # float[num_steps] (values)
-    Array, # float[num_steps] (proxy values)
 ]:
-    action_distributions, values, proxy_values, _net_states = jax.vmap(
+    action_distributions, values, _net_states = jax.vmap(
         net_apply,
         in_axes=(None, 0, 0, 0),
-        out_axes=(0, 0, 0, 0),
+        out_axes=(0, 0, 0),
     )(
         net_params,
         obs_sequence,
         net_state_sequence,
         prev_action_sequence,
     )
-    return action_distributions, values, proxy_values
+    return action_distributions, values
 
 
 # # # 
@@ -208,8 +205,6 @@ class Impala(ActorCriticNetwork):
 
     Notes on differences from IMPALA architecture:
 
-    * Original IMPALA has only one value head, whereas this network has two,
-      the second value being optionally used to predict proxy values.
     * There are small differences in the handling of auxiliary inputs.
       * We don't take the previous timestep reward as input. The rationale
         is that we want to train in settings where the reward is not always
@@ -235,7 +230,6 @@ class Impala(ActorCriticNetwork):
     ) -> tuple[
         distrax.Categorical,    # action distribution (pi)
         Array,                  # float (value v)
-        Array,                  # float (proxy value vp)
         ActorCriticState,       # next recurrent state
     ]:
         # embed the image part of the observation
@@ -288,12 +282,10 @@ class Impala(ActorCriticNetwork):
         logits = nn.Dense(features=self.num_actions)(rnn_out)
         pi = distrax.Categorical(logits=logits)
 
-        # critic heads -> value and proxy value
-        vs = nn.Dense(features=2)(rnn_out)
-        v = vs[0]
-        vp = vs[1]
+        # critic head -> value
+        value = nn.Dense(features=1)(rnn_out)[0]
 
-        return pi, v, vp, next_state
+        return pi, value, next_state
 
     
     @property

@@ -46,7 +46,6 @@ def make_buffer(levels, scores, last_visit=None, max_ever=None):
         last_visit_time=jnp.asarray(last_visit, dtype=int),
         first_visit_time=jnp.asarray(last_visit, dtype=int),
         max_ever_return=jnp.asarray(max_ever, dtype=float),
-        max_ever_proxy_return=jnp.zeros(n),
     )
 
 
@@ -57,13 +56,13 @@ def make_rollout(rewards):
     dones = jnp.zeros((nl, NS), dtype=bool).at[:, -1].set(True)
     transitions = experience.Transition(
         env_state=None, obs=None, net_state=None, prev_action=None,
-        value=jnp.zeros((nl, NS)), proxy_value=jnp.zeros((nl, NS)), action=None,
+        value=jnp.zeros((nl, NS)), action=None,
         log_prob=None, reward=rewards, done=dones,
-        info={'proxy_rewards': {'x': jnp.zeros((nl, NS))}},
+        info={},
     )
     return experience.Rollout(
         transitions=transitions,
-        final_value=jnp.zeros(nl), final_proxy_value=jnp.zeros(nl),
+        final_value=jnp.zeros(nl),
     )
 
 
