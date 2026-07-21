@@ -25,6 +25,7 @@ a failure, which flags fixed bugs for follow-up.
 | `baselines/test_experience.py` | GAE + `compute_average/maximum_return` | hand-computed golden, NumPy reference, λ=0 ⇒ TD error, `done` cuts bootstrap, multi-episode masking |
 | `environments/test_corner_oracle.py` | Cheese-in-the-Corner `LevelSolver` ↔ optimal rollout | end-to-end oracle cross-check, unreachable-cheese edge case |
 | `environments/test_keys_oracle.py` | Keys-and-Chests `FullLevelSolver` enumerate-and-argmax oracle | plan-set cardinality (incl. 21,600 for k=3,c=10), golden corridor levels ↔ `env.step` rollout |
+| `baselines/autocurricula/test_scores.py` | Regret-score primitives (`pvl`, `maxmc-*`, `oracle-actor`) + dispatcher wiring | hand-computed golden, critic-vs-balanced divergence, dispatcher smoke test |
 
 `conftest.py` holds shared fixtures: a fixed PRNG `key`, a `make_mazes` factory
 (generates border-respecting wall grids), and a `generator_name` parametrisation
@@ -50,6 +51,8 @@ fixed (across all envs) during the refactor.
 
 - **Dish oracle**: blocked on the broken/commented-out dish proxy solver
   (cleanup-plan issue #2 / Phase 2); add once that path is restored.
-- **Regret estimators** in `autocurricula/scores.py` (`maxmc-actor`,
-  `oracle-actor`, `pvl`) and **PLR/ACCEL buffer** mechanics (Tier-2
-  characterization) — the next layer up from these unit tests.
+- **PLR/ACCEL buffer** mechanics (`prioritisation.plr_replay_probs` rank +
+  staleness; buffer update/insert) — Tier-2 characterization, the next layer up.
+- **`LevelSolverFiltered` / BUG-2**: the keys `oracle-actor` solver's
+  hidden-vs-real-key selection (see `notes/03-bug-log.md`) is unpinned pending
+  the level-format invariant.

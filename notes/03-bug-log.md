@@ -53,7 +53,48 @@ Status legend: `[ ]` open (fix pending) · `[x]` fixed & verified.
 - **Also confirmed in keys-and-chests** (2026-07-21): `FullLevelSolver`
   discounts each chest reward by `γ^(cumulative distance to chest)` while the
   realised return uses `γ^(distance-1)` — same one-extra-factor bias, now
-  *per chest*. This confirms the off-by-one is **systematic across the oracle
-  family**, not corner-specific. Pinned by
+  *per chest*. Pinned by
   `tests/environments/test_keys_oracle.py::test_oracle_value_should_equal_realised_return`
   (3 golden corridor levels, `xfail(strict)`).
+- **Also confirmed in the `oracle-actor` regret estimator** (2026-07-21):
+  `scores.regret_oracle_actor` independently computes `oracle_max_return =
+  γ^goal_dist` (its own `maze_distances` lookup, *not* via `LevelSolver`), so an
+  optimal agent gets **negative** oracle-latest regret. This is the estimator
+  the paper's `oracle-actor` runs actually use, so the off-by-one is baked into
+  three separate code paths (corner solver, keys solver, oracle-actor). The fix
+  must touch the estimator too, not just the solvers. Pinned by
+  `tests/baselines/autocurricula/test_scores.py::test_oracle_actor_optimal_agent_has_zero_regret`
+  (`xfail(strict)`).
+
+---
+
+## BUG-2 (candidate, UNCONFIRMED) — `LevelSolverFiltered` selects on hidden-key count  `[ ]`
+
+- **Found:** 2026-07-21, reading the `oracle-actor` keys path.
+- **Where:** `jaxgmg/environments/keys_and_chests.py:1015-1020`
+  ```python
+  num_real_keys = level.hidden_keys.sum()          # actually counts HIDDEN keys
+  value = jnp.where(
+      num_real_keys == self.min_keys,
+      value_filtered_keys,
+      value_filtered_chests,
+  )
+  ```
+- **Concern:** `hidden_keys[i]=True` marks slot `i` as *hidden* (`LevelGenerator`:
+  `hidden_keys = arange(num_keys_max) >= num_keys`), so `hidden_keys.sum()` is the
+  number of **hidden** keys = `num_keys_max − num_keys`, not the number of real
+  keys. The variable is misnamed and the branch selector looks inverted: to pick
+  the key-filtered solve when keys are the small dimension (`num_keys == min_keys`)
+  the test should be `(~level.hidden_keys).sum() == self.min_keys`. As written it
+  only coincidentally selects correctly when `num_keys_max == 2*min_keys`.
+- **Reachability:** `LevelSolverFiltered` is used only by `scores.regret_oracle_actor`
+  for keys-and-chests, instantiated with hardcoded `min_keys=3, min_chests=3` (itself
+  issue #11 in the cleanup plan). So this only bites keys experiments run with the
+  `oracle-actor` estimator (default is `maxmc-actor`).
+- **NOT YET CONFIRMED — needs Matthew:** what `num_keys_max` did the oracle-actor
+  keys runs use? If always 6, the selection happens to be correct and this is "only"
+  a misnamed-variable landmine for the refactor. Otherwise it's a live correctness
+  bug in those runs. Also the class carries the loud docstring warning "THIS WILL
+  SILENTLY BREAK IF YOU PASS IT A LEVEL THAT DOES NOT HAVE THE EXPECTED FORMAT".
+- **Not pinned by a test yet** (would need the level-format invariant nailed down
+  first). Revisit when cleaning up `regret_oracle_actor` / issue #11 in Phase 4.
