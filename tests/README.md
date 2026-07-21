@@ -26,6 +26,8 @@ a failure, which flags fixed bugs for follow-up.
 | `environments/test_corner_oracle.py` | Cheese-in-the-Corner `LevelSolver` ↔ optimal rollout | end-to-end oracle cross-check, unreachable-cheese edge case |
 | `environments/test_keys_oracle.py` | Keys-and-Chests `FullLevelSolver` enumerate-and-argmax oracle | plan-set cardinality (incl. 21,600 for k=3,c=10), golden corridor levels ↔ `env.step` rollout |
 | `baselines/autocurricula/test_scores.py` | Regret-score primitives (`pvl`, `maxmc-*`, `oracle-actor`) + dispatcher wiring | hand-computed golden, critic-vs-balanced divergence, dispatcher smoke test |
+| `baselines/autocurricula/test_prioritisation.py` | `plr_replay_probs` rank + staleness mixture | golden distributions, sums-to-1, score/staleness/temperature monotonicity, tie-break characterization |
+| `baselines/autocurricula/test_plr_buffer.py` | PLR buffer update (`_new_update` tournament, `_replay_update` bookkeeping) | challenger displaces/rejected, eviction by potential-not-score, max-ever monotone, visit-time/clock |
 
 `conftest.py` holds shared fixtures: a fixed PRNG `key`, a `make_mazes` factory
 (generates border-respecting wall grids), and a `generator_name` parametrisation
@@ -59,5 +61,6 @@ Fix: `(~level.hidden_keys).sum()`.
 
 - **Dish oracle**: blocked on the broken/commented-out dish proxy solver
   (cleanup-plan issue #2 / Phase 2); add once that path is restored.
-- **PLR/ACCEL buffer** mechanics (`prioritisation.plr_replay_probs` rank +
-  staleness; buffer update/insert) — Tier-2 characterization, the next layer up.
+- **ACCEL buffer**: `plr.py` buffer logic is now pinned; the near-duplicate in
+  `accel.py` (issue #7) is not directly tested — the shared-buffer extraction in
+  Phase 4 should be gated by porting these tests to the shared module.
