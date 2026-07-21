@@ -59,14 +59,7 @@ def run(
     net_cnn_type: str,
     net_rnn_type: str,
     net_width: int,
-    # proxy augmentation config
-    train_proxy_critic: bool,
-    plr_proxy_shaping: bool,
-    proxy_name: str,
-    plr_proxy_shaping_coeff: float,
     clipping: bool,
-    eta_schedule: bool,
-    eta_schedule_time: float,
     debug_stop_gradient: bool,
     debug_stop_gradient_after: float,
     debug_stop_gradient_oracle: bool,
@@ -87,7 +80,6 @@ def run(
     ppo_gae_lambda: float,
     ppo_entropy_coeff: float,
     ppo_critic_coeff: float,
-    ppo_proxy_critic_coeff: float,
     ppo_max_grad_norm: float,
     ppo_lr_annealing: bool,
     # training run dimensions
@@ -127,24 +119,7 @@ def run(
 
     
     print(f"configuring curriculum with {ued=}...")
-    if plr_proxy_shaping and not train_proxy_critic:
-        print("WARNING: plr_proxy_shaping without train_proxy_critic")
-        print("WARNING: (proxy_value terms will be untrained)")
-        print("WARNING: (this invalidates most estimators)")
     rng_train_levels, rng_setup = jax.random.split(rng_setup)
-    if eta_schedule:
-        eta_pretraining_duration = eta_schedule_time * num_total_cycles
-        eta_rampup_duration = 0.05 * num_total_cycles
-        plr_proxy_shaping_coeff = optax.linear_schedule(
-            init_value=0.0,
-            end_value=plr_proxy_shaping_coeff,
-            transition_begin=eta_pretraining_duration,
-            transition_steps=eta_rampup_duration,
-        )
-    else:
-        plr_proxy_shaping_coeff = optax.constant_schedule(
-            value=plr_proxy_shaping_coeff,
-        )
     if ued == "dr":
         gen = dr_infinite.CurriculumGenerator(
             level_generator=train_level_generator,
@@ -173,9 +148,6 @@ def run(
             # scoring
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
-            proxy_shaping=plr_proxy_shaping,
-            proxy_name=proxy_name,
-            proxy_shaping_coeff=plr_proxy_shaping_coeff,
             clipping=clipping,
         )
         gen_state = gen.init(
@@ -198,9 +170,6 @@ def run(
             # scoring
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
-            proxy_shaping=plr_proxy_shaping,
-            proxy_name=proxy_name,
-            proxy_shaping_coeff=plr_proxy_shaping_coeff,
             clipping=clipping,
         )
         gen_state = gen.init(
@@ -384,8 +353,6 @@ def run(
         clip_eps=ppo_clip_eps,
         entropy_coeff=ppo_entropy_coeff,
         critic_coeff=ppo_critic_coeff,
-        train_proxy_critic=train_proxy_critic,
-        proxy_critic_coeff=ppo_proxy_critic_coeff,
         do_backprop_thru_time=net.is_recurrent,
     )
 
@@ -478,19 +445,6 @@ def run(
             lambda_=ppo_gae_lambda,
             discount_rate=ppo_gamma,
         )
-        if train_proxy_critic:
-            proxy_advantages = experience.batch_generalised_advantage_estimation(
-                rewards=rollouts.transitions.info["proxy_rewards"][proxy_name],
-                dones=rollouts.transitions.done,
-                values=rollouts.transitions.proxy_value,
-                final_values=rollouts.final_proxy_value,
-                lambda_=ppo_gae_lambda,
-                discount_rate=ppo_gamma,
-            )
-        else:
-            proxy_advantages = None
-
-
         # report experience and performance to level generator
         scoring_method_override = None
         if debug_stop_gradient:
@@ -503,16 +457,11 @@ def run(
             rollouts=rollouts,
             # shortcut: we did gae already
             advantages=advantages,
-            proxy_advantages=proxy_advantages,
-            step=t,
             scoring_method_override=scoring_method_override
         )
         if log_cycle:
             ued_metrics = gen.compute_metrics(gen_state)
             metrics['ued'].update(ued_metrics)
-            metrics['ued'].update({
-                'eta': plr_proxy_shaping_coeff(t),
-            })
 
 
         # ppo update network on this data (if curriculum says so, else skip)
@@ -531,7 +480,6 @@ def run(
                 net_init_state=net_init_state,
                 transitions=rollouts.transitions,
                 advantages=advantages,
-                proxy_advantages=proxy_advantages,
                 num_epochs=num_epochs_per_cycle,
                 num_minibatches_per_epoch=num_minibatches_per_epoch,
                 compute_metrics=log_cycle,

@@ -30,8 +30,7 @@ def make_gen(scoring_method, buffer_size):
     return plr.CurriculumGenerator(
         level_generator=None, level_metrics=None, buffer_size=buffer_size,
         temperature=1.0, staleness_coeff=0.0, robust=False, prob_replay=0.5,
-        scoring_method=scoring_method, discount_rate=GAMMA, proxy_shaping=False,
-        proxy_name='x', proxy_shaping_coeff=None, clipping=False,
+        scoring_method=scoring_method, discount_rate=GAMMA, clipping=False,
     )
 
 
@@ -87,8 +86,8 @@ def test_strong_challenger_displaces_weak_buffer_level():
     # challenger 100 scores 5.0 (beats buffer levels 2 and 3); 101 scores 0.2.
     ns = gen._new_update(
         state, rollouts=make_rollout([[0, 0, 0], [0, 0, 0]]),
-        advantages=const_adv([5.0, 0.2]), proxy_advantages=None,
-        levels=jnp.asarray([100, 101]), step=0, scoring_method_override=None,
+        advantages=const_adv([5.0, 0.2]),
+        levels=jnp.asarray([100, 101]), scoring_method_override=None,
     )
     buf_levels = set(int(x) for x in np.asarray(ns.buffer.level))
     # 100 (strong) enters, 3 (worst score among candidates) is evicted;
@@ -108,8 +107,8 @@ def test_weak_challengers_are_all_rejected():
     )
     ns = gen._new_update(
         state, rollouts=make_rollout([[0, 0, 0], [0, 0, 0]]),
-        advantages=const_adv([0.1, 0.0]), proxy_advantages=None,   # both weak
-        levels=jnp.asarray([100, 101]), step=0, scoring_method_override=None,
+        advantages=const_adv([0.1, 0.0]),   # both weak
+        levels=jnp.asarray([100, 101]), scoring_method_override=None,
     )
     # candidate levels 2 (3.0) and 3 (2.0) both beat the challengers, so the
     # buffer is unchanged.
@@ -130,8 +129,8 @@ def test_eviction_targets_lowest_potential_not_lowest_score():
     )
     ns = gen._new_update(
         state, rollouts=make_rollout([[0, 0, 0], [0, 0, 0]]),
-        advantages=const_adv([5.0, 0.0]), proxy_advantages=None,
-        levels=jnp.asarray([100, 101]), step=0, scoring_method_override=None,
+        advantages=const_adv([5.0, 0.0]),
+        levels=jnp.asarray([100, 101]), scoring_method_override=None,
     )
     buf_levels = set(int(x) for x in np.asarray(ns.buffer.level))
     # strong challenger 100 enters by evicting level 0 (score 1.0, lowest
@@ -160,8 +159,8 @@ def test_replay_update_tracks_max_ever_return_monotonically():
     this_return = GAMMA ** (NS - 1)
     ns = gen._replay_update(
         state, rollouts=make_rollout([[0, 0, 1], [0, 0, 1]]),
-        advantages=const_adv([0.0, 0.0]), proxy_advantages=None,
-        levels=jnp.asarray([0, 1]), step=0, scoring_method_override=None,
+        advantages=const_adv([0.0, 0.0]),
+        levels=jnp.asarray([0, 1]), scoring_method_override=None,
     )
     max_ever = np.asarray(ns.buffer.max_ever_return)
     # slot 0: old 0.5 < gamma^2 (~0.81) -> updates up; slot 1: old 0.9 wins.
@@ -187,8 +186,8 @@ def test_replay_update_marks_visited_and_advances_clock():
     )
     ns = gen._replay_update(
         state, rollouts=make_rollout([[0, 0, 1], [0, 0, 1]]),
-        advantages=const_adv([0.0, 0.0]), proxy_advantages=None,
-        levels=jnp.asarray([1, 3]), step=0, scoring_method_override=None,
+        advantages=const_adv([0.0, 0.0]),
+        levels=jnp.asarray([1, 3]), scoring_method_override=None,
     )
     visit = np.asarray(ns.buffer.last_visit_time)
     # replayed slots stamped with num_replay_batches + 1 = 6; others unchanged.

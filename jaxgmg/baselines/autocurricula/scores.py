@@ -23,10 +23,7 @@ from jaxgmg.environments import cheese_on_a_dish
     jax.jit,
     static_argnames=[
         "scoring_method",
-        "proxy_shaping",
-        "proxy_name",
         "clipping",
-        "proxy_shaping_coeff", # HACK: because it's a schedule
     ],
 )
 def plr_compute_scores(
@@ -37,17 +34,9 @@ def plr_compute_scores(
     max_ever_returns: Array,                # float[num_levels]
     advantages: Array,                      # float[num_levels, num_steps]
     discount_rate: float,
-    # how much proxy shaping?
-    proxy_shaping: bool,
-    proxy_name: str | None,
-    proxy_shaping_coeff: float | None,      # optional float
-    # data for computing proxy scores
-    max_ever_proxy_returns: Array | None,   # optional float[num_levels]
-    proxy_advantages: Array | None,         # optional float[num_levels, num_steps]
     # data for computing oracle scores (HACK)
     levels: Level,                          # Level[num_levels]
     clipping: bool,          # whether to clip the score
-    step: int,
 ) -> Array:                                 # float[num_levels]
     """
     Compute prioritisation 'scores' for a batch of levels using a named
@@ -110,14 +99,8 @@ def plr_compute_scores(
             0,      # max ever returns
             0,      # advantages
             None,   # discount rate (don't vmap)
-            None,   # proxy shaping (static, don't vmap)
-            None,   # proxy name (static, don't vmap)
-            None,   # proxy coefficient (don't vmap)
-            0 if proxy_shaping and max_ever_proxy_returns is not None else None,
-            0 if proxy_shaping and proxy_advantages is not None else None,
             0,      # levels
             None,   # clipping (static, don't vmap)
-            None,   # step (static, don't vmap)
         ),
     )(
         scoring_method,         # str (static)
@@ -125,14 +108,8 @@ def plr_compute_scores(
         max_ever_returns,       # float[vmap(num_levels)]
         advantages,             # float[vmap(num_levels), num_steps]
         discount_rate,          # float
-        proxy_shaping,          # bool (static)
-        proxy_name,             # str (static)
-        proxy_shaping_coeff,    # float
-        max_ever_proxy_returns, # float[vmap(num_levels)]
-        proxy_advantages,       # float[vmap(num_levels), num_steps]
         levels,                 # Level[vmap(num_levels)]
         clipping,               # bool (static)
-        step,                   # int
     )
 
 
@@ -144,10 +121,7 @@ def plr_compute_scores(
     jax.jit,
     static_argnames=[
         "scoring_method",
-        "proxy_shaping",
-        "proxy_name",
         "clipping",
-        "proxy_shaping_coeff", # HACK: it's secretly a schedule function
     ],
 )
 def plr_compute_score(
@@ -156,14 +130,8 @@ def plr_compute_score(
     max_ever_return: float,
     advantages: Array,              # float[num_steps]
     discount_rate: float,
-    proxy_shaping: bool,
-    proxy_name: str,
-    proxy_shaping_coeff: float | None,
-    max_ever_proxy_return: float | None,
-    proxy_advantages: Array | None, # float[num_steps] (optional)
     level: Level,                   # Level
     clipping: bool,
-    step: int,
 ) -> float:
     # compute the score on the original reward data
     match scoring_method.lower():
@@ -224,67 +192,11 @@ def plr_compute_score(
         case _:
             raise ValueError(f"Unknown scoring method {scoring_method!r}")
 
-    # if not proxy shaping, we're done
-    if not proxy_shaping:
-        return original_score
-
-    # else continue to compute the proxy score based on the proxy reward daya
-    match scoring_method.lower():
-        case "absgae":
-            proxy_score = l1_value_loss(
-                advantages=proxy_advantages,
-            )
-        case "pvl":
-            proxy_score = regret_pvl(
-                advantages=proxy_advantages,
-            )
-        case "maxmc-paper": 
-            proxy_score = regret_maxmc_paper(
-                values=rollout.transitions.proxy_value,
-                max_ever_return=max_ever_proxy_return,
-            )
-        case "maxmc-initial":
-            proxy_score = regret_maxmc_initial(
-                values=rollout.transitions.proxy_value,
-                max_ever_return=max_ever_proxy_return,
-            )
-        case "maxmc-critic":
-            proxy_score = regret_maxmc_critic(
-                values=rollout.transitions.proxy_value,
-                dones=rollout.transitions.done,
-                discount_rate=discount_rate,
-                max_ever_return=max_ever_proxy_return,
-            )
-        case "maxmc-critic-balanced":
-            proxy_score = regret_maxmc_critic_balanced(
-                values=rollout.transitions.proxy_value,
-                dones=rollout.transitions.done,
-                discount_rate=discount_rate,
-                max_ever_return=max_ever_proxy_return,
-            )
-        case "maxmc-actor":
-            proxy_score = regret_maxmc_actor(
-                rewards=rollout.transitions.info["proxy_rewards"][proxy_name],
-                dones=rollout.transitions.done,
-                discount_rate=discount_rate,
-                max_ever_return=max_ever_proxy_return,
-            )
-        case "oracle-actor":
-            proxy_score = regret_oracle_actor(
-                level=level,
-                rewards=rollout.transitions.info["proxy_rewards"][proxy_name],
-                dones=rollout.transitions.done,
-                discount_rate=discount_rate,
-                proxy_oracle=True,
-            )
-        case _:
-            raise ValueError(f"Unknown proxy scoring method {scoring_method!r}")
-
-    coeff_at_this_step = proxy_shaping_coeff(step) # secretly a schedule, sorry
-    shaped_score = original_score - coeff_at_this_step * proxy_score
-    if clipping:
-        shaped_score = jnp.maximum(shaped_score, 0)
-    return shaped_score
+    # NOTE: `clipping` historically only clipped the (now-removed) proxy-shaped
+    # score, so it is currently inert for the true-reward score. It is kept in
+    # the config pending a decision on whether to clip the regret score here
+    # (see notes/04-phase3-design.md).
+    return original_score
 
 
 # # # 

@@ -198,7 +198,7 @@ def _make_rollout(rewards, dones, values):
 
 
 @pytest.mark.parametrize("method", ["maxmc-actor", "pvl", "maxmc-paper"])
-def test_dispatcher_returns_primitive_when_not_proxy_shaping(method):
+def test_dispatcher_returns_primitive(method):
     rewards = [0.0, 0.0, 1.0]
     dones = [False, False, True]
     values = [0.5, 0.4, 0.3]
@@ -212,14 +212,8 @@ def test_dispatcher_returns_primitive_when_not_proxy_shaping(method):
         max_ever_return=max_ever,
         advantages=advantages,
         discount_rate=GAMMA,
-        proxy_shaping=False,
-        proxy_name=None,
-        proxy_shaping_coeff=None,
-        max_ever_proxy_return=None,
-        proxy_advantages=None,
         level=None,
         clipping=False,
-        step=0,
     ))
 
     if method == "maxmc-actor":

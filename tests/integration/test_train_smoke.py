@@ -64,15 +64,7 @@ def _tiny_run_kwargs():
         net_cnn_type='mlp',
         net_rnn_type='ff',
         net_width=16,
-        # --- proxy machinery: to be removed in Phase 3 (kept off here) ---
-        train_proxy_critic=False,
-        plr_proxy_shaping=False,
-        proxy_name='proxy_corner',
-        plr_proxy_shaping_coeff=0.0,
-        # --- eta schedule: to be removed in Phase 3 ---
-        eta_schedule=False,
-        eta_schedule_time=0.0,
-        # --- debug-stop-gradient: to be removed in Phase 3 ---
+        # --- debug-stop-gradient: to be removed in Phase 3 (task 10) ---
         debug_stop_gradient=False,
         debug_stop_gradient_after=0.5,
         debug_stop_gradient_oracle=False,
@@ -95,7 +87,6 @@ def _tiny_run_kwargs():
         ppo_gae_lambda=0.95,
         ppo_entropy_coeff=0.01,
         ppo_critic_coeff=0.5,
-        ppo_proxy_critic_coeff=0.5,
         ppo_max_grad_norm=0.5,
         ppo_lr_annealing=False,
         # dimensions (tiny)
