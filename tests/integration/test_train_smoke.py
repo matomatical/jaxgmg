@@ -64,10 +64,6 @@ def _tiny_run_kwargs():
         net_cnn_type='mlp',
         net_rnn_type='ff',
         net_width=16,
-        # --- debug-stop-gradient: to be removed in Phase 3 (task 10) ---
-        debug_stop_gradient=False,
-        debug_stop_gradient_after=0.5,
-        debug_stop_gradient_oracle=False,
         # ued (overridden per-test)
         ued='dr',
         prob_shift=0.0,

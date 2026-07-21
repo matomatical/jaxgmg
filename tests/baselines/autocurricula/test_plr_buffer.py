@@ -87,7 +87,7 @@ def test_strong_challenger_displaces_weak_buffer_level():
     ns = gen._new_update(
         state, rollouts=make_rollout([[0, 0, 0], [0, 0, 0]]),
         advantages=const_adv([5.0, 0.2]),
-        levels=jnp.asarray([100, 101]), scoring_method_override=None,
+        levels=jnp.asarray([100, 101]),
     )
     buf_levels = set(int(x) for x in np.asarray(ns.buffer.level))
     # 100 (strong) enters, 3 (worst score among candidates) is evicted;
@@ -108,7 +108,7 @@ def test_weak_challengers_are_all_rejected():
     ns = gen._new_update(
         state, rollouts=make_rollout([[0, 0, 0], [0, 0, 0]]),
         advantages=const_adv([0.1, 0.0]),   # both weak
-        levels=jnp.asarray([100, 101]), scoring_method_override=None,
+        levels=jnp.asarray([100, 101]),
     )
     # candidate levels 2 (3.0) and 3 (2.0) both beat the challengers, so the
     # buffer is unchanged.
@@ -130,7 +130,7 @@ def test_eviction_targets_lowest_potential_not_lowest_score():
     ns = gen._new_update(
         state, rollouts=make_rollout([[0, 0, 0], [0, 0, 0]]),
         advantages=const_adv([5.0, 0.0]),
-        levels=jnp.asarray([100, 101]), scoring_method_override=None,
+        levels=jnp.asarray([100, 101]),
     )
     buf_levels = set(int(x) for x in np.asarray(ns.buffer.level))
     # strong challenger 100 enters by evicting level 0 (score 1.0, lowest
@@ -160,7 +160,7 @@ def test_replay_update_tracks_max_ever_return_monotonically():
     ns = gen._replay_update(
         state, rollouts=make_rollout([[0, 0, 1], [0, 0, 1]]),
         advantages=const_adv([0.0, 0.0]),
-        levels=jnp.asarray([0, 1]), scoring_method_override=None,
+        levels=jnp.asarray([0, 1]),
     )
     max_ever = np.asarray(ns.buffer.max_ever_return)
     # slot 0: old 0.5 < gamma^2 (~0.81) -> updates up; slot 1: old 0.9 wins.
@@ -187,7 +187,7 @@ def test_replay_update_marks_visited_and_advances_clock():
     ns = gen._replay_update(
         state, rollouts=make_rollout([[0, 0, 1], [0, 0, 1]]),
         advantages=const_adv([0.0, 0.0]),
-        levels=jnp.asarray([1, 3]), scoring_method_override=None,
+        levels=jnp.asarray([1, 3]),
     )
     visit = np.asarray(ns.buffer.last_visit_time)
     # replayed slots stamped with num_replay_batches + 1 = 6; others unchanged.

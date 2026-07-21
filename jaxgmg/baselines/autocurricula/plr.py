@@ -174,14 +174,13 @@ class CurriculumGenerator(base.CurriculumGenerator):
             return (batch_type == 1)
 
 
-    @functools.partial(jax.jit, static_argnames=['self', 'scoring_method_override'])
+    @functools.partial(jax.jit, static_argnames=['self'])
     def update(
         self,
         state: GeneratorState,
         levels: Level,                  # Level[num_levels]
         rollouts: Rollout,              # Rollout[num_levels] (num_steps)
         advantages: Array,              # float[num_levels, num_steps]
-        scoring_method_override: str | None, # used for debugging
     ) -> GeneratorState:
         # perform both a replay-type update and a new-type update
         replay_next_state = self._replay_update(
@@ -189,14 +188,12 @@ class CurriculumGenerator(base.CurriculumGenerator):
             rollouts=rollouts,
             advantages=advantages,
             levels=levels,
-            scoring_method_override=scoring_method_override,
         )
         new_next_state = self._new_update(
             state,
             rollouts=rollouts,
             advantages=advantages,
             levels=levels,
-            scoring_method_override=scoring_method_override,
         )
         # and keep the result corresponding to the previous batch's type
         next_state = jax.tree.map(
@@ -213,7 +210,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
         rollouts: Rollout,
         advantages: Array,
         levels: Level,  # Level[num_levels]
-        scoring_method_override: str | None,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a replay batch, update the
@@ -237,7 +233,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         )
         # compute the scores of these levels from the rollouts
         scores = plr_compute_scores(
-            scoring_method=self.scoring_method if scoring_method_override is None else scoring_method_override,
+            scoring_method=self.scoring_method,
             rollouts=rollouts,
             max_ever_returns=max_max_returns,
             advantages=advantages,
@@ -268,7 +264,6 @@ class CurriculumGenerator(base.CurriculumGenerator):
         rollouts: Rollout,
         advantages: Array,
         levels: Level,  # Level[num_levels]
-        scoring_method_override: str | None,
     ) -> GeneratorState:
         """
         Conditional on the previous batch being a new batch (not a replay
@@ -285,7 +280,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
         )
         # compute the initial scores from these rollouts
         scores = plr_compute_scores(
-            scoring_method=self.scoring_method if scoring_method_override is None else scoring_method_override,
+            scoring_method=self.scoring_method,
             rollouts=rollouts,
             max_ever_returns=max_returns,
             advantages=advantages,

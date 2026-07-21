@@ -87,7 +87,6 @@ class CurriculumGenerator:
         levels: Level,                  # Level[num_levels]
         rollouts: Rollout,              # Rollout[num_levels] (num_steps)
         advantages: Array,              # float[num_levels, num_steps]
-        scoring_method_override: str | None, # IGNORED
     ) -> GeneratorState:
         return state
 
