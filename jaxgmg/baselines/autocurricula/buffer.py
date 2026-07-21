@@ -41,7 +41,7 @@ from jaxgmg.baselines.experience import Rollout
 from jaxgmg.baselines.autocurricula.prioritisation import plr_replay_probs
 from jaxgmg.baselines.autocurricula.scores import plr_compute_scores
 
-from jaxgmg.environments.base import Level, LevelGenerator
+from jaxgmg.environments.base import Level, LevelGenerator, LevelSolver
 
 
 @struct.dataclass
@@ -168,6 +168,31 @@ def merge_max_returns(
     return jnp.maximum(new_max_returns, buffer.max_ever_return[ids])
 
 
+def oracle_returns(
+    level_solver: LevelSolver | None,
+    scoring_method: str,
+    levels: Level,                      # Level[num_levels]
+) -> Array:                             # float[num_levels]
+    """
+    The analytically-computed optimal return for each level, for ORACLE scoring
+    methods (the `oracle-actor` regret estimator). Computed by solving each
+    level with the provided, pre-configured `level_solver`.
+
+    `scoring_method` is static, so the branch resolves at trace time: non-oracle
+    methods don't need a solver and get a cheap zero placeholder (the scorer
+    ignores it). This is where the oracle re-solving lives -- see the note in
+    `scores.regret_oracle_actor` on eventually caching it per buffer entry.
+    """
+    if "oracle" in scoring_method.lower():
+        assert level_solver is not None, \
+            "oracle scoring methods require a configured level_solver"
+        solutions = level_solver.vmap_solve(levels)
+        return level_solver.vmap_level_value(solutions, levels)
+    # placeholder for non-oracle methods (the scorer does not read it)
+    num_levels = jax.tree.leaves(levels)[0].shape[0]
+    return jnp.zeros(num_levels)
+
+
 def score_batch(
     scoring_method: str,
     rollouts: Rollout,                  # Rollout[num_levels] w/ Transition[num_steps]
@@ -175,10 +200,13 @@ def score_batch(
     discount_rate: float,
     levels: Level,                      # Level[num_levels]
     max_ever_returns: Array,            # float[num_levels]
+    level_solver: LevelSolver | None = None,
 ) -> Array:                             # float[num_levels]
     """
     Replayability scores for a batch of rollouts under the named scoring method
-    (usually a regret estimator). See `scores.plr_compute_scores`.
+    (usually a regret estimator). See `scores.plr_compute_scores`. Oracle
+    methods additionally solve each level via `level_solver`; other methods
+    ignore it.
     """
     return plr_compute_scores(
         scoring_method=scoring_method,
@@ -186,7 +214,7 @@ def score_batch(
         max_ever_returns=max_ever_returns,
         advantages=advantages,
         discount_rate=discount_rate,
-        levels=levels,
+        oracle_returns=oracle_returns(level_solver, scoring_method, levels),
     )
 
 

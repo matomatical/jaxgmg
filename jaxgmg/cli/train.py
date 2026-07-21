@@ -350,7 +350,11 @@ def dish(
 
     print("configuring environment...")
     if 'oracle' in plr_regret_estimator:
-        assert not env_terminate_after_dish, "assumed False hack in scores.py"
+        # the dish oracle values the path to the cheese; it does not model the
+        # episode ending early on the dish, so restrict oracle scoring to the
+        # non-terminating variant.
+        assert not env_terminate_after_dish, \
+            "oracle scoring assumes terminate_after_cheese_and_dish=False"
     env = cheese_on_a_dish.Env(
         terminate_after_cheese_and_dish=env_terminate_after_dish,
         num_channels_cheese=num_channels_cheese,
@@ -746,11 +750,13 @@ def keys(
 
     
     if "oracle" in plr_regret_estimator:
-        print("assertions guarding the hacks in autocurricula scoring module...")
-        assert env_num_keys == 3, "assumed as part of hack"
-        assert env_num_chests_shift == 3, "assumed as part of hack"
-        assert env.penalize_time == False, "assumed as part of hack"
-        assert env.max_steps_in_episode == 128, "assumed as part of hack"
+        # the oracle-latest estimator now solves each level with the configured
+        # `level_solver` above (real min_keys/min_chests, real max_steps), so the
+        # old min_keys==3 / min_chests==3 / max_steps==128 hacks are gone. The
+        # one remaining assumption is no time penalty (the oracle-latest regret
+        # is defined against the undiscounted-time optimum).
+        assert env.penalize_time == False, \
+            "oracle scoring assumes penalize_time=False"
 
 
     print("configuring level metrics...")

@@ -15,11 +15,11 @@ function over 1-D arrays. So we test the primitives directly against
 hand-computed golden values, and cover the ``match`` dispatch with one light
 smoke test (the dispatcher returns each primitive's value verbatim).
 
-The oracle-latest estimator (``regret_oracle_actor``) carries the same
-**BUG-1** discount off-by-one as the ``LevelSolver`` oracles
-(``notes/03-bug-log.md``): it values the optimum at ``gamma^d`` while an optimal
-agent realises ``gamma^(d-1)``, so an optimal agent shows *negative* regret.
-Pinned here as ``xfail``.
+The oracle-latest estimator (``regret_oracle_actor``) is now pure arithmetic
+(``oracle_return - realised_return``); the oracle optimal return is computed by
+``buffer.oracle_returns`` from a configured ``LevelSolver`` (issue #11), and the
+BUG-1 discount off-by-one is fixed (the solver reports ``gamma^(d-1)``), so an
+optimal agent has exactly zero oracle regret.
 """
 
 import math
@@ -32,8 +32,8 @@ import pytest
 
 from jaxgmg.baselines import experience
 from jaxgmg.baselines.autocurricula import scores
+from jaxgmg.baselines.autocurricula import buffer
 from jaxgmg.environments import cheese_in_the_corner as corner
-from jaxgmg.procgen import maze_solving
 
 
 GAMMA = 0.9
@@ -131,10 +131,11 @@ def test_critic_and_balanced_diverge_on_unequal_episodes():
 
 # --- oracle-actor (the oracle-latest estimator) --------------------------- #
 
-def _corridor_corner_level(distance):
-    # 3 x (distance+3) grid, open middle row; mouse at left, cheese `distance`
-    # cells to the right along the corridor.
-    w = distance + 3
+def _corridor_corner_level(distance, width=None):
+    # 3 x width grid, open middle row; mouse at left, cheese `distance` cells to
+    # the right along the corridor. A fixed `width` lets several such levels
+    # (different distances) stack into one batch.
+    w = distance + 3 if width is None else width
     wall = np.ones((3, w), dtype=bool)
     wall[1, 1:w - 1] = False               # open corridor
     return corner.Level(
@@ -144,40 +145,61 @@ def _corridor_corner_level(distance):
     )
 
 
-def test_oracle_actor_oracle_term_is_gamma_pow_d():
-    # With zero realised reward, regret == the oracle term == gamma^d, and we
-    # cross-check d against maze_distances independently.
-    for d in (1, 2, 3):
-        level = _corridor_corner_level(d)
-        dist = float(np.asarray(maze_solving.maze_distances(level.wall_map))[1, 1, 1, 1 + d])
-        assert dist == d
-        rewards = jnp.zeros(4)
-        dones = jnp.asarray([False, False, False, True])
-        regret = float(scores.regret_oracle_actor(
-            level=level, rewards=rewards, dones=dones,
-            discount_rate=GAMMA,
-        ))
-        assert regret == pytest.approx(GAMMA ** d)
+def test_oracle_actor_is_oracle_minus_realised_return():
+    # regret_oracle_actor now takes the oracle optimal return directly and
+    # subtracts the realised (average) return of the rollout.
+    oracle_return = 0.7
+    # zero realised reward -> regret is exactly the oracle term
+    regret0 = float(scores.regret_oracle_actor(
+        oracle_return=oracle_return,
+        rewards=jnp.zeros(4), dones=jnp.asarray([False, False, False, True]),
+        discount_rate=GAMMA,
+    ))
+    assert regret0 == pytest.approx(oracle_return)
+    # a realised reward of 1 on the index-1 step -> avg return gamma^1
+    regret1 = float(scores.regret_oracle_actor(
+        oracle_return=oracle_return,
+        rewards=jnp.asarray([0.0, 1.0]), dones=jnp.asarray([False, True]),
+        discount_rate=GAMMA,
+    ))
+    assert regret1 == pytest.approx(oracle_return - GAMMA ** 1)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG-1 (notes/03-bug-log.md) at the estimator level: regret_oracle_actor "
-        "values the optimum at gamma^d, but an optimal agent that reaches the "
-        "goal in d steps realises gamma^(d-1) (reward on the arrival step). So "
-        "an optimal agent gets NEGATIVE oracle regret instead of 0. When BUG-1 "
-        "is fixed, drop this xfail."
-    ),
-)
+def test_oracle_returns_via_solver_is_gamma_pow_d_minus_1():
+    # end-to-end plumbing: buffer.oracle_returns solves a batch of levels with
+    # the configured corner solver and returns gamma^(d-1) (BUG-1 fixed).
+    env = corner.Env(
+        max_steps_in_episode=128, penalize_time=False, automatically_reset=False,
+    )
+    solver = corner.LevelSolver(env=env, discount_rate=GAMMA)
+    ds = (1, 2, 3)
+    levels = jax.tree.map(
+        lambda *xs: jnp.stack(xs),
+        *[_corridor_corner_level(d, width=6) for d in ds],
+    )
+    out = np.asarray(buffer.oracle_returns(solver, "oracle-actor", levels))
+    assert out == pytest.approx([GAMMA ** (d - 1) for d in ds])
+
+
+def test_oracle_returns_placeholder_for_non_oracle_methods():
+    # non-oracle methods don't need a solver: a zero placeholder, no solve.
+    levels = jax.tree.map(
+        lambda *xs: jnp.stack(xs),
+        _corridor_corner_level(1, width=6), _corridor_corner_level(2, width=6),
+    )
+    out = np.asarray(buffer.oracle_returns(None, "maxmc-actor", levels))
+    assert out.tolist() == [0.0, 0.0]
+
+
 def test_oracle_actor_optimal_agent_has_zero_regret():
+    # end-to-end: an optimal agent's realised return equals the (BUG-1-fixed)
+    # oracle return, so its oracle-latest regret is exactly 0.
     d = 2
-    level = _corridor_corner_level(d)
-    # optimal agent arrives in d steps: reward on the final (arrival) step.
-    rewards = jnp.asarray([0.0, 1.0])
+    oracle_return = GAMMA ** (d - 1)    # what the corner solver reports
+    rewards = jnp.asarray([0.0, 1.0])   # optimal: reward on the arrival step
     dones = jnp.asarray([False, True])
     regret = float(scores.regret_oracle_actor(
-        level=level, rewards=rewards, dones=dones,
+        oracle_return=oracle_return, rewards=rewards, dones=dones,
         discount_rate=GAMMA,
     ))
     assert regret == pytest.approx(0.0)
@@ -212,7 +234,7 @@ def test_dispatcher_returns_primitive(method):
         max_ever_return=max_ever,
         advantages=advantages,
         discount_rate=GAMMA,
-        level=None,
+        oracle_return=0.0,
     ))
 
     if method == "maxmc-actor":

@@ -13,6 +13,7 @@ from flax import struct
 from chex import PRNGKey, Array
 
 from jaxgmg.environments.base import Level, LevelGenerator, LevelMetrics
+from jaxgmg.environments.base import LevelSolver
 from jaxgmg.baselines.experience import Rollout
 from jaxgmg.baselines.autocurricula import base
 from jaxgmg.baselines.autocurricula import buffer
@@ -46,6 +47,8 @@ class CurriculumGenerator(base.CurriculumGenerator):
     # scoring
     scoring_method: str
     discount_rate: float
+    # solver for oracle-based scoring methods (unused otherwise)
+    level_solver: LevelSolver | None = None
 
 
     @functools.partial(jax.jit, static_argnames=['self', 'batch_size_hint'])
@@ -203,6 +206,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             discount_rate=self.discount_rate,
             levels=levels,
+            level_solver=self.level_solver,
             max_ever_returns=max_max_returns,
         )
         # replace the scores of the replayed level ids with the new scores
@@ -238,6 +242,7 @@ class CurriculumGenerator(base.CurriculumGenerator):
             advantages=advantages,
             discount_rate=self.discount_rate,
             levels=levels,
+            level_solver=self.level_solver,
             max_ever_returns=max_returns,
         )
 

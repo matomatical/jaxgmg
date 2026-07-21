@@ -7,15 +7,8 @@ from chex import Array
 from jaxgmg.baselines import experience
 from jaxgmg.baselines.experience import Rollout
 
-# hack for computing oracle regrets
-from jaxgmg.procgen import maze_solving
-from jaxgmg.environments.base import Level
-from jaxgmg.environments import cheese_in_the_corner
-from jaxgmg.environments import keys_and_chests
-from jaxgmg.environments import cheese_on_a_dish
 
-
-# # # 
+# # #
 # Compute scores for a batch of levels
 
 
@@ -33,13 +26,13 @@ def plr_compute_scores(
     max_ever_returns: Array,                # float[num_levels]
     advantages: Array,                      # float[num_levels, num_steps]
     discount_rate: float,
-    # data for computing oracle scores (HACK)
-    levels: Level,                          # Level[num_levels]
+    # data for computing oracle scores
+    oracle_returns: Array,                  # float[num_levels]
 ) -> Array:                                 # float[num_levels]
     """
     Compute prioritisation 'scores' for a batch of levels using a named
     scoring method.
-    
+
     Inputs:
 
     * scoring_method : str (static)
@@ -56,11 +49,11 @@ def plr_compute_scores(
             for score methods that use them, provide them here.
     * discount_rate: float
             Used in several regret estimation methods.
-    * levels : Level[num_levels]
-            The levels probably shouldn't be needed for computing the scores,
-            as they are meant to be based on the rollouts. However, for
-            ORACLE versions of the scores (used for evaluating estimators)
-            they are provided here.
+    * oracle_returns : float[num_levels]
+            The analytically-computed optimal return for each level, used only
+            by ORACLE scoring methods (used for evaluating estimators). The
+            caller computes these once from a configured level solver (see
+            `buffer.oracle_returns`); a placeholder is fine for other methods.
 
     Returns:
 
@@ -75,7 +68,7 @@ def plr_compute_scores(
             0,      # max ever returns
             0,      # advantages
             None,   # discount rate (don't vmap)
-            0,      # levels
+            0,      # oracle returns
         ),
     )(
         scoring_method,         # str (static)
@@ -83,7 +76,7 @@ def plr_compute_scores(
         max_ever_returns,       # float[vmap(num_levels)]
         advantages,             # float[vmap(num_levels), num_steps]
         discount_rate,          # float
-        levels,                 # Level[vmap(num_levels)]
+        oracle_returns,         # float[vmap(num_levels)]
     )
 
 
@@ -103,7 +96,7 @@ def plr_compute_score(
     max_ever_return: float,
     advantages: Array,              # float[num_steps]
     discount_rate: float,
-    level: Level,                   # Level
+    oracle_return: float,
 ) -> float:
     # compute the score on the original reward data
     match scoring_method.lower():
@@ -148,7 +141,7 @@ def plr_compute_score(
             )
         case "oracle-actor":
             original_score = regret_oracle_actor(
-                level=level,
+                oracle_return=oracle_return,
                 rewards=rollout.transitions.reward,
                 dones=rollout.transitions.done,
                 discount_rate=discount_rate,
@@ -336,7 +329,7 @@ def regret_maxmc_actor(
 
 @jax.jit
 def regret_oracle_actor(
-    level: Level,
+    oracle_return: float,
     rewards: Array,             # float[num_steps]
     dones: Array,               # float[num_steps]
     discount_rate: float,
@@ -348,63 +341,16 @@ def regret_oracle_actor(
 
         Return_{max oracle} - sum_{t=0}^T \\gamma^t r_t.
 
-    Notes:
+    The optimal return `oracle_return` is computed by the caller from a
+    configured level solver (see `buffer.oracle_returns`), not here. The solver
+    is responsible for the oracle's validity constraints (cardinal actions, an
+    episode long enough for the optimal path); turn-action environments like
+    minigrid_maze are not dispatched to oracle scoring at all.
 
-    * The oracle assumes there is no linear time penalty and no time limit.
-      It will therefore give wrong results for other environment
-      configurations.
-    * The oracle assumes the action space is to move in a cardinal direction.
-      Turn-action environments like minigrid_maze are not supported: they are
-      no longer dispatched here and fall through to a ValueError, rather than
-      silently returning a wrong result that ignores the turn actions.
-
-    Implementation notes:
-
-    * The current implementation depends on internal details of the level in
-      a way it shouldn't need to, meaning it only works for certain levels
-      and it solves the level every time this function is called.
-    * This (and the configuration limitation) should be fixed when time
-      allows by having the caller solve the level once when it is created
-      with a provided, configured level solver, and pass in the oracle
-      returns here (instead of the level, like maxmc).
+    Possible future improvement: the oracle return is a property of the level,
+    so it need only be computed once when the level enters the buffer (like the
+    max-ever return), rather than recomputed on every replay/score pass.
     """
-    if isinstance(level, cheese_in_the_corner.Level):
-        goal_dist = maze_solving.maze_distances(level.wall_map)[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ]
-        oracle_max_return = discount_rate ** goal_dist
-    elif isinstance(level, cheese_on_a_dish.Level):
-        wall_map = level.wall_map.at[
-            level.dish_pos[0],
-            level.dish_pos[1],
-        ].set(
-            (level.dish_pos != level.cheese_pos).any()
-        )
-        goal_dist = maze_solving.maze_distances(wall_map)[
-            level.initial_mouse_pos[0],
-            level.initial_mouse_pos[1],
-            level.cheese_pos[0],
-            level.cheese_pos[1],
-        ]
-        oracle_max_return = discount_rate ** goal_dist
-    elif isinstance(level, keys_and_chests.Level):
-        level_solver = keys_and_chests.LevelSolverFiltered(
-            env=keys_and_chests.Env( # HACK
-                penalize_time=False,
-                max_steps_in_episode=128,
-            ),
-            discount_rate=discount_rate,
-            min_keys=3, # HACK
-            min_chests=3, # HACK
-        )
-        soln = level_solver.solve(level)
-        oracle_max_return = level_solver.level_value(soln, level)
-    else:
-        raise ValueError(f"Unsupported level type for oracle regret.")
-
     # no oracle for average return, just use the provided experience
     average_return = experience.compute_average_return(
         rewards=rewards,
@@ -412,7 +358,7 @@ def regret_oracle_actor(
         discount_rate=discount_rate,
     )
 
-    return oracle_max_return - average_return
+    return oracle_return - average_return
 
 
 def dro_actor(

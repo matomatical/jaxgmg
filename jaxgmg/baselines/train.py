@@ -142,6 +142,7 @@ def run(
             # scoring
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
+            level_solver=level_solver,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
@@ -163,6 +164,7 @@ def run(
             # scoring
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
+            level_solver=level_solver,
         )
         gen_state = gen.init(
             rng=rng_train_levels,
