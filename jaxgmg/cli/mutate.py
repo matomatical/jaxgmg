@@ -13,7 +13,6 @@ from jaxgmg.procgen import maze_generation
 from jaxgmg.environments import base
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import cheese_on_a_dish
-from jaxgmg.environments import cheese_on_a_pile
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import minigrid_maze
 from jaxgmg.environments.base import MixtureLevelMutator, IteratedLevelMutator
@@ -188,82 +187,6 @@ def dish(
         num_steps=num_mutate_steps,
     )
 
-    mutate_forever(
-        rng=rng,
-        env=env,
-        level_generator=level_generator,
-        level_mutator=level_mutator,
-        fps=fps,
-        debug=debug,
-    )
-
-
-def pile(
-    height: int                         = 9,
-    width: int                          = 9,
-    layout: str                         = 'tree',
-    level_of_detail: int                = 8,
-    max_cheese_radius: int              = 0,
-    max_cheese_radius_shift: int        = 5,
-    split_elements: int                 = 0,
-    num_mutate_steps: int               = 1,
-    prob_mutate_shift: float            = 0.3,
-    transpose: bool                     = False,
-    fps: float                          = 12.0,
-    debug: bool                         = False,
-    seed: int                           = 42,
-):
-    """
-    Iterative Cheese on a Pile mutator demo.
-    """
-    if level_of_detail not in {1,3,4,8}:
-        raise ValueError(f"invalid level of detail {level_of_detail}")
-    util.print_config(locals())
-
-    rng = jax.random.PRNGKey(seed=seed)
-    env = cheese_on_a_pile.Env(split_object_firstgroup=split_elements,img_level_of_detail=level_of_detail)
-    level_generator = cheese_on_a_pile.LevelGenerator(
-        height=height,
-        width=width,
-        maze_generator=maze_generation.get_generator_class_from_name(
-            name=layout
-        )(),
-        max_cheese_radius=max_cheese_radius,
-        split_elements=split_elements,
-    )
-    print("configuring level mutator...")
-    
-    biased_cheese_on_pile_mutator = MixtureLevelMutator(
-        mutators=(
-            # teleport cheese on pile
-            cheese_on_a_pile.CheeseonPileLevelMutator(
-                max_cheese_radius=max_cheese_radius,
-                split_elements=split_elements,
-            ),
-            # teleport cheese and pile to a random different position, apart by max_cheese_radius
-            cheese_on_a_pile.CheeseonPileLevelMutator(
-                max_cheese_radius=max_cheese_radius_shift,
-                split_elements=split_elements,
-            ),
-        ),
-        mixing_probs=(1-prob_mutate_shift, prob_mutate_shift),
-    )
-    # overall, rotate between wall/mouse/cheese mutations uniformly
-    level_mutator = IteratedLevelMutator(
-        mutator=MixtureLevelMutator(
-            mutators=(
-                cheese_on_a_pile.ToggleWallLevelMutator(),
-                cheese_on_a_pile.ScatterMouseLevelMutator(
-                    transpose_with_cheese_on_collision=False,
-                    transpose_with_pile_on_collision=False,
-                    split_elements=split_elements,
-                ),
-                biased_cheese_on_pile_mutator,
-            ),
-            mixing_probs=(1/3,1/3,1/3),
-        ),
-        num_steps=num_mutate_steps,
-    )
     mutate_forever(
         rng=rng,
         env=env,

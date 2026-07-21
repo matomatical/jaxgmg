@@ -126,7 +126,6 @@ app.add_typer(make_typer_app(
         mutate.corner,
         mutate.dish,
         mutate.minimaze,
-        mutate.pile,
         mutate.keys,
     ),
 ))
@@ -219,7 +218,6 @@ app.add_typer(make_typer_app(
     subcommands=(
         train.corner,
         train.dish,
-        train.pile,
         train.follow,
         train.keys,
         train.lava,

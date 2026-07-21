@@ -13,7 +13,6 @@ from jaxgmg.environments.base import Level
 from jaxgmg.environments import cheese_in_the_corner
 from jaxgmg.environments import keys_and_chests
 from jaxgmg.environments import cheese_on_a_dish
-from jaxgmg.environments import cheese_on_a_pile
 
 
 # # # 
@@ -533,22 +532,6 @@ def regret_oracle_actor(
                 level.initial_mouse_pos[1],
                 level.dish_pos[0],
                 level.dish_pos[1],
-            ]
-        oracle_max_return = discount_rate ** goal_dist
-    elif isinstance(level, cheese_on_a_pile.Level):
-        if not proxy_oracle:
-            goal_dist = maze_solving.maze_distances(level.wall_map)[
-                level.initial_mouse_pos[0],
-                level.initial_mouse_pos[1],
-                level.cheese_pos[0],
-                level.cheese_pos[1],
-            ]
-        else:
-            goal_dist = maze_solving.maze_distances(level.wall_map)[
-                level.initial_mouse_pos[0],
-                level.initial_mouse_pos[1],
-                level.napkin_pos[0],
-                level.napkin_pos[1],
             ]
         oracle_max_return = discount_rate ** goal_dist
     elif isinstance(level, keys_and_chests.Level):
