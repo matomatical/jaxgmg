@@ -29,8 +29,6 @@ dependencies = [
     "readchar",
     "typer",
     "tqdm",
-    "wandb",
-    "orbax-checkpoint",
 ]
 
 [project.optional-dependencies]

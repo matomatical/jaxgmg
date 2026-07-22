@@ -27,12 +27,11 @@ from jaxgmg import util
 # Canonical defaults for the universal training hyperparameters. Every command
 # below sources its TrainConfig-field defaults from here (via `_DEFAULTS.x.y`)
 # so there is a single source of truth and no cross-command default drift. Only
-# environment-specific args (env_*, mutator/accel knobs, wandb routing) carry
-# their own per-command literals.
+# environment-specific args (env_*, mutator/accel knobs) carry their own
+# per-command literals.
 _DEFAULTS = TrainConfig()
 
 
-@util.wandb_run
 def corner(
     # environment config
     env_size: int = 13,
@@ -79,11 +78,6 @@ def corner(
     num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
     console_log: bool = _DEFAULTS.log.console,
-    wandb_log: bool = _DEFAULTS.log.wandb,
-    wandb_project: str = "test",
-    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
-    wandb_group: str = None,
-    wandb_name: str = None,
     log_gifs: bool = _DEFAULTS.log.gifs,
     log_imgs: bool = _DEFAULTS.log.imgs,
     log_hists: bool = _DEFAULTS.log.hists,
@@ -95,11 +89,6 @@ def corner(
     evals_num_levels: int = _DEFAULTS.eval.num_levels,
     gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
     level_splayer: str = 'mouse',           # or 'cheese' or 'cheese-and-mouse'
-    # checkpointing
-    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
     seed: int = _DEFAULTS.seed,
 ):
@@ -269,7 +258,6 @@ def corner(
     )
 
 
-@util.wandb_run
 def dish(
     # environment config
     env_size: int = 13,
@@ -321,11 +309,6 @@ def dish(
     num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
     console_log: bool = _DEFAULTS.log.console,
-    wandb_log: bool = _DEFAULTS.log.wandb,
-    wandb_project: str = "test",
-    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
-    wandb_group: str = None,
-    wandb_name: str = None,
     log_gifs: bool = _DEFAULTS.log.gifs,
     log_imgs: bool = _DEFAULTS.log.imgs,
     log_hists: bool = _DEFAULTS.log.hists,
@@ -336,11 +319,6 @@ def dish(
     evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
     evals_num_levels: int = _DEFAULTS.eval.num_levels,
     gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
-    # checkpointing
-    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
     seed: int = _DEFAULTS.seed,
 ):
@@ -511,7 +489,6 @@ def dish(
     )
 
 
-@util.wandb_run
 def keys(
     # environment config
     env_size: int = 15,
@@ -562,11 +539,6 @@ def keys(
     num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
     console_log: bool = _DEFAULTS.log.console,
-    wandb_log: bool = _DEFAULTS.log.wandb,
-    wandb_project: str = "keys_demo",
-    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
-    wandb_group: str = None,
-    wandb_name: str = None,
     log_gifs: bool = _DEFAULTS.log.gifs,
     log_imgs: bool = _DEFAULTS.log.imgs,
     log_hists: bool = _DEFAULTS.log.hists,
@@ -577,11 +549,6 @@ def keys(
     evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
     evals_num_levels: int = _DEFAULTS.eval.num_levels,
     gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
-    # checkpointing
-    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
     seed: int = _DEFAULTS.seed,
 ):
@@ -786,7 +753,6 @@ def keys(
     )
 
 
-@util.wandb_run
 def minimaze(
     # environment config
     env_size: int = 15,
@@ -833,11 +799,6 @@ def minimaze(
     num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
     console_log: bool = _DEFAULTS.log.console,
-    wandb_log: bool = _DEFAULTS.log.wandb,
-    wandb_project: str = "test",
-    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
-    wandb_group: str = None,
-    wandb_name: str = None,
     log_gifs: bool = _DEFAULTS.log.gifs,
     log_imgs: bool = _DEFAULTS.log.imgs,
     log_hists: bool = _DEFAULTS.log.hists,
@@ -848,11 +809,6 @@ def minimaze(
     evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
     evals_num_levels: int = _DEFAULTS.eval.num_levels,
     gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
-    # checkpointing
-    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
     seed: int = _DEFAULTS.seed,
 ):
@@ -980,7 +936,6 @@ def minimaze(
     )
 
 
-@util.wandb_run
 def follow(
     # environment config
     env_size: int = 15,
@@ -1028,11 +983,6 @@ def follow(
     num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
     console_log: bool = _DEFAULTS.log.console,
-    wandb_log: bool = _DEFAULTS.log.wandb,
-    wandb_project: str = "followme_demo",
-    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
-    wandb_group: str = None,
-    wandb_name: str = None,
     log_gifs: bool = _DEFAULTS.log.gifs,
     log_imgs: bool = _DEFAULTS.log.imgs,
     log_hists: bool = _DEFAULTS.log.hists,
@@ -1043,11 +993,6 @@ def follow(
     evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
     evals_num_levels: int = _DEFAULTS.eval.num_levels,
     gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
-    # checkpointing
-    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
     seed: int = _DEFAULTS.seed,
 ):
@@ -1136,7 +1081,6 @@ def follow(
     )
 
 
-@util.wandb_run
 def lava(
     # environment config
     env_size: int = 15,
@@ -1184,11 +1128,6 @@ def lava(
     num_parallel_envs: int = _DEFAULTS.collect.num_parallel_envs,
     # logging and evals config
     console_log: bool = _DEFAULTS.log.console,
-    wandb_log: bool = _DEFAULTS.log.wandb,
-    wandb_project: str = "lavaland_demo",
-    wandb_entity: str = None,               # e.g. 'krueger-lab-cambridge'
-    wandb_group: str = None,
-    wandb_name: str = None,
     log_gifs: bool = _DEFAULTS.log.gifs,
     log_imgs: bool = _DEFAULTS.log.imgs,
     log_hists: bool = _DEFAULTS.log.hists,
@@ -1199,11 +1138,6 @@ def lava(
     evals_num_env_steps: int = _DEFAULTS.eval.num_env_steps,
     evals_num_levels: int = _DEFAULTS.eval.num_levels,
     gif_grid_width: int = _DEFAULTS.log.gif_grid_width,
-    # checkpointing
-    checkpointing: bool = _DEFAULTS.ckpt.enabled,             # keep checkpoints? (default: yes)
-    keep_all_checkpoints: bool = _DEFAULTS.ckpt.keep_all,     # if so: keep all of them? (no)
-    max_num_checkpoints: int = _DEFAULTS.ckpt.max_num,           # if not: keep only latest n (=1)
-    num_cycles_per_checkpoint: int = _DEFAULTS.ckpt.num_cycles_per,
     # other
     seed: int = _DEFAULTS.seed,
 ):

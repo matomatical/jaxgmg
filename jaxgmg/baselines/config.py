@@ -73,21 +73,12 @@ class EvalConfig:
 @dataclass(frozen=True)
 class LogConfig:
     console: bool = True
-    wandb: bool = True
     gifs: bool = False
     imgs: bool = True
     hists: bool = False
     num_cycles_per_log: int = 32
     num_cycles_per_gifs: int = 1024
     gif_grid_width: int = 16
-
-
-@dataclass(frozen=True)
-class CheckpointConfig:
-    enabled: bool = True
-    keep_all: bool = False
-    max_num: int = 1
-    num_cycles_per: int = 512
 
 
 @dataclass(frozen=True)
@@ -99,7 +90,6 @@ class TrainConfig:
     collect: CollectConfig = field(default_factory=CollectConfig)
     eval: EvalConfig = field(default_factory=EvalConfig)
     log: LogConfig = field(default_factory=LogConfig)
-    ckpt: CheckpointConfig = field(default_factory=CheckpointConfig)
 
     @staticmethod
     def from_cli(flat: dict) -> "TrainConfig":
@@ -157,18 +147,11 @@ class TrainConfig:
             ),
             log=LogConfig(
                 console=g("console_log", D.log.console),
-                wandb=g("wandb_log", D.log.wandb),
                 gifs=g("log_gifs", D.log.gifs),
                 imgs=g("log_imgs", D.log.imgs),
                 hists=g("log_hists", D.log.hists),
                 num_cycles_per_log=g("num_cycles_per_log", D.log.num_cycles_per_log),
                 num_cycles_per_gifs=g("num_cycles_per_gifs", D.log.num_cycles_per_gifs),
                 gif_grid_width=g("gif_grid_width", D.log.gif_grid_width),
-            ),
-            ckpt=CheckpointConfig(
-                enabled=g("checkpointing", D.ckpt.enabled),
-                keep_all=g("keep_all_checkpoints", D.ckpt.keep_all),
-                max_num=g("max_num_checkpoints", D.ckpt.max_num),
-                num_cycles_per=g("num_cycles_per_checkpoint", D.ckpt.num_cycles_per),
             ),
         )

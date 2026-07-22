@@ -1,6 +1,5 @@
 """
-Configuring various kinds of evaluations that can be run on checkpoints or
-during training.
+Configuring various kinds of evaluations that can be run during training.
 """
 
 import functools

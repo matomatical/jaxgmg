@@ -28,30 +28,29 @@
 * Research-enabling speed vs. bottom-up quality: bottom-up wins on balance;
   new reward-function research starts after the port.
 
-## Pre-arc: cut wandb (on `cleanup2`)
+## Pre-arc: cut wandb + orbax checkpointing (on `cleanup2`) — DONE 2026-07-22
 
-Scope (from a grep audit, 2026-07-22):
+Decision: option (b) — checkpointing was coupled to wandb (saved into
+`wandb.run.dir`, force-disabled without it), equally untested, and gets
+rebuilt on strux in Phase 3, so it went too. What was cut:
 
-* `util.py`: `wandb_img`, `wandb_gif`, `wandb_flatten_and_wrap_metrics`,
-  `wandb_run` decorator, `wandb_define_metrics` (~180 lines).
-* `cli/train.py`: `@util.wandb_run` + five `wandb_*` args on each of the 6
-  train commands.
-* `baselines/train.py`: the wandb logging branch of the train loop, metric
-  definitions, end-of-run `wandb.save`.
-* `baselines/config.py`: `log.wandb` flag; the gif/img/hist logging levers
-  feed wandb-only sinks and go with it.
-* `baselines/evaluate.py`: stray unused `import wandb`.
-* `pyproject.toml`: the dependency.
+* `util.py`: the whole wandb section (`wandb_img`, `wandb_gif`,
+  `wandb_flatten_and_wrap_metrics`, `wandb_run` decorator,
+  `wandb_define_metrics`) plus the now-orphaned `flatten_dict` helper.
+* `cli/train.py`: `@util.wandb_run` + five `wandb_*` args + four
+  checkpointing args on each of the 6 train commands.
+* `baselines/train.py`: the wandb logging branch, metric definitions,
+  checkpointer init/save/finish blocks.
+* `baselines/config.py`: `log.wandb` flag and the `CheckpointConfig` /
+  `TrainConfig.ckpt` node. (The gif/img/hist levers STAY — they also drive
+  console rendering via `filter_and_render_metrics`, not just wandb.)
+* `cli/eval.py` + `baselines/evaluate.py` deleted (the `jaxgmg eval` command
+  existed only to load orbax checkpoints; recoverable from git history).
+* `pyproject.toml`: `wandb` and `orbax-checkpoint` dependencies dropped
+  (and uninstalled from the venv).
 
-**Coupling to resolve:** checkpointing writes to `wandb.run.dir` and is
-force-disabled when wandb is off (`baselines/train.py:301–307`). Options:
-(a) redirect checkpoints to a local run directory (small change, keeps
-checkpointing usable for interim GPU runs); (b) cut orbax checkpointing too
-(it's equally untested and gets rebuilt on strux in Phase 3 anyway).
-**Decision: TBD.**
-
-The train smoke tests already run with wandb off, so the suite should stay
-green through this cut.
+Verified: full suite green (139 passed) and all six `jaxgmg train *` help
+screens build with the packages uninstalled.
 
 ## Phase 0 — scaffolding
 
@@ -133,8 +132,8 @@ ported and green.
 
 ## Open questions (running list)
 
-1. Pre-arc wandb cut: keep checkpointing via a local run dir, or cut orbax
-   checkpointing too?
+1. ~~Pre-arc wandb cut: keep checkpointing via a local run dir, or cut orbax
+   checkpointing too?~~ Resolved: cut both (see pre-arc section).
 2. Engine subpackage/repo name ("gg"? "gridgames"? something else?).
 3. Which non-paper environments make the cut in Phase 2.
 4. wandb replacement (deferred by design).

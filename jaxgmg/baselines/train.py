@@ -1,21 +1,16 @@
 """
 Run proximal policy optimisation with unsupervised environment design for a
-given network, environment, and set of training/eval levels. Integrated with
-wandb.
+given network, environment, and set of training/eval levels.
 """
 
 import collections
-import functools
 import time
-import os
 
 import jax
 from flax.training.train_state import TrainState
 import optax
-import orbax.checkpoint as ocp
 
 import tqdm
-import wandb
 
 from jaxgmg import util
 from jaxgmg.baselines.config import TrainConfig
@@ -85,7 +80,6 @@ def run(
     num_env_steps_per_cycle = config.collect.num_env_steps_per_cycle
     num_parallel_envs = config.collect.num_parallel_envs
     console_log = config.log.console
-    wandb_log = config.log.wandb
     log_gifs = config.log.gifs
     log_imgs = config.log.imgs
     log_hists = config.log.hists
@@ -96,10 +90,6 @@ def run(
     evals_num_env_steps = config.eval.num_env_steps
     evals_num_levels = config.eval.num_levels
     gif_grid_width = config.log.gif_grid_width
-    checkpointing = config.ckpt.enabled
-    keep_all_checkpoints = config.ckpt.keep_all
-    max_num_checkpoints = config.ckpt.max_num
-    num_cycles_per_checkpoint = config.ckpt.num_cycles_per
 
     # deriving some additional config variables
     num_total_env_steps_per_cycle = num_env_steps_per_cycle * num_parallel_envs
@@ -297,26 +287,6 @@ def run(
     print("  number of parameters:", param_count)
 
 
-    # initialise the checkpointer
-    if checkpointing and not wandb_log:
-        print("WARNING: checkpointing requested without wandb logging.")
-        print("WARNING: disabling checkpointing!")
-        checkpointing = False
-    elif checkpointing:
-        print("initialising the checkpointer...")
-        checkpoint_path = os.path.join(wandb.run.dir, "checkpoints/")
-        max_to_keep = None if keep_all_checkpoints else max_num_checkpoints
-        checkpoint_manager = ocp.CheckpointManager(
-            directory=checkpoint_path,
-            options=ocp.CheckpointManagerOptions(
-                max_to_keep=max_to_keep,
-                save_interval_steps=num_cycles_per_checkpoint,
-            ),
-        )
-    # TODO: Would be a good idea to checkpoint the training levels and eval
-    # levels...
-
-
     # set up optimiser
     print("setting up optimiser...")
     if ppo_lr_annealing:
@@ -365,7 +335,7 @@ def run(
     step_counts = collections.defaultdict(int)
     for t in range(num_total_cycles):
         rng_t, rng_train = jax.random.split(rng_train)
-        log_cycle = (console_log or wandb_log) and t % num_cycles_per_log == 0
+        log_cycle = console_log and t % num_cycles_per_log == 0
         if log_cycle:
             metrics = collections.defaultdict(dict)
         
@@ -502,23 +472,8 @@ def run(
             })
 
 
-        # define undefined metrics
-        if wandb_log:
-            wandb.define_metric("step/env-step-all-after")
-            wandb.define_metric("step/ppo-update-after")
-            util.wandb_define_metrics(
-                example_metrics=metrics,
-                step_metric_prefix_mapping={
-                    "train": "step/env-step-all-after",
-                    "eval": "step/env-step-all-after",
-                    "ued": "step/env-step-all-after",
-                    "ppo": "step/ppo-update-after",
-                },
-            )
-
-
-        # periodic logging to console/wandb
-        if log_cycle and console_log:
+        # periodic logging to console
+        if log_cycle:
             metrics_str = util.filter_and_render_metrics(
                 metrics,
                 include_gifs=log_gifs,
@@ -526,20 +481,6 @@ def run(
                 include_hists=log_hists,
             )
             progress.write(f'{"="*59}\n{metrics_str}\n{"="*59}')
-        if log_cycle and wandb_log:
-            data = util.wandb_flatten_and_wrap_metrics(
-                metrics,
-                include_gifs=log_gifs,
-                include_imgs=log_imgs,
-                include_hists=log_hists,
-            )
-            wandb.log(step=t, data=data)
-
-        
-        # periodic checkpointing
-        if checkpointing and t % num_cycles_per_checkpoint == 0:
-            progress.write("saving checkpoint (wandb will sync at end of run)...")
-            checkpoint_manager.save(t, args=ocp.args.PyTreeSave(train_state.params))
 
 
         # ending cycle
@@ -549,16 +490,6 @@ def run(
     # ending run
     progress.close()
     print("training run complete.")
-
-
-    if checkpointing:
-        print("finishing checkpoints...")
-        checkpoint_manager.wait_until_finished()
-        checkpoint_manager.close()
-        # for some reason I have to manually save these files (I thought
-        # they would be automatically saved since I put them in the run dir,
-        # and the docs say this, but it doesn't seem to be the case...)
-        wandb.save(checkpoint_path + "/**", base_path=wandb.run.dir)
 
     # return the trained parameters (fire-and-forget for the CLI, but lets the
     # integration smoke test inspect the result).

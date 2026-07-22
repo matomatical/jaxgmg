@@ -29,7 +29,6 @@ from jaxgmg.cli import solve
 from jaxgmg.cli import speedtest
 from jaxgmg.cli import splay
 from jaxgmg.cli import train
-from jaxgmg.cli import eval
 
 
 # # #
@@ -226,15 +225,4 @@ app.add_typer(make_typer_app(
         #train.scatter,
     ),
 ))
-
-
-# evaluation of checkpoints
-app.add_typer(make_typer_app(
-    name='eval',
-    help=eval.__doc__,
-    subcommands=(
-        eval.corner,
-    ),
-))
-
 

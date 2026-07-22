@@ -348,11 +348,12 @@ line. To see the API for running an experiment, run:
 jaxgmg train corner --help
 ```
 
-Include the flag `--wandb-log` to log results to wandb, etc.
+Training metrics are logged to the console; experiment-tracker integration
+(previously wandb) and checkpointing were removed pending the rewrite.
 
 > [!NOTE]
-> The `jaxgmg eval` and `jaxgmg heatmaps` analysis commands are currently
-> specific to Cheese in the Corner.
+> The `jaxgmg heatmaps` analysis command is currently specific to Cheese in
+> the Corner.
 
 
 Roadmap: Towards jaxgmg 1.0

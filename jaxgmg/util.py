@@ -1,9 +1,8 @@
 """
-Utilities for transforming data or rendering it to strings/stdout/disk/wandb
+Utilities for transforming data or rendering it to strings/stdout/disk
 in support of jaxgmg CLI application and training scripts.
 """
 
-import functools
 import os
 import datetime
 import numpy as np
@@ -11,7 +10,6 @@ import jax
 import jax.numpy as jnp
 import einops
 import PIL.Image as pillow
-import wandb
 import json
 
 
@@ -110,17 +108,6 @@ def filter_and_render_metrics(
 
 # # # 
 # Transforming dictionaries
-
-
-def flatten_dict(nested_dict, separator='/'):
-    merged_dict = {}
-    for key, inner_dict in nested_dict.items():
-        if isinstance(inner_dict, dict):
-            for inner_key, value in flatten_dict(inner_dict).items():
-                merged_dict[key + separator + inner_key] = value
-        else:
-            merged_dict[key] = inner_dict
-    return merged_dict
 
 
 def linearise_dict(dct):
@@ -233,188 +220,6 @@ def save_gif(
         duration=1000 // fps,
         loop=1-repeat, # 1 = loop once, 0 = loop forever
     )
-
-
-# # #
-# wandb wrappers and formatting functions
-
-
-def wandb_img(image):
-    """
-    Format a gif as a video for wandb.
-
-    Parameters:
-
-    * image : float[h, w, rgb]
-            RGB floats each channel in range [0,1].
-
-    Returns:
-
-    * image : wandb.Image (contains uint8[h, w, c]).
-            RGB Image including this data in the required format.
-
-    """
-    return wandb.Image(
-        np.asarray(
-            255 * image,
-            dtype=np.uint8,
-        ),
-    )
-
-
-def wandb_gif(frames, fps=12):
-    """
-    Format a gif as a video for wandb.
-
-    Parameters:
-
-    * frames : float[t h w c]
-            RGB floats each channel in range [0,1].
-    * fps : int = 12
-            Frames per second for the wandb video.
-
-    Returns:
-
-    * video : wandb.Video (contains uint8[t c h w]).
-            RGB video including this data in the required format.
-
-    """
-    return wandb.Video(
-        np.asarray(
-            255 * einops.rearrange(frames, 't h w c -> t c h w'),
-            dtype=np.uint8,
-        ),
-        fps=fps,
-    )
-            
-
-def wandb_flatten_and_wrap_metrics(
-    metrics,
-    include_gifs: bool,
-    include_imgs: bool,
-    include_hists: bool,
-):
-    """
-    W&B expects certain data to be wrapped with their custom wrappers,
-    namely histograms, images, and videos. Also, nested dictionaries should
-    be flattened. This function prepares a nested dictionary with key
-    suffixes indicated the type for sending to wandb.
-    """
-    metrics_flat = flatten_dict(metrics)
-    metrics_wandb = {}
-    for key, val in metrics_flat.items():
-        if key.endswith("_hist"):
-            if include_hists:
-                metrics_wandb[key] = wandb.Histogram(val)
-        elif key.endswith("_gif"):
-            if include_gifs:
-                metrics_wandb[key] = wandb_gif(val)
-        elif key.endswith("_img"):
-            if include_imgs:
-                metrics_wandb[key] = wandb_img(val)
-        else:
-            metrics_wandb[key] = val
-    return metrics_wandb
-
-
-# # # 
-# Training run file/wandb management
-
-
-def wandb_run(f):
-    """
-    Decorator to initialise (and finish) wandb runs associated with a
-    function, while syncing the keyword arguments of the function and the
-    wandb run config.
-
-    With this you can write functions that are configured by their arguments
-    rather than a `config` dictionary. In turn this allows using annotation-
-    based CLI generators like Typer or plac to neatly call the function from
-    the command line.
-    
-    The function `f` must satisfy some mild requirements:
-
-    1. The function *must* have at least one keyword argument `wandb_log`,
-       a Boolean indicating whether to activate wandb. The wrapper will call
-       `wandb.init` if and only if this argument is True, and accordingly the
-       function should only call `wandb.log` in this case.
-    
-    2. The function *may* have additional keyword arguments matching those of
-       `wandb.init` (https://docs.wandb.ai/ref/python/init) with an
-       additional prefix `wandb_`. These arguments will be passed to
-       `wandb.init`.
-
-       For example, if there is an argument `wandb_project` then `wandb.init`
-       will be called with `project` set to its value.
-
-       Note: not all `wandb_init` parameters are supported right now, check
-       source code; it's pretty easy to add more.
-
-    Note: The function can include positional arguments, but these are not
-    passed to wandb.init.
-    """
-    @functools.wraps(f)
-    def g(*args, **kwargs):
-        if kwargs['wandb_log']:
-            wandb.require("core")
-            # convert kwargs into config dictionary
-            # exclude those that are passed to the init function directly
-            config = wandb.helper.parse_config(
-                kwargs,
-                exclude=(
-                    'wandb_log',
-                    'wandb_entity',
-                    'wandb_project',
-                    'wandb_group',
-                    'wandb_name',
-                    'wandb_notes',
-                    'wandb_tags',
-                    'wandb_config_exclude_keys',
-                    'wandb_config_include_keys',
-                    *kwargs.get('wandb_config_exclude_keys', ()),
-                ),
-                include=[
-                    *kwargs.get('wandb_config_include_keys', ()),
-                ],
-            )
-            with wandb.init(
-                config=config,
-                # locate / describe the run
-                entity=kwargs.get('wandb_entity', None),
-                project=kwargs.get('wandb_project', None),
-                group=kwargs.get('wandb_group', None),
-                name=kwargs.get('wandb_name', None),
-                notes=kwargs.get('wandb_notes', None),
-                tags=kwargs.get('wandb_tags', None),
-            ):
-                # for the function call, update kwargs with any changes from wandb
-                # (e.g. during sweeps) before passing to the run function
-                kwargs.update(wandb.config)
-                return f(*args, **kwargs)
-        else:
-            return f(*args, **kwargs)
-    return g
-
-
-_global_defined_metrics = set()
-
-
-def wandb_define_metrics(
-    example_metrics: dict,
-    step_metric_prefix_mapping: str,
-):
-    global _global_defined_metrics
-    for metric_name in flatten_dict(example_metrics):
-        if metric_name in _global_defined_metrics:
-            continue
-        for prefix in step_metric_prefix_mapping:
-            if metric_name.startswith(prefix):
-                wandb.define_metric(
-                    metric_name,
-                    step_metric=step_metric_prefix_mapping[prefix],
-                )
-                _global_defined_metrics.add(metric_name)
-                break
 
 
 # # # 

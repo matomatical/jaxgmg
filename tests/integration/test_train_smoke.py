@@ -8,8 +8,6 @@ correctly-structured parameters.
 This is the safety net for the Phase-3 config refactor. Everything is kept tiny
 so we can leave eval / metrics / logging turned ON (exercising the eval, level
 metrics, classifier and console-render paths) while still running in seconds.
-wandb is OFF (console logging drives that path without it); checkpointing is OFF
-(the backend is slated for replacement).
 """
 
 import numpy as np
@@ -21,7 +19,7 @@ import pytest
 from jaxgmg.baselines import train
 from jaxgmg.baselines.config import (
     TrainConfig, NetConfig, PPOConfig, UEDConfig, CollectConfig,
-    EvalConfig, LogConfig, CheckpointConfig,
+    EvalConfig, LogConfig,
 )
 from jaxgmg.environments import cheese_in_the_corner as corner
 from jaxgmg.procgen import maze_generation
@@ -53,8 +51,7 @@ def _tiny_corner_builders(mutator=None):
 
 
 def _tiny_config(ued, regret_estimator='maxmc-actor'):
-    """A tiny TrainConfig: 3 cycles of 8x8 = 192 env steps. Logging/eval ON,
-    wandb/checkpoint OFF."""
+    """A tiny TrainConfig: 3 cycles of 8x8 = 192 env steps. Logging/eval ON."""
     return TrainConfig(
         seed=0,
         net=NetConfig(cnn_type='mlp', rnn_type='ff', width=16),
@@ -78,11 +75,8 @@ def _tiny_config(ued, regret_estimator='maxmc-actor'):
             num_env_steps=8, num_levels=4,
         ),
         log=LogConfig(
-            console=True, wandb=False, gifs=False, imgs=False, hists=False,
+            console=True, gifs=False, imgs=False, hists=False,
             num_cycles_per_log=1, num_cycles_per_gifs=1000, gif_grid_width=2,
-        ),
-        ckpt=CheckpointConfig(
-            enabled=False, keep_all=False, max_num=1, num_cycles_per=1000,
         ),
     )
 

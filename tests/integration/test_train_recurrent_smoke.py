@@ -29,7 +29,7 @@ import pytest
 from jaxgmg.baselines import train
 from jaxgmg.baselines.config import (
     TrainConfig, NetConfig, PPOConfig, UEDConfig, CollectConfig,
-    EvalConfig, LogConfig, CheckpointConfig,
+    EvalConfig, LogConfig,
 )
 from jaxgmg.environments import minigrid_maze
 
@@ -59,7 +59,7 @@ def _tiny_memory_builders():
 
 def _tiny_recurrent_config(rnn_type):
     """A tiny TrainConfig with a recurrent cell: 3 cycles of 16x8 = 384 env
-    steps. Logging ON (drives train-metric logging), eval/wandb/checkpoint OFF."""
+    steps. Logging ON (drives train-metric logging), eval OFF."""
     return TrainConfig(
         seed=0,
         net=NetConfig(cnn_type='mlp', rnn_type=rnn_type, width=16),
@@ -83,11 +83,8 @@ def _tiny_recurrent_config(rnn_type):
             num_env_steps=8, num_levels=4,
         ),
         log=LogConfig(
-            console=True, wandb=False, gifs=False, imgs=False, hists=False,
+            console=True, gifs=False, imgs=False, hists=False,
             num_cycles_per_log=1, num_cycles_per_gifs=1000, gif_grid_width=2,
-        ),
-        ckpt=CheckpointConfig(
-            enabled=False, keep_all=False, max_num=1, num_cycles_per=1000,
         ),
     )
 
