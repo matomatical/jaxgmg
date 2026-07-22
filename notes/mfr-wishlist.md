@@ -18,6 +18,21 @@ Some musings on some things I want to eventually do with the rewrite.
   * We should switch from using typer to tyro for CLI.
   * We should switch from using orbax-checkpoint to strux for checkpointing.
   * We eventually want to switch from wandb to something different.
+* [vamp] Was unsure how much to unify the environment mechanics. I now think we
+  could have a module that handles both types of mazes (fully observable udlr,
+  partially observable forward/turn movement), including step functions and
+  rendering given sprites, maybe some generic support for object interaction
+  and inventory (unsure), plus procedural generation and solving of
+  mazes/gridworlds themselves, all bundled together with no particular
+  environment rules like the num keys or chests or thougths about termination
+  and rewards; a little JAX game engine that makes sense by itself. The
+  environments can 'import gridgames as gg' and fill in the environment
+  distribution / RL API with the specifics for each environment. This I think I
+  would be satisfied with. The difference from refactoring this to some shared
+  blob within jaxgmg is that gg can aim to be more general and reusable by
+  other projects involving game simulation, not just goal misgeneralisation.
+  Thinking about it this way may also suggest features and demos that belong in
+  gg that would make this library complete by itself.[/vamp]
 * Testing:
   * Complex JAX algorithms like procedural generation, maze solving, reward
     accumulation, GAE, etc., need tests. Edge cases of environment termination
@@ -33,13 +48,13 @@ Some musings on some things I want to eventually do with the rewrite.
   * **Parallel + robust PLR baseline** (my implementation of the variant
     proposed in the minimax paper, `~/agents/papers/Jiang+2023-minimax`).
     Rebuild cleanly rather than porting — the old version duplicated most of
-    `plr.py`. The distinctive behaviour to preserve: `get_batch` returns
-    `2 * num_levels` levels (a `replay` batch *and* a `new` batch), rollouts +
-    UED buffer updates run on **all** of them, but PPO trains on **only** the
-    first `num_levels` (the replay ones). i.e. collect experience in parallel
-    from both batches, but keep the "robust" property of training on replay
-    only. (The old module carried this as a decommissioned `NotImplementedError`
-    stub with a training-loop integration snippet in its docstring.)
+    `plr.py`. The distinctive behaviour to preserve: `get_batch` returns `2 *
+    num_levels` levels (a `replay` batch *and* a `new` batch), rollouts + UED
+    buffer updates run on **all** of them, but PPO trains on **only** the first
+    `num_levels` (the replay ones). i.e. collect experience in parallel from
+    both batches, but keep the "robust" property of training on replay only.
+    (The old module carried this as a decommissioned `NotImplementedError` stub
+    with a training-loop integration snippet in its docstring.)
   * **JaxUED-conformant environment wrapper** for interop with external UED
     baselines (wraps our `Env`/`Level` in jaxued's `UnderspecifiedEnv` API).
     Will need a comprehensive rewrite; deleting the old wrapper also lets us

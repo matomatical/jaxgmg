@@ -330,14 +330,16 @@ unsupervised environment design (UED) baselines — domain randomisation (DR),
 robust prioritised level replay (PLR⊥), and ACCEL — used to study goal
 misgeneralisation. These are the baselines behind the paper:
 
-> Sadek, Farrugia-Roberts, Anwar, Erlebach, Schroeder de Witt, Krueger, and
-> Dennis. *Mitigating Goal Misgeneralization via Minimax Regret.* RLC 2025
+> Karim Abdel Sadek, Matthew Farrugia-Roberts, Usman Anwar, Hannah Erlebach,
+> Christian Schroeder de Witt, David Krueger, and Michael Dennis. *Mitigating
+> Goal Misgeneralization via Minimax Regret.* RLC 2025
 > ([arXiv:2507.03068](https://arxiv.org/abs/2507.03068)).
 
-Training is supported for the three environments studied in the paper —
-**Cheese in the Corner**, **Cheese on a Dish**, and **Keys and Chests** — via
-`jaxgmg train {corner,dish,keys}`. Commands for a few other environments
-(`follow`, `lava`, `minimaze`) also exist but are currently unmaintained.
+Training is supported for the three environments studied in the
+paper---**Cheese in the Corner**, **Cheese on a Dish**, and **Keys and
+Chests**---via `jaxgmg train {corner,dish,keys}`. Commands for a few other
+environments (`follow`, `lava`, `minimaze`) also exist but are currently
+unmaintained.
 
 Most environment and training hyperparameters can be set from the command
 line. To see the API for running an experiment, run:
