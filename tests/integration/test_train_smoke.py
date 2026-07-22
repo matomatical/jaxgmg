@@ -27,7 +27,7 @@ from jaxgmg.environments import cheese_in_the_corner as corner
 from jaxgmg.procgen import maze_generation
 
 
-def _tiny_corner_builders():
+def _tiny_corner_builders(mutator=None):
     """The environment-specific objects run() needs, tiny + fast, evals wired up."""
     env = corner.Env(
         penalize_time=False,
@@ -42,7 +42,7 @@ def _tiny_corner_builders():
     return dict(
         env=env,
         train_level_generator=gen,
-        level_mutator=None,           # DR/PLR don't need one
+        level_mutator=mutator,        # DR/PLR don't need one; ACCEL does
         level_solver=corner.LevelSolver(env=env, discount_rate=0.99),
         level_metrics=corner.LevelMetrics(env=env, discount_rate=0.99),
         eval_level_generators={'eval': gen},                 # one small eval batch
@@ -52,7 +52,7 @@ def _tiny_corner_builders():
     )
 
 
-def _tiny_config(ued):
+def _tiny_config(ued, regret_estimator='maxmc-actor'):
     """A tiny TrainConfig: 3 cycles of 8x8 = 192 env steps. Logging/eval ON,
     wandb/checkpoint OFF."""
     return TrainConfig(
@@ -66,7 +66,7 @@ def _tiny_config(ued):
         ),
         ued=UEDConfig(
             method=ued, prob_shift=0.0, num_train_levels=16,
-            regret_estimator='maxmc-actor', robust=False, buffer_size=16,
+            regret_estimator=regret_estimator, robust=False, buffer_size=16,
             temperature=1.0, staleness_coeff=0.1, prob_replay=0.5,
         ),
         collect=CollectConfig(
@@ -100,6 +100,21 @@ def _assert_finite_params(train_state):
 @pytest.mark.parametrize("ued", ["dr", "plr"])
 def test_train_run_completes_with_finite_params(ued):
     train_state = train.run(_tiny_config(ued), **_tiny_corner_builders())
+    _assert_finite_params(train_state)
+
+
+@pytest.mark.parametrize("ued", ["plr", "accel"])
+def test_train_run_oracle_actor_completes_with_finite_params(ued):
+    # The oracle-latest estimator path: run() threads the configured level_solver
+    # into the curriculum, which solves each batch (buffer.oracle_returns) to
+    # score levels. This exercises that wiring end-to-end under the full loop for
+    # both buffer-based curricula (issue #11). ACCEL additionally needs a mutator,
+    # so this is also the only integration coverage of the ACCEL training path.
+    mutator = corner.ToggleWallLevelMutator() if ued == "accel" else None
+    train_state = train.run(
+        _tiny_config(ued, regret_estimator='oracle-actor'),
+        **_tiny_corner_builders(mutator=mutator),
+    )
     _assert_finite_params(train_state)
 
 
