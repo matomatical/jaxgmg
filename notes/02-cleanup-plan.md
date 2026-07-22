@@ -257,6 +257,59 @@ Stand up `tests/` (none exists) with pytest, CPU-only JAX. Cover the ranked tric
   scripts are incomplete and of historical interest only — no need to archive in-tree
   (git history preserves them).
 
+> **Phase 5 — SKIPPED (Matthew, 2026-07-22).** The shared-gridworld-base
+> extraction is deferred to the rewrite. Rationale: (i) the env API is slated
+> for a from-scratch rewrite (reward functions as first-class objects), so a
+> deep flax-coupled `base.Env` extraction now is largely work the port undoes;
+> (ii) deleting `cheese_on_a_pile` in Phase 2 reduced the cheese family to a
+> 2-way corner↔dish duplication (was 3-way), shrinking the payoff. Cheap/safe
+> de-dup, if any, happens in the rewrite where the env structure is reshaped.
+
+> **Status (2026-07-22).** Phase 6 **done** (lean scope, decided w/ Matthew;
+> suite green: 139 passed, 0 xfailed throughout). Much of the original Phase-6
+> surface had already been resolved as a side effect of Phases 3–4, so this was
+> mostly deletion + documentation + decisions:
+> - **`scripts/` + `jobs/` deleted** (34 files; git-recoverable).
+> - **Issue #14 already largely resolved earlier:** the proxy-solver duck-typing
+>   (proxy machinery removed, Phase 3 follow-up), `scoring_method_override`
+>   (removed, Phase 3), and the `splay_*` reconcile (onto `splayer_from_name`,
+>   Phase 3 follow-up) were all done before this phase. The one live remainder —
+>   `regret_estimator` (CLI/config) vs `scoring_method` (internal) — turned out
+>   to be a **deliberate, sensible layering**, not drift: the internal umbrella
+>   is intentionally general because not every method estimates regret (`absgae`
+>   is an L1 value loss, `dro-actor` a DRO objective), and Matthew expects to add
+>   further non-regret scoring methods. So we **kept both names** and documented
+>   the split (scores.py docstring + train.py handoff comment). No rename.
+> - **Issue #13 (typed enums) — DEFERRED to the rewrite** (decided): `ued` /
+>   estimator / splayer already validate at dispatch (else/`case _` → ValueError)
+>   and the `match ued` duplication had already collapsed to a single dispatch in
+>   Phase 3. The only added value of enums is tyro-friendly CLI choices — exactly
+>   the typer→tyro CLI layer the port redoes. Not worth the churn now.
+> - **Demo surface (scope #5):** kept as-is (crashers already fixed in Phase 2);
+>   **documented** that `eval`/`heatmaps` are corner-specific rather than
+>   generalizing them (rewrite territory).
+> - **`__init__.py` — no-op after inspection:** `graphics/__init__.py` is
+>   load-bearing (defines `LevelOfDetail`/`load_spritesheet` + bundles the
+>   spritesheet PNG resources, imported by `environments/base.py`); the other
+>   subpackages are namespace packages *by design* (no package-level code). So
+>   the apparent inconsistency is justified — nothing to add or remove.
+> - **README refreshed** (light, accurate — not a rewrite): fixed the stale
+>   "only Cheese in the Corner" RL-baselines claim, added the paper citation
+>   (Sadek et al., RLC 2025, arXiv:2507.03068), documented the eval/heatmaps
+>   limitation, and ticked the two completed roadmap items. Public-facing wording
+>   flagged for Matthew's review before pushing.
+> - **Known remaining (out of cleanup scope):** `base.LevelSolver.level_value`
+>   carries a pre-existing `TODO` (takes a `level` arg it should read from the
+>   soln); left for the rewrite's solver-API redesign.
+
+## Cleanup complete (2026-07-22)
+
+All six phases resolved (Phase 5 intentionally skipped; see above). The bug log
+(`03-bug-log.md`) is fully closed. Suite: 139 passed, 0 xfailed, CPU-only. The
+science core is tested and the debt targeted by this pass is cleared; the deeper
+env-API and dependency-stack work is left to the planned rewrite
+(`mfr-wishlist.md`).
+
 ## Test strategy (the "tricky parts")
 
 Tooling: `pytest`, JAX on CPU (`JAX_PLATFORM_NAME=cpu`), tiny fixtures (3×3–7×7 mazes),
