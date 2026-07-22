@@ -36,8 +36,12 @@ def plr_compute_scores(
     Inputs:
 
     * scoring_method : str (static)
-            One of a specific number of scoring methods. Usually this the
-            name of a regret estimator. See below for a list of methods.
+            Which level-scoring method to use. The CLI/config surface calls
+            this the "regret estimator" (the paper's framing), but internally
+            it is deliberately the more general "scoring method": most methods
+            estimate regret, but some do not (e.g. `absgae` is an L1 value loss
+            and `dro-actor` a distributionally-robust objective), and we may
+            add further non-regret methods. See below for the full list.
     * rollouts : Rollout[num_levels] with Transition[num_steps].
             The experience data from which the scores should be computed.
     * max_ever_returns : float[num_levels]

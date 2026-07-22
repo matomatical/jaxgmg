@@ -139,7 +139,8 @@ def run(
             # replay dynamics
             robust=plr_robust,
             prob_replay=plr_prob_replay,
-            # scoring
+            # scoring (the CLI's `regret_estimator` is the internal, more
+            # general `scoring_method` — see scores.plr_compute_score)
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
             level_solver=level_solver,
@@ -161,7 +162,8 @@ def run(
             # replay dynamics
             robust=plr_robust,
             prob_replay=plr_prob_replay,
-            # scoring
+            # scoring (the CLI's `regret_estimator` is the internal, more
+            # general `scoring_method` — see scores.plr_compute_score)
             scoring_method=plr_regret_estimator,
             discount_rate=ppo_gamma,
             level_solver=level_solver,
