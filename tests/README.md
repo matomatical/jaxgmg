@@ -21,13 +21,16 @@ a failure, which flags fixed bugs for follow-up.
 | File | Covers | Kind |
 |---|---|---|
 | `procgen/test_maze_solving.py` | Floyd–Warshall APSP (`maze_distances`), directional distances, optimal directions | golden, invariants (symmetry / triangle ineq. / walls=∞), BFS cross-check, **border-invariant guard** |
-| `procgen/test_combinatorix.py` | Dyck/Catalan + combination/permutation enumeration (keys oracle primitives) | counts vs closed forms, set-equality vs `itertools` brute force |
 | `baselines/test_experience.py` | GAE + `compute_average/maximum_return` | hand-computed golden, NumPy reference, λ=0 ⇒ TD error, `done` cuts bootstrap, multi-episode masking |
 | `environments/test_corner_oracle.py` | Cheese-in-the-Corner `LevelSolver` ↔ optimal rollout | end-to-end oracle cross-check, unreachable-cheese edge case |
 | `environments/test_keys_oracle.py` | Keys-and-Chests `FullLevelSolver` enumerate-and-argmax oracle | plan-set cardinality (incl. 21,600 for k=3,c=10), golden corridor levels ↔ `env.step` rollout |
 | `baselines/autocurricula/test_scores.py` | Regret-score primitives (`pvl`, `maxmc-*`, `oracle-actor`) + dispatcher wiring | hand-computed golden, critic-vs-balanced divergence, dispatcher smoke test |
 | `baselines/autocurricula/test_prioritisation.py` | `plr_replay_probs` rank + staleness mixture | golden distributions, sums-to-1, score/staleness/temperature monotonicity, tie-break characterization |
 | `baselines/autocurricula/test_plr_buffer.py` | PLR buffer update (`_new_update` tournament, `_replay_update` bookkeeping) | challenger displaces/rejected, eviction by potential-not-score, max-ever monotone, visit-time/clock |
+
+The Dyck/Catalan + combination/permutation enumeration primitives behind the
+keys oracle now live in the standalone `combinatorix` package (a sibling
+repo), which carries their tests.
 
 `conftest.py` holds shared fixtures: a fixed PRNG `key`, a `make_mazes` factory
 (generates border-respecting wall grids), and a `generator_name` parametrisation

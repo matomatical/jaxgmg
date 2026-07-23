@@ -29,6 +29,7 @@ dependencies = [
     "readchar",
     "typer",
     "tqdm",
+    "combinatorix",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +41,12 @@ jaxgmg = "jaxgmg.cli.app:app"
 [project.urls]
 Homepage = "https://github.com/matomatical/jaxgmg"
 Issues = "https://github.com/matomatical/jaxgmg/issues"
+
+[tool.uv.sources]
+# combinatorix was spun out of jaxgmg/procgen during the rewrite arc. It is
+# unpublished (the PyPI name is taken by an unrelated package); for now it
+# lives as a sibling repo in the private meta-repo wrapping this one.
+combinatorix = { path = "../combinatorix", editable = true }
 
 [build-system]
 requires = ["hatchling"]

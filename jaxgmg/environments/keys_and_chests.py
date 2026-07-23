@@ -31,9 +31,10 @@ import einops
 from flax import struct
 import chex
 from jaxtyping import PyTree
+import combinatorix
 
 from jaxgmg.procgen import maze_generation as mg
-from jaxgmg.procgen import maze_solving, combinatorix
+from jaxgmg.procgen import maze_solving
 from jaxgmg.environments import base
 
 

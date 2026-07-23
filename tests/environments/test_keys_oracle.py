@@ -2,10 +2,9 @@
 Oracle cross-check for Keys-and-Chests: does ``FullLevelSolver``'s
 enumerate-and-argmax oracle report the correct optimal discounted return?
 
-Test-strategy item #3 in ``notes/02-cleanup-plan.md``. The combinatorial
-*primitives* (permutations / associations) are covered in
-``procgen/test_combinatorix.py``; this file covers the **oracle that consumes
-them** to value a level.
+The combinatorial *primitives* (permutations / associations) are covered by
+the standalone ``combinatorix`` package's own test suite; this file covers
+the **oracle that consumes them** to value a level.
 
 Two independent angles:
 
@@ -18,12 +17,11 @@ Two independent angles:
    collected by stepping ``env.step`` with that hardcoded optimal action
    sequence (fully independent of the oracle's own simulation).
 
-As with the corner oracle, this surfaces the **BUG-1** discount off-by-one
-(``notes/03-bug-log.md``): the oracle discounts a chest's reward by
-``gamma ** (cumulative distance to that chest)``, but the realised return
-discounts by ``gamma ** (distance - 1)`` because the reward lands on the
-*arrival* step. So the keys oracle also over-discounts by one factor of gamma
-per chest. Pinned as ``xfail`` here too (``test_oracle_value_should_equal_..``).
+As with the corner oracle, this surfaced the **BUG-1** discount off-by-one
+(since fixed): the oracle discounted a chest's reward by
+``gamma ** (cumulative distance to that chest)`` where the realised return
+discounts by ``gamma ** (distance - 1)``, because the reward lands on the
+*arrival* step.
 """
 
 import math
@@ -33,9 +31,9 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import pytest
+import combinatorix
 
 from jaxgmg.environments import keys_and_chests as kc
-from jaxgmg.procgen import combinatorix
 from jaxgmg.baselines import experience
 
 
