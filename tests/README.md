@@ -1,6 +1,6 @@
 # jaxgmg tests
 
-Phase-0 correctness net for the cleanup (see `notes/02-cleanup-plan.md`). These
+Correctness net built during the 2026 cleanup. These
 are the **Tier-1** training-free correctness tests over the science core — they
 run on CPU in ~10s and need no training compute or checkpoints. They are the
 safety net that gates the later refactor phases.
@@ -33,11 +33,11 @@ a failure, which flags fixed bugs for follow-up.
 (generates border-respecting wall grids), and a `generator_name` parametrisation
 across the four border-respecting generators.
 
-## Known findings (pinned as xfail)
+## Known findings (found and fixed during the cleanup)
 
-Correctness bugs found during the cleanup are logged in `notes/03-bug-log.md`
-and pinned here as `xfail(strict)` so a fix flips them to xpass (our signal to
-drop the marker and check the bug off). Currently:
+Three correctness bugs were found during the cleanup, pinned here as
+`xfail(strict)`, then fixed (flipping them to xpass, at which point the
+markers were dropped — no xfails remain). Kept for the record:
 
 **BUG-1 — oracle discount off-by-one.** The `LevelSolver` oracles discount the
 terminal reward by one extra factor of γ: corner returns `γ^d` where the
@@ -46,8 +46,8 @@ keys-and-chests over-discounts each chest reward the same way. So an optimal
 agent shows slightly *negative* oracle-regret. Tiny at γ=0.999 but a real bias
 in the oracle-latest estimator. Pinned by
 `test_corner_oracle.py`, `test_keys_oracle.py`, and `test_scores.py`
-(`..._should_equal_realised_return` / `..._optimal_agent_has_zero_regret`). To
-be fixed (across all envs *and* the estimator) during the refactor.
+(`..._should_equal_realised_return` / `..._optimal_agent_has_zero_regret`).
+Fixed across all envs and the estimator.
 
 **BUG-2 — `LevelSolverFiltered` branch selection.** The keys `oracle-actor`
 solver picks its truncated-solve branch on `hidden_keys.sum()` (hidden count)
@@ -55,7 +55,7 @@ instead of the real-key count, so on the paper's training distribution it
 returns the wrong branch and undervalues the optimum. Confirmed to affect
 published keys oracle-latest results. Pinned by
 `test_keys_oracle.py::test_filtered_solver_matches_full_solver_on_train_format`.
-Fix: `(~level.hidden_keys).sum()`.
+Fixed: `(~level.hidden_keys).sum()`.
 
 **BUG-3 — staleness `+1` vs reference PLR.** `plr_replay_probs` uses
 `1 + current − last_visit`, but both PLR papers and both reference

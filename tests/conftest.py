@@ -1,9 +1,9 @@
 """
 Shared pytest fixtures and configuration for the jaxgmg test suite.
 
-The whole suite is designed to run on CPU with no training compute (see the
-"test tiers" discussion in ``notes/02-cleanup-plan.md``): these are the Tier-1
-correctness tests over the training-free science core.
+The whole suite is designed to run on CPU with no training compute: these are
+the Tier-1 correctness tests over the training-free science core (see
+``tests/README.md``).
 """
 
 import os

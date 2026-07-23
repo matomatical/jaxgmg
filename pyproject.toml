@@ -50,7 +50,7 @@ packages = ["jaxgmg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Tier-1 correctness tests run on CPU (see notes/02-cleanup-plan.md). The CPU
+# Tier-1 correctness tests run on CPU (see tests/README.md). The CPU
 # pin is also set in tests/conftest.py before JAX is imported.
 filterwarnings = [
     "ignore:jax.core.pytype_aval_mappings is deprecated:DeprecationWarning",
